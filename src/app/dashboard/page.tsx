@@ -31,6 +31,7 @@ export default function DashboardPage() {
         Track your <strong>multi-chain COOKIE score</strong>, bridges and mints
         across Monad, Base, Mantle, Linea and Mitosis. Complete daily & weekly
         quests to climb the ranks and become a <strong>Emerald Cookie</strong> 🍪✨
+        <strong>Data synchronizes every 10 minutes.</strong>
       </p>
 
       <DashboardClient />
