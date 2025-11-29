@@ -7,7 +7,7 @@ import type { Address } from 'viem';
 import { useAccount, useBalance, useConnect, useDisconnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { sdk } from '@farcaster/miniapp-sdk';
-import { monadTestnet } from '../../lib/chain';
+import { baseMainnet, monadTestnet } from '../../lib/chain';
 
 /* -------------------- layout: two stacked rows (no grid) -------------------- */
 const CONTAINER: React.CSSProperties = { width: '100%', marginBottom: 12 };
@@ -114,8 +114,9 @@ export default function MiniNav() {
   const tabs = useMemo(
     () => [
       { href: '/mini', label: 'Main' },
+      { href: '/mini/bridge', label: 'ZK Bridge' },      
       { href: '/mini/leaderboard', label: 'Leaderboard' },
-      { href: '/mini/smartaccount', label: 'Smart Account' },
+      { href: '/mini/dashboard', label: 'Dashboard' },      
     ],
     []
   );
@@ -202,7 +203,7 @@ export default function MiniNav() {
         : 'https://monad-fortune-cookies.vercel.app/mini';
 
     await sdk.actions.composeCast({
-      text: 'Mint a Monad Fortune 🍪 in the Mini!',
+      text: 'Mint a Fortune 🍪 in the Mini!',
       embeds: [url],
     });
   }, []);
@@ -220,10 +221,10 @@ export default function MiniNav() {
               : 'Sign in with Farcaster'}
           </button>
 
-          {/* MON balance pill (only when signed) */}
+          {/* ETH balance pill (only when signed) */}
           {addr ? (
             <span style={PILL} title="Wallet balance">
-              {bal?.formatted ? `${Number(bal.formatted).toFixed(4)} ${bal.symbol || 'MON'}` : '— MON'}
+              {bal?.formatted ? `${Number(bal.formatted).toFixed(4)} ${bal.symbol || 'ETH'}` : '— ETH'}
             </span>
           ) : null}
         </div>

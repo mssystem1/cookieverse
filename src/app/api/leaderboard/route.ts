@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createPublicClient, http, parseAbi } from "viem";
 import { monadTestnet } from "../../../lib/chain";
 
+//import type { Abi } from 'viem';
+import { getPublicClientByKey, type ChainKey } from '../../../lib/aa/clients';
+import FortuneABI from '../../../abi/FortuneCookiesAI.json';
+
 /**
  * Leaderboard strategy:
  * 1) Base Top-20 = BlockVision collection holders snapshot (stable).
@@ -10,23 +14,28 @@ import { monadTestnet } from "../../../lib/chain";
  * 3) Short server caches + real bypass on fresh=1.
  */
 
+let SELECTED_KEY: ChainKey = "monad"; // default
+
+function cookieAddressForKey(key: ChainKey): `0x${string}` {
+  if (key === 'base')    return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_BASE as `0x${string}`;
+  if (key === 'mantle')  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE as `0x${string}`;
+  if (key === 'linea')  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_LINEA as `0x${string}`;
+  if (key === 'mitosis') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
+  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`; // monad (default)
+}
+
+function keyFromChainId(id?: number): ChainKey {
+  if (id === 8453) return 'base';
+  if (id === 5000) return 'mantle';
+  if (id === 59144) return 'linea';
+  const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777);
+  if (id === mitosisId) return 'mitosis';
+  return 'monad';
+}
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const ABI = parseAbi([
-  "function getTextMinters() view returns (address[])",
-  "function getImageMinters() view returns (address[])",
-]);
-
-// Shared viem public client (do NOT create another elsewhere)
-const pc = createPublicClient({
-  chain: monadTestnet,
-  transport: http(
-    process.env.NEXT_PUBLIC_RPC_HTTP ||
-      process.env.NEXT_PUBLIC_MONAD_RPC_URL ||
-      "https://testnet-rpc.monad.xyz"
-  ),
-});
 
 // Count repeated addresses (case-insensitive)
 const tallyLower = (arr?: readonly (string | `0x${string}`)[]) => {
@@ -39,9 +48,6 @@ const tallyLower = (arr?: readonly (string | `0x${string}`)[]) => {
   return m;
 };
 
-// ---- BlockVision endpoints ----
-const BV_HOLDERS  = "https://api.blockvision.org/v2/monad/collection/holders";
-const BV_HOLDINGS = "https://api.blockvision.org/v2/monad/account/nft/holdings";
 
 // ---- Types (loose) ----
 type Holder = { ownerAddress?: string; amount?: string };
@@ -76,9 +82,61 @@ function normTokenId(id?: string): string {
 }
 
 /** Fetch collection holders (stable base). */
+// Fetch per-wallet mint counts for a single chain using getAllMints()
+// Return type is Map<walletLowercase, count>
+/*
 async function fetchHolders(
   contract: string,
   apiKey: string,
+  forceFresh = false
+): Promise<Row[]> {
+const now = Date.now();
+  if (!forceFresh && holdersCacheRows && now - holdersCachedAt < HOLDERS_TTL_MS) {
+    return holdersCacheRows;
+  }
+  if (!forceFresh && holdersInflight) return holdersInflight;
+
+  holdersInflight = (async () => {
+    // use shared client + selected chain’s cookie address
+    const client  = getPublicClientByKey(SELECTED_KEY);
+    const COOKIE  = cookieAddressForKey(SELECTED_KEY);
+
+    // read all mints once
+    const all = await client.readContract({
+      address: COOKIE,
+      abi: FortuneABI,
+      functionName: "getAllMints",
+      // some viem setups require this; harmless if ignored at runtime
+      authorizationList: undefined as any,
+    }) as Array<{ id: bigint; wallet: `0x${string}`; isImage: boolean }>;
+
+    // count mints per wallet (ERC721 → 1 per token)
+    const byAddr: Record<string, number> = {};
+    for (const r of all) {
+      const k = (r.wallet || "0x").toLowerCase();
+      byAddr[k] = (byAddr[k] ?? 0) + 1;
+    }
+
+    const rows = Object.entries(byAddr)
+      .map(([address, mints]) => ({ address, mints }))
+      .filter((r) => r.mints > 0)
+      .sort((a, b) => b.mints - a.mints);
+
+    holdersCacheRows = rows;
+    holdersCachedAt = Date.now();
+    return rows;
+  })();
+
+  try {
+    return await holdersInflight;
+  } finally {
+    holdersInflight = null;
+  }
+}
+*/
+async function fetchHolders(
+  _contract: string,
+  _apiKey: string,
   forceFresh = false
 ): Promise<Row[]> {
   const now = Date.now();
@@ -88,49 +146,29 @@ async function fetchHolders(
   if (!forceFresh && holdersInflight) return holdersInflight;
 
   holdersInflight = (async () => {
+    const KEYS: ChainKey[] = ["monad", "base", "mantle", "linea", "mitosis"];
     const byAddr: Record<string, number> = {};
-    let cursor = "";
-    let pages = 0;
-    const MAX_PAGES = 6;
-    const LIMIT = "100";
 
-    while (pages < MAX_PAGES) {
-      const qs = new URLSearchParams({ contractAddress: contract, limit: LIMIT });
-      if (cursor) qs.set("cursor", cursor);
+    for (const key of KEYS) {
+      try {
+        const client = getPublicClientByKey(key);
+        const COOKIE = cookieAddressForKey(key);
 
-      // retry/backoff for 429
-      let attempt = 0;
-      let res: Response | null = null;
-      while (attempt <= 3) {
-        res = await fetch(`${BV_HOLDERS}?${qs.toString()}`, {
-          headers: { Accept: "application/json", "x-api-key": apiKey },
-          cache: "no-store",
-        });
-        if (res.status !== 429) break;
-        await sleep(300 + attempt * 300 + Math.floor(Math.random() * 200));
-        attempt++;
+        const all = await client.readContract({
+          address: COOKIE,
+          abi: FortuneABI,
+          functionName: "getAllMints",
+          authorizationList: undefined as any,
+        }) as Array<{ id: bigint; wallet: `0x${string}`; isImage: boolean }>;
+
+        for (const r of all) {
+          const k = (r.wallet || "0x").toLowerCase();
+          byAddr[k] = (byAddr[k] ?? 0) + 1;
+        }
+      } catch {
+        // ignore chains that are not configured / not reachable
+        continue;
       }
-      if (!res || !res.ok) {
-        const text = await (res ? res.text() : Promise.resolve("no response"));
-        throw new Error(`BlockVision error: ${res ? res.status : "?"} ${text}`);
-      }
-
-      const json = await res.json();
-      const data: Holder[] = json?.result?.data ?? [];
-      for (const h of data) {
-        const addr = (h.ownerAddress || "").toLowerCase();
-        if (!addr) continue;
-        const amt = Number(h.amount || "0");
-        if (!Number.isFinite(amt)) continue;
-        // pages can repeat; take max to avoid double counting
-        byAddr[addr] = Math.max(byAddr[addr] ?? 0, amt);
-      }
-
-      cursor = json?.result?.nextPageCursor || "";
-      pages++;
-      if (!cursor) break;
-      // heuristic: once many uniques seen, Top-20 is stable enough
-      if (Object.keys(byAddr).length >= 200) break;
     }
 
     const rows = Object.entries(byAddr)
@@ -150,6 +188,7 @@ async function fetchHolders(
   }
 }
 
+
 /** Authoritative per-wallet count for THIS collection (same idea as holdings/route.ts). */
 async function fetchYouHoldingsCount(
   you: string,
@@ -160,62 +199,24 @@ async function fetchYouHoldingsCount(
   const now = Date.now();
   const ck = you.toLowerCase();
 
-  // tiny cache (skip when forceFresh)
   if (!forceFresh) {
     const cached = youCache.get(ck);
     if (cached && now - cached.at < YOU_TTL_MS) return cached.count;
   }
 
-  let cursor = "";
-  let pages = 0;
-  const LIMIT = "100";
-  const MAX_PAGES = 100; // generous; we stop when no cursor
-  const target = contract.toLowerCase();
+  const client  = getPublicClientByKey(SELECTED_KEY);
+  const COOKIE  = cookieAddressForKey(SELECTED_KEY);
 
-  // per-token map: take MAX amount we see for each tokenId (prevents undercount w/ dup rows)
-  const perToken = new Map<string, number>();
+  const all = await client.readContract({
+    address: COOKIE,
+    abi: FortuneABI,
+    functionName: "getAllMints",
+    authorizationList: undefined as any,
+  }) as Array<{ id: bigint; wallet: `0x${string}`; isImage: boolean }>;
 
-  while (pages < MAX_PAGES) {
-    const qs = new URLSearchParams({ address: ck, limit: LIMIT });
-    if (cursor) qs.set("cursor", cursor);
+  // count only this wallet’s mints
+  const total = all.reduce((acc, r) => acc + (r.wallet?.toLowerCase() === ck ? 1 : 0), 0);
 
-    // retry/backoff
-    let attempt = 0;
-    let res: Response | null = null;
-    while (attempt <= 3) {
-      res = await fetch(`${BV_HOLDINGS}?${qs.toString()}`, {
-        headers: { Accept: "application/json", "x-api-key": apiKey },
-        cache: "no-store",
-      });
-      if (res.status !== 429) break;
-      await sleep(300 + attempt * 300 + Math.floor(Math.random() * 200));
-      attempt++;
-    }
-    if (!res || !res.ok) {
-      // don’t break leaderboard if holdings fails; just skip patching
-      return null;
-    }
-
-    const json = await res.json();
-    const data: Holding[] = json?.result?.data ?? [];
-
-    for (const h of data) {
-      const ca = (h.nft?.contractAddress || "").toLowerCase();
-      if (ca !== target) continue;
-
-      const key = normTokenId(h.nft?.tokenId);
-      const qty = Number(h.amount ?? 1) || 1; // ERC721=1, ERC1155 uses amount
-
-      const prev = perToken.get(key) ?? 0;
-      if (qty > prev) perToken.set(key, qty);
-    }
-
-    cursor = json?.result?.nextPageCursor || "";
-    pages++;
-    if (!cursor) break;
-  }
-
-  const total = Array.from(perToken.values()).reduce((a, b) => a + b, 0);
   youCache.set(ck, { at: Date.now(), count: total });
   return total;
 }
@@ -223,6 +224,19 @@ async function fetchYouHoldingsCount(
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { searchParams } = new URL(req.url);
+
+    // resolve selected chain (header > query > default)
+    const chainIdHdr = req.headers.get("x-chain-id");
+    const chainIdQ   = url.searchParams.get("chainId");
+    const chainQ     = url.searchParams.get("chain"); // 'monad'|'base'|'mantle'|'mitosis'
+    SELECTED_KEY = chainQ
+      ? (["monad","base","mantle","linea","mitosis"].includes(chainQ) ? (chainQ as ChainKey) : "monad")
+      : keyFromChainId(chainIdHdr ? Number(chainIdHdr) : chainIdQ ? Number(chainIdQ) : undefined);
+
+    // optional: "you" can be "0xEOA,0xSA"
+    const youCsv = searchParams.get('you');
+
     //const YOU = (url.searchParams.get("you") || "").toLowerCase();
     const forceFresh = url.searchParams.get("fresh") === "1";
 
@@ -230,18 +244,10 @@ export async function GET(req: Request) {
     const YOU_LIST = YOU_RAW ? YOU_RAW.split(',').map(s => s.trim()).filter(Boolean) : [];
     const YOU = YOU_LIST[0] || ''; // keep the first for backward-compatibility
 
-    const contract = (process.env.NEXT_PUBLIC_COOKIE_ADDRESS || "").toLowerCase();
-    const apiKey = process.env.BLOCKVISION_API_KEY;
-
+    const contract = cookieAddressForKey(SELECTED_KEY).toLowerCase();
     if (!contract) {
       return NextResponse.json(
-        { error: "NEXT_PUBLIC_COOKIE_ADDRESS is not set" },
-        { status: 500, headers: { "Cache-Control": "no-store" } }
-      );
-    }
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "BLOCKVISION_API_KEY is not set (server-side)" },
+        { error: `Missing COOKIE address for ${SELECTED_KEY}` },
         { status: 500, headers: { "Cache-Control": "no-store" } }
       );
     }
@@ -255,59 +261,93 @@ export async function GET(req: Request) {
     }
 
     // 1) Base snapshot
-    const baseRows = await fetchHolders(contract, apiKey, /*forceFresh*/ forceFresh);
+    const baseRows = await fetchHolders(contract, "" /*unused now*/, /*forceFresh*/ forceFresh);
     const byAddr = new Map<string, number>(baseRows.map((r) => [r.address, r.mints]));
 
     // 2) ALWAYS patch the connected wallet from holdings (authoritative)
     if (YOU) {
-      const youCount = await fetchYouHoldingsCount(YOU, contract, apiKey, /*forceFresh*/ forceFresh);
+      const youCount = await fetchYouHoldingsCount(YOU, contract, "" /*unused*/, /*forceFresh*/ forceFresh);
       if (youCount != null) {
         const current = byAddr.get(YOU) ?? 0;
         if (youCount !== current) byAddr.set(YOU, youCount);
       }
     }
 
-    // 2.5) Read contract minters for the two leaderboard columns
-let textCounts  = new Map<string, number>();
-let imageCounts = new Map<string, number>();
-try {
-  const [textMintersArr, imageMintersArr] = await Promise.all([
-    (pc as any).readContract({
-      address: contract as `0x${string}`,
-      abi: ABI,
-      functionName: "getTextMinters",
-    } as any) as Promise<`0x${string}`[]>,
-    (pc as any).readContract({
-      address: contract as `0x${string}`,
-      abi: ABI,
-      functionName: "getImageMinters",
-    } as any) as Promise<`0x${string}`[]>,
-  ]);
-  textCounts  = tallyLower(textMintersArr);
-  imageCounts = tallyLower(imageMintersArr);
-} catch {
-  // Keep sets empty if reads fail → columns default to 0
-}
+    // 2.5) Use getAllMints once to build both columns
+    let textCounts  = new Map<string, number>();   // cookies
+    let imageCounts = new Map<string, number>();   // images
+    try {
+      const client = getPublicClientByKey(SELECTED_KEY);
+      const all = await client.readContract({
+        address: contract as `0x${string}`,
+        abi: FortuneABI,
+        functionName: "getAllMints",
+        authorizationList: undefined as any,
+      }) as Array<{ id: bigint; wallet: `0x${string}`; isImage: boolean }>;
 
-    // 3) Build rows + Top-20
+      for (const r of all) {
+        const k = (r.wallet || "0x").toLowerCase();
+        if (r.isImage) {
+          imageCounts.set(k, (imageCounts.get(k) ?? 0) + 1);
+        } else {
+          textCounts.set(k, (textCounts.get(k) ?? 0) + 1);
+        }
+      }
+    } catch {
+      // keep empty → columns default to 0
+    }
+
+  // --- BEGIN: compute your total mints across all chains ---
+  let youMintsAllChains = 0;
+  if (YOU_LIST.length) {
+    const KEYS = ['monad','base','mantle','linea','mitosis'] as ChainKey[];
+    for (const key of KEYS) {
+      try {
+        const client = getPublicClientByKey(key);
+        const cookie = cookieAddressForKey(key);
+        const all = await client.readContract({
+          address: cookie as `0x${string}`,
+          abi: FortuneABI,
+          functionName: 'getAllMints',
+          authorizationList: undefined as any, // harmless in some viem configs
+        }) as Array<{ id: bigint; wallet: `0x${string}`; isImage: boolean }>;
+
+        // count per-wallet for this chain
+        const per = new Map<string, number>();
+        for (const r of all) {
+          const w = (r.wallet || '0x').toLowerCase();
+          per.set(w, (per.get(w) ?? 0) + 1);
+        }
+        // add this chain’s counts for all YOU_LIST addresses
+        for (const a of YOU_LIST) youMintsAllChains += per.get(a) ?? 0;
+      } catch {
+        // ignore chain errors; keep accumulating others
+      }
+    }
+  }
+  // --- END: compute your total mints across all chains --
+
+
+    // 3) Build rows + Top-50
     const rows = Array.from(byAddr.entries())
       .map(([address, mints]) => ({ address, mints }))
       .filter((r) => r.mints > 0)
       .sort((a, b) => b.mints - a.mints);
 
-const actual = rows.slice(0, 20).map((r, i) => {
-  const a = (r.address || "").toLowerCase();
-  return {
-    rank: i + 1,
-    address: r.address,
-    mints: r.mints,
-    // ↓ counts, not booleans
-    mintedCookies: textCounts.get(a)  ?? 0,
-    mintedImages:  imageCounts.get(a) ?? 0,
-  };
-});
-    const need = Math.max(0, 20 - actual.length);
-    const top20 = [
+    const actual = rows.slice(0, 50).map((r, i) => {
+      const a = (r.address || "").toLowerCase();
+      return {
+        rank: i + 1,
+        address: r.address,
+        mints: r.mints,
+        // ↓ counts, not booleans
+        mintedCookies: textCounts.get(a)  ?? 0,
+        mintedImages:  imageCounts.get(a) ?? 0,
+        youMintsAllChains,
+      };
+    });
+    const need = Math.max(0, 50 - actual.length);
+    const top50 = [
       ...actual,
       ...Array.from({ length: need }, (_, i) => ({
         rank: actual.length + i + 1,
@@ -315,6 +355,7 @@ const actual = rows.slice(0, 20).map((r, i) => {
         mints: 0,
         mintedCookies: 0,
         mintedImages: 0,
+        youMintsAllChains: 0,
       })),
     ];
 
@@ -326,7 +367,7 @@ const actual = rows.slice(0, 20).map((r, i) => {
       if (idx >= 0) you = { rank: idx + 1, address: YOU, mints: rows[idx].mints };
     }
     */
-    let you: { rank: number; address: string | string[]; mints: number; mintedCookies: number; mintedImages: number } | null = null;
+    let you: { rank: number; address: string | string[]; mints: number; mintedCookies: number; mintedImages: number, youMintsAllChains } | null = null;
 
     if (YOU_LIST.length) {
       // mints: sum across rows (case-insensitive)
@@ -338,7 +379,7 @@ const actual = rows.slice(0, 20).map((r, i) => {
       const mints         = YOU_LIST.reduce((acc, a) => acc + (rowMap.get(a) ?? 0), 0);
 
       // rank is ambiguous for multi; set to NaN or min rank if you prefer
-      you = { rank: Number.NaN, address: YOU_LIST, mints, mintedCookies, mintedImages };
+      you = { rank: Number.NaN, address: YOU_LIST, mints, mintedCookies, mintedImages,   youMintsAllChains };
     } else if (YOU) {
       const idx = rows.findIndex(r => r.address.toLowerCase() === YOU);
       you = {
@@ -347,26 +388,28 @@ const actual = rows.slice(0, 20).map((r, i) => {
         mints: rows[idx]?.mints ?? 0,
         mintedCookies: textCounts.get(YOU) ?? 0,
         mintedImages: imageCounts.get(YOU) ?? 0,
+        youMintsAllChains,
       };
     }
 
     return NextResponse.json(
-      { updatedAt: new Date().toISOString(), totalMinters: rows.length, top20, you },
+      { updatedAt: new Date().toISOString(), totalMinters: rows.length, top50, you },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (err: any) {
     // If we have a holders cache, serve it as a fallback
     if (holdersCacheRows) {
       const rows = holdersCacheRows;
-      const actual = rows.slice(0, 20).map((r, i) => ({
+      const actual = rows.slice(0, 50).map((r, i) => ({
         rank: i + 1,
         address: r.address,
         mints: r.mints,
         mintedCookies: 0,
         mintedImages: 0,
+        youMintsAllChains: 0,
       }));
-      const need = Math.max(0, 20 - actual.length);
-      const top20 = [
+      const need = Math.max(0, 50 - actual.length);
+      const top50 = [
         ...actual,
         ...Array.from({ length: need }, (_, i) => ({
           rank: actual.length + i + 1,
@@ -374,13 +417,14 @@ const actual = rows.slice(0, 20).map((r, i) => {
           mints: 0,
           mintedCookies: 0,
           mintedImages: 0,
+          youMintsAllChains: 0,
         })),
       ];
       return NextResponse.json(
         {
           updatedAt: new Date().toISOString(),
           totalMinters: rows.length,
-          top20,
+          top50,
           you: null,
           stale: true,
           error: String(err?.message || err),

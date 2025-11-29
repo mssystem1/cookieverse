@@ -1,37 +1,6 @@
 {
-  "0x5c8d187534ba0d6869ab2db368cb8d331b3031e9": {
-    "username": "maksim",
-    "embeddedWallet": "0x5c8d187534BA0d6869aB2DB368cB8D331b3031e9",
-    "totalScore": 397,
-    "totalTransactions": 327,
-    "updatedAt": 1756470716321
-  },
-  "0x4d0fe556393967edfb0b6f76c7faf2a44b065d03": {
-    "username": "monad",
-    "embeddedWallet": "0x4D0Fe556393967eDfB0B6f76c7faf2a44b065d03",
-    "totalScore": 7,
-    "totalTransactions": 4,
-    "updatedAt": 1756476845828
-  },
-  "0x0621b5bca00d0f3e3f7adae45a9994ad4d495d55": {
-    "username": "gmonad",
-    "embeddedWallet": "0x0621b5BCA00D0F3E3F7ADAE45A9994aD4d495D55",
-    "totalScore": 2,
-    "totalTransactions": 2,
-    "updatedAt": 1756479740590
-  },
-  "0x4a1f0710ccc4cfac2d7a046a2b9c8e96db725a54": {
-    "username": "brian",
-    "embeddedWallet": "0x4a1f0710CCc4cFac2D7A046a2B9C8e96db725a54",
-    "totalScore": 3,
-    "totalTransactions": 1,
-    "updatedAt": 1756480129721
-  },
-  "0xb89ea6bfe7d74b55ef78c57f4b257502df30b72a": {
-    "username": "meee",
-    "embeddedWallet": "0xb89ea6BfE7D74b55Ef78C57f4B257502Df30B72A",
-    "totalScore": 3,
-    "totalTransactions": 2,
-    "updatedAt": 1756482039554
-  }
+  "version": 1,
+  "iv": "YTZvGClz6bD9El3f",
+  "tag": "IsPGqfo865Mfn4dR/SXNbw==",
+  "ciphertext": "SjnNthz/VF+iebmIKLq4LaYsw61tJ9P+W/1xdZOtEeuDB0WgUjqJUmN3mOFA0G996buPTsBGWrzKltzmb2uRwBHWzIY/RNtnlO2sE0U0E+tt3UY5dt/hoLx4Kp9I329JUS/pobaSKU0RJNMzOsPAuoJmoXK8Cxo+SQN8k2VSXMhHjiLmjhvJnwWb2KwdGVbR9GOg/zf7GvIrwnVi7L3jQqqaQ+Lw1CP/+I1Zn74krUbaT+vqgfyGEGpB3jhLXqGiGvU8EIRnX6dGu0drl4T4PcYIXeovFzHaPFg0B3XMGE6HqRdQcynel/nygzEvhghIBXeZV/v5dKkwYvX93Z0C5xyWxviwZPmA/9U7RDkt0uHz+DFvGPmlJbgZYsMaCkoGbgbzxjj+Lxug+Nhxm+JTlYJcpQTz+XGYX0d5pL5RxCxPd4R/aZjCv799gRv0udLXvzNe6KpfOsg6zyPo0ahbYv7ezLDk307KC3Ir5LBu1w7nnkHCJCP21L267PBc3fpV9Iq/QGc8ojFG3oATQk+jzaKMTAyanMMvzVb9uR+zXYd0HR8xtrYekV1qI+OmCx8PTk49Jpu/Dcr7gT24ArUBL/bi1aqi3webt/CKoBowRrEty9oITfSdRiPaGUmVKG0NWWnID4ndS/G7cezGCqetvp7za/uAAGnXAzD717jcwe/D8jvtpIeCh6LoBjQs/DkggnxqBWL3OHecfGj12a2mHi6NIS6QA7d4VHLA0DZ6TYHW0ru+0jJrApd/bDOr7s4VlVJu19K37MrNJERALzvLus4s7SKejNVDVyW1B2JFlGfNxYBcIIdOWLZdJ5AJvtE9pIvSOocO1nTB2G36EsjVOFRKMqFNiFcJFAm/MxBYRa+6fW2fy3exE1V0wm08hLcu8lELClaQUJkFLgGp38mNEy0K/z76kKYR8Hfnfl8="
 }

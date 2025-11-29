@@ -1,20 +1,22 @@
 'use client';
+/*
 import { useSmartAccount } from '../app/SmartAccountProvider';
 
 import * as React from 'react'; // if not already present
-import { useWalletClient } from 'wagmi';
+import { useWalletClient, useChainId } from 'wagmi';
 import { encodeFunctionData, parseEther, type Address, createWalletClient, custom} from 'viem';
 import FortuneABI from '../abi/FortuneCookiesAI.json';
 import { buildSmartAccount } from '../lib/aa/smartAccount';
 import { bundlerClient, publicClient } from '../lib/aa/clients';
 
 import { usePathname } from 'next/navigation'; // NEW
-
-import { monadTestnet } from '../../src/lib/chain';
+import { defaultChain } from '../lib/aa/clients';
+//import { monadTestnet } from '../../src/lib/chain';
+import { CHAINS } from '../lib/chain';
 
 //import { sendAndWaitUserOperation } from "../lib/aa/userOp";
 
-const COOKIE_ADDRESS = process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
+//const COOKIE_ADDRESS = process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
 
 const getMiniSdk = async () => (await import('@farcaster/miniapp-sdk')).sdk;
 
@@ -22,8 +24,15 @@ export function SaStatusCard() {
   const {
     mode, setMode,
     eoaAddress, eoaBalance,
-    saAddress, saBalance, saReady
+    saAddress, saBalance, saReady,
+    chainId,
+    tokenSymbol,   
   } = useSmartAccount();
+
+ const wagmiChainId = useChainId();
+ const activeChainId = wagmiChainId || defaultChain.id;
+ const activeChain =
+      CHAINS.find((c) => c.id === activeChainId) ?? defaultChain;
 
 const pathname = usePathname();
 const isMini = !!pathname && pathname.startsWith('/mini');
@@ -86,7 +95,7 @@ async function onCreateSa() {
         wc = createWalletClient({
           // IMPORTANT: keep chain consistent with your AA infra (monadTestnet).
           // If your Mini wallet runs on Base (or another chain), switch this.
-           chain: monadTestnet,
+           chain: activeChain,
           transport: custom(ethProvider),
         });
       }
@@ -191,7 +200,7 @@ function short(addr?: string, head: number = 6, tail: number = 4) {
             Use Smart Account
           </button>
 
-*/
+
 
 React.useEffect(() => {
   if (mode !== 'sa') {
@@ -208,7 +217,7 @@ React.useEffect(() => {
 
 
         <div className="status__row">
-           {/* Use exactly your existing button styles */}
+           {/* Use exactly your existing button styles }
 
         </div>
 
@@ -226,7 +235,7 @@ React.useEffect(() => {
           <div className="status__row" style={{ marginTop: 8 }}>
             {lowCreateBalance && (
               <div className="note" style={{ marginRight: 12 }}>
-                need to top up Smart account &gt; 0.2 MON
+                need to top up Smart account &gt; 0.2 {tokenSymbol}
               </div>
             )}
             <button
@@ -259,7 +268,7 @@ React.useEffect(() => {
         <div className="status__row">
           <span className="muted">SA balance:</span>
           <span title={saBalance ?? ''} suppressHydrationWarning> 
-            {saReady ? (saBalance ?? '—') : '—'} MON
+            {saReady ? (saBalance ?? '—') : '—'} {tokenSymbol}
           </span>
         </div>
 
@@ -457,3 +466,4 @@ React.useEffect(() => {
     </div>
   );
 }
+*/

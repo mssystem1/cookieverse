@@ -1,42 +1,49 @@
-// src/app/mini/page.tsx
 'use client';
 
 import * as React from 'react';
-// lazy import the SDK so /mini can render even outside Warpcast
+
+// lazy import the SDK so /mini-bridge can render even outside Warpcast
 const getSdk = async () => (await import('@farcaster/miniapp-sdk')).sdk;
 
-// reuse your main page 1:1 (all logic/cards/queries)
-import MainPage from '../page';
+// reuse your bridge page 1:1 (all logic/cards/queries)
+import BridgePage from '../../bridge/page';
 
-export default function MiniMirrorPage() {
+export default function MiniBridgePage() {
   /*
   React.useEffect(() => {
     (async () => {
       try {
         const sdk = await getSdk();
+
         // Hide the splash **after** your UI is ready
         sdk.actions.ready().catch(() => {});
+
         // Expose Farcaster EIP-1193 so wagmi injected() picks it up
-        const provider: any = await sdk.wallet.getEthereumProvider().catch(() => null);
+        const provider: any = await sdk.wallet
+          .getEthereumProvider()
+          .catch(() => null);
+
         if (provider) {
           (window as any).ethereum = provider;
+
+          // Optional: attach listeners so host doesn’t complain
           provider?.on?.('accountsChanged', () => {});
           provider?.on?.('disconnect', () => {});
         }
       } catch {
-        // Not inside Farcaster host — safe no-op so /mini still renders
+        // Not inside Farcaster host — safe no-op so /mini-bridge still renders in browser
       }
     })();
   }, []);
 */
   return (
     <div className="mini-root">
-      {/* exact same content as app/page.tsx */}
-      <MainPage />
+      {/* exact same content as app/bridge/page.tsx */}
+      <BridgePage />
 
       {/* --- MINI OVERRIDES (scoped) --- */}
       <style jsx global>{`
-        /* Outer modal size per docs (web mini): 424 x 695 */
+        /* Outer modal size per Farcaster Mini docs (web surface): 424 x 695 */
         .mini-root {
           box-sizing: border-box;
           width: 424px;
@@ -44,31 +51,33 @@ export default function MiniMirrorPage() {
           height: 695px;
           margin: 0 auto;
           padding: 8px 0 12px;
-          overflow: hidden;           /* contain the app UI to modal bounds */
+          overflow: hidden; /* contain the app UI to modal bounds */
           display: flex;
           flex-direction: column;
           background: #0b0b10;
         }
 
-        /* Make the scroll area only the main content, not the header */
+        /* If you use a header on bridge page, you can give it .mini-header to freeze it */
         .mini-header {
           flex: 0 0 auto;
           padding: 0 12px;
         }
+
+        /* Reuse your .page class from bridge; make only main content scrollable */
         .mini-root .page {
           flex: 1 1 auto;
-          overflow: auto;             /* vertical scroll in the content only */
+          overflow: auto;
           max-width: 100%;
-          padding: 12px;              /* tighter padding for mini */
+          padding: 12px; /* tighter padding for mini */
         }
 
-        /* Layout: stack cards in one column; keep small gaps */
+        /* Layout: single column cards for 424px viewport */
         .mini-root .grid {
           grid-template-columns: 1fr !important;
           gap: 10px !important;
         }
 
-        /* Tighter components for mini surface */
+        /* Tighter card styling for mini surface */
         .mini-root .card {
           padding: 14px !important;
           border-radius: 14px !important;
@@ -79,10 +88,12 @@ export default function MiniMirrorPage() {
           letter-spacing: 0.08em;
         }
 
-        /* Form controls trimmed to fit 424 width comfortably */
+        /* Form controls trimmed to fit inside 424px comfortably */
         .mini-root .input,
-        .mini-root .textarea {
+        .mini-root .textarea,
+        .mini-root select {
           width: 90% !important;
+          max-width: 100%;
           padding: 8px 10px !important;
           font-size: 14px !important;
         }
@@ -97,19 +108,21 @@ export default function MiniMirrorPage() {
           border-radius: 10px !important;
         }
 
-        /* 2-col groups collapse nicely inside the 424px surface */
+        /* Any 2-col sections on bridge page collapse nicely on mini */
         .mini-root .two-col {
           grid-template-columns: 1fr !important;
           gap: 10px !important;
         }
 
-        /* Status list spacing tweaks */
+        /* Status list spacing tweaks for mini */
         .mini-root .list {
           gap: 4px !important;
         }
 
-        /* Ensure the body background stays consistent when embedded */
-        :root, :global(html), :global(body) {
+        /* Ensure body background stays consistent when embedded */
+        :root,
+        :global(html),
+        :global(body) {
           background: #0b0b10;
         }
       `}</style>

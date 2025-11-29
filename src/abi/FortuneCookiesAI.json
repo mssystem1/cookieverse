@@ -55,5 +55,21 @@
   { "type": "function", "name": "getImageMinters", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "address[]" }] },
   { "type": "function", "name": "mintWithFortune", "stateMutability": "payable", "inputs": [{ "name": "fortune", "type": "string" }], "outputs": [{ "type": "uint256" }] },
   { "type": "function", "name": "mintWithImage", "stateMutability": "payable", "inputs": [{ "name": "fortune", "type": "string" }, { "name": "imageURI", "type": "string" }], "outputs": [{ "type": "uint256" }] },
-  { "type": "function", "name": "tokenURI", "stateMutability": "view", "inputs": [{ "name": "tokenId", "type": "uint256" }], "outputs": [{ "type": "string" }] }
+  { "type": "function", "name": "tokenURI", "stateMutability": "view", "inputs": [{ "name": "tokenId", "type": "uint256" }], "outputs": [{ "type": "string" }] },
+{
+  "type": "function",
+  "name": "getAllMints",
+  "stateMutability": "view",
+  "inputs": [],
+  "outputs": [
+    {
+      "type": "tuple[]",
+      "components": [
+        { "name": "id",     "type": "uint256" },
+        { "name": "wallet", "type": "address" },
+        { "name": "isImage","type": "bool" }
+      ]
+    }
+  ]
+}
 ]

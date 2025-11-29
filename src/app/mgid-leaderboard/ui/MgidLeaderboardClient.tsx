@@ -133,7 +133,7 @@ export default function MgidLeaderboardClient() {
                 {/* embedded wallet (short) with explorer link */}
                 <Td style={{ textAlign: 'left', paddingLeft: 28 }}>
                   <a
-                    href={`https://testnet.monadexplorer.com/address/${r.embeddedWallet}`}
+                    href={`https://monadvision.com/address/${r.embeddedWallet}`}
                     target="_blank"
                     rel="noreferrer"
                     style={{ color: '#cbd5e1', textDecoration: 'none', fontFamily: 'ui-monospace, Menlo, monospace' }}

@@ -30,7 +30,8 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx",
-    "src/types/ox-shim.d.ts"
+    "src/types/ox-shim.d.ts",
+    "src"
   ],
   "exclude": ["node_modules"]
 }

@@ -1,13 +1,21 @@
 // src/providers/SmartAccountProvider.tsx
+/*
 'use client';
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { useWalletClient, useAccount, useBalance } from 'wagmi';
+import { useWalletClient, useAccount, useBalance, useChainId } from 'wagmi';
 import { formatEther, createWalletClient, custom } from 'viem';
 import { buildSmartAccount } from '../../src/lib/aa/smartAccount';
-import { bundlerClient, publicClient } from '../../src/lib/aa/clients';
-import { monadTestnet } from '../../src/lib/chain';
+import {
+  bundlerClient,
+  publicClient,
+  defaultChain,
+  defaultChainKey,
+  type ChainKey,
+} from '../../src/lib/aa/clients';
+//import { monadTestnet } from '../../src/lib/chain';
+import { CHAINS } from '../lib/chain';
 
 // Lazy-load Farcaster Mini SDK only on /mini to keep main bundle clean
 const getMiniSdk = async () => (await import('@farcaster/miniapp-sdk')).sdk;
@@ -24,16 +32,50 @@ type Ctx = {
   saAddress?: `0x${string}`;
   saBalance?: string;
   saReady: boolean; // bundler available
+  chainId: number;
+  tokenSymbol: string;
 };
 
 const SmartAccountCtx = createContext<Ctx | null>(null);
 
-/* ------------------------------------------------------------------
- * Main provider (Chrome / Monad testnet) — logic preserved as-is
- * ------------------------------------------------------------------ */
+const CHAIN_SYMBOLS_BY_ID: Record<number, string> = {
+  10143: 'MON', // monadTestnet.id
+  8453: 'ETH',  // baseMainnet.id
+  5000: 'MNT',  // mantleMainnet.id
+  59144: 'ETH', // lineaMainnet.id
+  // keep mitosis dynamic to match your env chain id:
+  [Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777_777)]: 'MITO',
+};
+
+const CHAIN_SYMBOLS: Record<ChainKey, string> = {
+  monad: 'MON',
+  base: 'ETH',
+  mantle: 'MNT',
+  linea: 'ETH',
+  mitosis: 'MITO',
+};
+
+const tokenSymbol =
+  CHAIN_SYMBOLS[defaultChainKey] ?? defaultChain.nativeCurrency.symbol;
+
+// ------------------------------------------------------------------
+// * Main provider (Chrome / Monad testnet) — logic preserved as-is
+// * ------------------------------------------------------------------ 
 export function SmartAccountProvider({ children }: { children: React.ReactNode }) {
   const { address } = useAccount();
-  const { data: walletClient } = useWalletClient({ chainId: monadTestnet.id });
+  const wagmiChainId = useChainId();
+
+  // fallback to AA default chain if wagmi not connected yet
+  const activeChainId = wagmiChainId || defaultChain.id;
+
+  // find full chain object from CHAINS
+  const activeChain =
+    CHAINS.find((c) => c.id === activeChainId) ?? defaultChain;
+
+  const tokenSymbol =
+    CHAIN_SYMBOLS_BY_ID[activeChain.id] ?? activeChain.nativeCurrency.symbol;
+
+  const { data: walletClient } = useWalletClient({ chainId: activeChainId });
 
   // persist user choice
   const [mode, setMode] = useState<Mode>(() =>
@@ -46,7 +88,7 @@ export function SmartAccountProvider({ children }: { children: React.ReactNode }
   // EOA balance
   const { data: eoaBal } = useBalance({
     address,
-    chainId: monadTestnet.id,
+    chainId: activeChainId,
     query: { enabled: !!address },
   });
 
@@ -82,7 +124,7 @@ export function SmartAccountProvider({ children }: { children: React.ReactNode }
         const bal = await publicClient.getBalance({ address: saAddress });
         if (!alive) return;
         setSaBalance(formatEther(bal));
-      } catch { /* keep previous */ }
+      } catch { }
     };
     tick();
     const t = setInterval(tick, 30_000);
@@ -97,19 +139,30 @@ export function SmartAccountProvider({ children }: { children: React.ReactNode }
     saAddress,
     saBalance,
     saReady,
-  }), [mode, address, eoaBal?.value, saAddress, saBalance, saReady]);
+    chainId: activeChainId,
+    tokenSymbol,
+  }), [mode, address, eoaBal?.value, saAddress, saBalance, saReady, activeChainId, tokenSymbol,]);
 
   return <SmartAccountCtx.Provider value={value}>{children}</SmartAccountCtx.Provider>;
 }
 
-/* ------------------------------------------------------------------
- * Mini provider (Farcaster) — builds viem WalletClient from Mini SDK
- * when Wagmi's wallet client is missing. Uses monadTestnet here;
- * switch if your Mini wallet is on a different chain.
- * ------------------------------------------------------------------ */
+// ------------------------------------------------------------------
+// * Mini provider (Farcaster) — builds viem WalletClient from Mini SDK
+// * when Wagmi's wallet client is missing. Uses monadTestnet here;
+// * switch if your Mini wallet is on a different chain.
+// * ------------------------------------------------------------------ 
 export function SmartAccountProviderMini({ children }: { children: React.ReactNode }) {
   const { address } = useAccount();
-  const { data: wagmiWalletClient } = useWalletClient({ chainId: monadTestnet.id });
+
+  const wagmiChainId = useChainId();
+  const activeChainId = wagmiChainId || defaultChain.id;
+  const activeChain =
+    CHAINS.find((c) => c.id === activeChainId) ?? defaultChain;
+
+  const tokenSymbol =
+    CHAIN_SYMBOLS_BY_ID[activeChain.id] ?? activeChain.nativeCurrency.symbol;
+
+  const { data: wagmiWalletClient } = useWalletClient({ chainId: activeChainId });
 
   const [mode, setMode] = useState<Mode>(() =>
     typeof window !== 'undefined'
@@ -120,7 +173,7 @@ export function SmartAccountProviderMini({ children }: { children: React.ReactNo
 
   const { data: eoaBal } = useBalance({
     address,
-    chainId: monadTestnet.id,
+    chainId: activeChainId,
     query: { enabled: !!address },
   });
 
@@ -142,7 +195,7 @@ export function SmartAccountProviderMini({ children }: { children: React.ReactNo
             if (sdk?.wallet) {
               const ethProvider = await sdk.wallet.getEthereumProvider();
               wc = createWalletClient({
-                chain: monadTestnet,         // ⚠ change if your Mini is on another chain
+                chain: activeChain,         // ⚠ change if your Mini is on another chain
                 transport: custom(ethProvider),
               });
             }
@@ -187,7 +240,7 @@ export function SmartAccountProviderMini({ children }: { children: React.ReactNo
         const bal = await publicClient.getBalance({ address: saAddress });
         if (!alive) return;
         setSaBalance(formatEther(bal));
-      } catch { /* keep previous */ }
+      } catch { }
     };
     tick();
     const t = setInterval(tick, 30_000);
@@ -202,14 +255,16 @@ export function SmartAccountProviderMini({ children }: { children: React.ReactNo
     saAddress,
     saBalance,
     saReady,
-  }), [mode, address, eoaBal?.value, saAddress, saBalance, saReady]);
+    chainId: activeChainId,
+    tokenSymbol,    
+  }), [mode, address, eoaBal?.value, saAddress, saBalance, saReady, activeChainId, tokenSymbol,]);
 
   return <SmartAccountCtx.Provider value={value}>{children}</SmartAccountCtx.Provider>;
 }
 
-/* ------------------------------------------------------------------
- * Router: choose provider by pathname (/mini → Mini, else Main)
- * ------------------------------------------------------------------ */
+//------------------------------------------------------------------
+// Router: choose provider by pathname (/mini → Mini, else Main)
+ //------------------------------------------------------------------ 
 export default function SmartAccountProviderRouter({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '';
   const isMini = pathname.startsWith('/mini');
@@ -218,9 +273,10 @@ export default function SmartAccountProviderRouter({ children }: { children: Rea
     : <SmartAccountProvider>{children}</SmartAccountProvider>;
 }
 
-/* Hook */
+
 export const useSmartAccount = () => {
   const ctx = useContext(SmartAccountCtx);
   if (!ctx) throw new Error('useSmartAccount must be used inside SmartAccountProvider');
   return ctx;
 };
+*/

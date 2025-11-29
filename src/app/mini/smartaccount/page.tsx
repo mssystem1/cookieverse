@@ -1,3 +1,4 @@
+/*
 'use client'
 
 import * as React from 'react'
@@ -253,7 +254,7 @@ export default function MiniSmartAccountPage() {
   }
 
   // ---------- Mint (SA path; mirrors main smartaccount) ----------
-  const { writeContractAsync } = useWriteContract()
+  //const { writeContractAsync } = useWriteContract()
   const [txHash, setTxHash] = React.useState<`0x${string}` | undefined>(undefined)
 
   const onMintImage = async () => {
@@ -407,7 +408,7 @@ export default function MiniSmartAccountPage() {
       ) : null}
 
       <div className="grid">
-        {/* LEFT: Mint Fortune */}
+        {/* LEFT: Mint Fortune }
         <section className="card card--fortune">
           <h2 className="card__title">Generate Fortune</h2>
 
@@ -470,7 +471,7 @@ export default function MiniSmartAccountPage() {
           </button>
         </section>
 
-        {/* Image generation + mint */}
+        {/* Image generation + mint }
         <section className="card card--image">
           <h2 className="card__title">Generate Image with AI</h2>
 
@@ -481,7 +482,7 @@ export default function MiniSmartAccountPage() {
                 className="input"
                 value={imgPrompt}
                 onChange={(e) => setImgPrompt(e.target.value)}
-                placeholder="e.g., neon cyber cookie with Monad logo"
+                placeholder="e.g., neon cyber cookie with logo"
               />
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button className="btn btn--primary" onClick={async () => {
@@ -582,7 +583,7 @@ export default function MiniSmartAccountPage() {
           ) : null}
         </section>
 
-        {/* RIGHT: Status Card */}
+        {/* RIGHT: Status Card }
         <section className="card card--status">
           <h2 className="card__title">Status</h2>
 
@@ -660,14 +661,14 @@ export default function MiniSmartAccountPage() {
         </section>
       </div>
 
-      {/* Mini styles */}
+      {/* Mini styles }
       <style jsx>{`
-        /* Global background stays consistent inside Warpcast webview */
+        /* Global background stays consistent inside Warpcast webview 
           :global(html), :global(body) { background: #0b0b10; }
 
-          /* The mini surface: fixed size, centered, scrolls internally */
+          /* The mini surface: fixed size, centered, scrolls internally 
           .page {
-            /* Farcaster web mini recommended surface ~424 x 695 */
+            /* Farcaster web mini recommended surface ~424 x 695 
             box-sizing: border-box;
             width: 424px;
             max-width: 100%;
@@ -675,38 +676,38 @@ export default function MiniSmartAccountPage() {
             margin: 0 auto;
             color: #e5e7eb;
 
-            /* Padding tighter than desktop */
+            /* Padding tighter than desktop 
             padding: 12px;
 
-            /* Scroll only the content inside this surface */
+            /* Scroll only the content inside this surface 
             overflow: auto;
 
-            /* Optional: subtle in-view background in case parent is transparent */
+            /* Optional: subtle in-view background in case parent is transparent 
             background: #0b0b10;
           }
 
-          /* Force single column for mini; keep small gaps */
+          /* Force single column for mini; keep small gaps 
           .grid {
             display: grid;
             grid-template-columns: 1fr;
             gap: 10px;
           }
 
-          /* Drop the desktop 2-col override (it makes columns on wide screens) */
-          /* (Remove your previous @media that reorders columns) */
+          /* Drop the desktop 2-col override (it makes columns on wide screens) 
+          /* (Remove your previous @media that reorders columns) 
 
           .col { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 
           .card {
             background: rgba(24,24,28,.82);
             border: 1px solid rgba(63,63,70,.7);
-            border-radius: 14px;          /* slightly tighter than desktop */
-            padding: 14px;                 /* tighter than desktop */
+            border-radius: 14px;          /* slightly tighter than desktop 
+            padding: 14px;                 /* tighter than desktop 
             box-shadow: 0 10px 30px rgba(0,0,0,.3);
           }
 
           .card__title {
-            font-size: 12px;               /* compact titles */
+            font-size: 12px;               /* compact titles 
             text-transform: uppercase;
             letter-spacing: .08em;
             color: #a1a1aa;
@@ -718,7 +719,7 @@ export default function MiniSmartAccountPage() {
           .field { margin: 8px 0; }
           .label { display: block; font-size: 12px; color: #9ca3af; margin-bottom: 4px; }
 
-          /* Inputs: full width on mini; compact spacing */
+          /* Inputs: full width on mini; compact spacing 
           .input, .textarea {
             width: 90%;
             background: rgba(39,39,42,.7);
@@ -733,7 +734,7 @@ export default function MiniSmartAccountPage() {
 
           .hint { margin-top: 6px; font-size: 12px; color: #9ca3af; }
 
-          /* 2-col groups collapse to 1 column in mini */
+          /* 2-col groups collapse to 1 column in mini 
           .two-col {
             display: grid;
             grid-template-columns: 1fr;
@@ -741,7 +742,7 @@ export default function MiniSmartAccountPage() {
           }
           .two-col .input { width: 100%; box-sizing: border-box; }
 
-          /* Buttons: slightly smaller padding & font for mini */
+          /* Buttons: slightly smaller padding & font for mini 
           .btn {
             display: inline-block;
             border-radius: 10px;
@@ -783,9 +784,10 @@ export default function MiniSmartAccountPage() {
           .link:hover { text-decoration: underline; }
           .note { margin-top: 6px; font-size: 12px; color: #9ca3af; }
 
-          /* Zoom overlay should always be on top */
+          /* Zoom overlay should always be on top 
           :global(.zoom-overlay) { z-index: 1000; }
       `}</style>
     </main>
   )
 }
+*/

@@ -1,3 +1,4 @@
+/*
 'use client';
 
 import * as React from 'react';
@@ -25,20 +26,45 @@ import { buildSmartAccount } from '../../../src/lib/aa/smartAccount';
 import FortuneABI from '../../abi/FortuneCookiesAI.json';
 import { monadTestnet } from '../../lib/chain';
 
+import { usePathname } from 'next/navigation';
+import { sdk } from '@farcaster/miniapp-sdk';
+
 // [FIXED] Privy + banner
 //import { PrivyProvider } from '@privy-io/react-auth';
 //import MonadGamesIdBanner from '../components/MonadGamesIdBanner';
 
-const COOKIE_ADDRESS = process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
+const CHAIN_IDS = {
+  monad: 10143,
+  base: 8453,
+  mantle: 5000,
+  linea: 59144,  
+  mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
+} as const;
 
-const explorerNftUrl = (tokenId: number) =>
-  `https://testnet.monadexplorer.com/nft/${COOKIE_ADDRESS}/${tokenId}`;
-const xShareUrl = (tokenId: number) => {
-  const text = `My COOKIE #${tokenId} on Monad 🍪✨`;
-  return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(
-    explorerNftUrl(tokenId),
-  )}`;
-};
+function cookieAddressFor(chainId?: number): `0x${string}` | undefined {
+  if (chainId === CHAIN_IDS.base)    return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_BASE as `0x${string}`;
+  if (chainId === CHAIN_IDS.mantle)  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE as `0x${string}`;
+  if (chainId === CHAIN_IDS.linea)  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_LINEA as `0x${string}`;  
+  if (chainId === CHAIN_IDS.mitosis) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
+  // default → Monad testnet
+  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
+}
+
+function makeExplorerNftUrl(chainId: number | undefined, contract: `0x${string}`, tokenId: number): string {
+  // Known explorers
+  if (chainId === CHAIN_IDS.base)    return `https://basescan.org/token/${contract}?a=${tokenId}`;
+  if (chainId === CHAIN_IDS.mantle)  return `https://mantlescan.xyz/token/${contract}?a=${tokenId}`;
+  if (chainId === CHAIN_IDS.linea)  return `https://lineascan.build/token/${contract}?a=${tokenId}`;  
+  if (chainId === CHAIN_IDS.mitosis) return `https://mitoscan.io/token/${contract}?a=${tokenId}`;
+  // Monad testnet
+  return `https://testnet.monadexplorer.com/nft/${contract}/${tokenId}`;
+}
+
+function makeXShareUrl(chainName: string | undefined, url: string, tokenId: number): string {
+  const net = chainName || 'this network';
+  const text = `My COOKIE #${tokenId} on ${net} 🍪✨`;
+  return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+}
 
 //const MIN_ABI = parseAbi([
 //  'function mintPrice() view returns (uint256)',
@@ -58,11 +84,26 @@ const sendSaUo = async ({
   data: `0x${string}`;
   value: bigint;
 }) => {
-  // cast bundlerClient to any locally to avoid deep type expansion
-  return (bundlerClient as any).sendUserOperation({
+  // 1) submit the UserOperation → get userOp hash
+  const uoHash = await (bundlerClient as any).sendUserOperation({
     account: sa as any,
     calls: [{ to, data, value }] as any,
   });
+
+  // 2) wait for bundler to include it → get UserOp receipt
+  const uoReceipt = await (bundlerClient as any).waitForUserOperationReceipt({
+    hash: uoHash,
+  });
+
+  // 3) extract L1/L2 transaction hash from receipt
+  const txHash =
+    (uoReceipt?.receipt?.transactionHash ??
+      uoReceipt?.transactionHash ??
+      uoReceipt?.logs?.[0]?.transactionHash) as `0x${string}` | undefined;
+
+  if (!txHash) throw new Error('No transaction hash returned by bundler');
+
+  return txHash;
 };
 
 export default function Page() {
@@ -70,7 +111,165 @@ export default function Page() {
   const { address, chain, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const connected = isConnected && !!address;
-/*
+  const COOKIE_ADDRESS = React.useMemo(
+      () => cookieAddressFor(chain?.id),
+      [chain?.id]
+    );
+  if (connected && !COOKIE_ADDRESS) {
+    return <main className="page"><div className="muted">Unsupported network.</div></main>;
+    }
+
+  const pathname = usePathname();
+  const isMini = !!pathname && pathname.startsWith('/mini');
+    
+  const [fcUsername, setFcUsername] = React.useState<string>('');
+
+  type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea';
+    
+      const CHAIN_BY_ID: Record<number, ChainKey> = {
+        [CHAIN_IDS.monad]: 'monad',
+        [CHAIN_IDS.base]: 'base',
+        [CHAIN_IDS.mantle]: 'mantle',
+        [CHAIN_IDS.linea]: 'linea',        
+        [CHAIN_IDS.mitosis]: 'mitosis',
+      };
+    
+      function currentKey(id?: number): ChainKey {
+        return id && CHAIN_BY_ID[id] ? CHAIN_BY_ID[id] : 'monad';
+      }
+    
+      // scoreByChain & imagesByChain come from holdings (you already set these as shown earlier)
+    const [scoreByChain, setScoreByChain] = React.useState<Record<ChainKey, number>>({
+      monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0,
+    });
+    const [imagesByChain, setImagesByChain] = React.useState<Record<ChainKey, number>>({
+      monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0,
+    });
+    
+    // NEW: transactionsByChain (accumulated from BLOB)
+    const [txByChain, setTxByChain] = React.useState<Record<ChainKey, number>>({
+      monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0,
+    });
+    
+    
+    async function upsertMgid({
+      address,
+      incrementImages,
+      SAWallet,                 // pass from your smart-account page; on main page pass undefined
+      usernamefarcaster,        // pass from mini when Farcaster connected; otherwise undefined
+    }: {
+      address: `0x${string}`;
+      incrementImages: boolean;  // true only for onMintImage
+      SAWallet?: `0x${string}`;
+      usernamefarcaster?: string;
+    }) {
+      // 1) X username from session (client-side)
+      const sessionResp = await fetch('/api/auth/session', { cache: 'no-store' });
+      const session = sessionResp.ok ? await sessionResp.json() : null;
+      const twitter_username = session?.twitter_username || '';
+    
+      // 2) current chain key
+      const k = currentKey(chain?.id);
+    
+      // 3) read existing row
+      const readResp = await fetch(`/api/mgid-get?address=${address}`, { cache: 'no-store' });
+      const existing = readResp.ok ? await readResp.json() : null;
+    
+      // 4) build base row using your requested field names
+      const row = {
+        usernameX: twitter_username,
+        usernamefarcaster: usernamefarcaster || existing?.usernamefarcaster || '',  // keep if already present
+        EOAWallet: address,
+        SAWallet: SAWallet || existing?.SAWallet || '',
+
+        LineaBoost: Number(existing?.LineaBoost),
+        BaseBoost: Number(existing?.BaseBoost),
+        MonadBoost: Number(existing?.MonadBoost),
+        MantleBoost: Number(existing?.MantleBoost),
+        MitosisBoost: Number(existing?.MitosisBoost),
+    
+        // per-chain: seed from existing if available, else from current derived maps
+        totalScore_monad:  Number(existing?.totalScore_monad  ?? scoreByChain.monad),
+        totalTransactions_monad: Number(existing?.totalTransactions_monad ?? txByChain.monad),
+        totalImages_monad: Number(existing?.totalImages_monad ?? imagesByChain.monad),
+    
+        totalScore_base:   Number(existing?.totalScore_base   ?? scoreByChain.base),
+        totalTransactions_base: Number(existing?.totalTransactions_base ?? txByChain.base),
+        totalImages_base:  Number(existing?.totalImages_base  ?? imagesByChain.base),
+    
+        totalScore_mantle: Number(existing?.totalScore_mantle ?? scoreByChain.mantle),
+        totalTransactions_mantle: Number(existing?.totalTransactions_mantle ?? txByChain.mantle),
+        totalImages_mantle: Number(existing?.totalImages_mantle ?? imagesByChain.mantle),
+
+        totalScore_linea: Number(existing?.totalScore_linea ?? scoreByChain.linea),
+        totalTransactions_linea: Number(existing?.totalTransactions_linea ?? txByChain.linea),
+        totalImages_linea: Number(existing?.totalImages_linea ?? imagesByChain.linea),        
+    
+        totalScore_mitosis: Number(existing?.totalScore_mitosis ?? scoreByChain.mitosis),
+        totalTransactions_mitosis: Number(existing?.totalTransactions_mitosis ?? txByChain.mitosis),
+        totalImages_mitosis: Number(existing?.totalImages_mitosis ?? imagesByChain.mitosis),
+    
+        // totals (recomputed next)
+        totalScore: 0,
+        totalTransactions: 0,
+        totalImages: 0,
+   
+        updatedAt: Date.now(),
+      };
+    
+      // 5) increment ONLY the selected chain counters
+      switch (k) {
+        case 'base':
+          row.totalScore_base += 1;
+          row.totalTransactions_base += 1;
+          if (incrementImages) row.totalImages_base += 1;
+          break;
+        case 'mantle':
+          row.totalScore_mantle += 1;
+          row.totalTransactions_mantle += 1;
+          if (incrementImages) row.totalImages_mantle += 1;
+          break;
+        case 'linea':
+          row.totalScore_linea += 1;
+          row.totalTransactions_linea += 1;
+          if (incrementImages) row.totalImages_linea += 1;
+          break;          
+        case 'mitosis':
+          row.totalScore_mitosis += 1;
+          row.totalTransactions_mitosis += 1;
+          if (incrementImages) row.totalImages_mitosis += 1;
+          break;
+        default: // monad
+          row.totalScore_monad += 1;
+          row.totalTransactions_monad += 1;
+          if (incrementImages) row.totalImages_monad += 1;
+          break;
+      }
+    
+      // 6) recompute totals
+      row.totalScore =
+        row.totalScore_monad + row.totalScore_base + row.totalScore_mantle + row.totalScore_linea +  row.totalScore_mitosis;
+    
+      row.totalTransactions =
+        row.totalTransactions_monad + row.totalTransactions_base + row.totalTransactions_mantle + row.totalTransactions_linea + row.totalTransactions_mitosis;
+    
+      row.totalImages =
+        row.totalImages_monad + row.totalImages_base + row.totalImages_mantle + row.totalImages_linea +  row.totalImages_mitosis;
+    
+      // 7) write to BLOB
+      await fetch('/api/mgid-upsert', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(row),
+      });
+    
+      // 8) update local txByChain so UI reflects increment immediately
+      setTxByChain(prev => ({ ...prev, [k]: (prev[k] ?? 0) + 1 }));
+      if (incrementImages) setImagesByChain(prev => ({ ...prev, [k]: (prev[k] ?? 0) + 1 }));
+      setScoreByChain(prev => ({ ...prev, [k]: (prev[k] ?? 0) + 1 }));
+    }
+
+
   // [FIXED] load Privy config from server-only env via /api/privy-config
   const [privyCfg, setPrivyCfg] = React.useState<{ appId: string; providerAppId: string } | null>(null);
   React.useEffect(() => {
@@ -89,13 +288,17 @@ export default function Page() {
       alive = false;
     };
   }, []);
-*/
+
   // Wallet balance (shown in top bar)
-  const { data: balance } = useBalance({
-    address,
-    chainId: monadTestnet.id,
-    query: { enabled: !!address },
-  });
+ // const { data: balance } = useBalance({
+ //   address,
+ //   chainId: monadTestnet.id,
+//    query: { enabled: !!address },
+ // });
+
+  const [imageIds, setImageIds] = React.useState<number[]>([]);
+  const [pendingMintType, setPendingMintType] = React.useState<null | 'text' | 'image'>(null);
+  const [lastProcessedTx, setLastProcessedTx] = React.useState<string | null>(null);
 
   // ---------- UI state ----------
   const [topic, setTopic] = React.useState('');
@@ -108,6 +311,8 @@ export default function Page() {
   const [lastMinted, setLastMinted] = React.useState<number | null>(null);
   const [holdingIds, setHoldingIds] = React.useState<number[]>([]);
   const [scanNote, setScanNote] = React.useState<string | null>(null);
+
+  const [showAll, setShowAll] = React.useState(false);
 
   // image minting state
   const [imgPrompt, setImgPrompt] = React.useState('');
@@ -161,9 +366,27 @@ const { mode, eoaAddress, saAddress, saReady, saBalance } = useSmartAccount();
 //const selectedAddress: Address | undefined = mode === 'sa' ? saAddress : eoaAddress;
 
   // ---------- Queries ----------
+
+React.useEffect(() => {
+  if (!isMini) return;
+  let alive = true;
+  (async () => {
+    try {
+      // SDK context contains user fields, incl. username
+      // (context is awaited per docs; username is optional) 
+      const ctx = await (sdk as any).context; 
+      const uname = ctx?.user?.username || '';
+      if (alive) setFcUsername(uname);
+    } catch {
+      // ignore
+    }
+  })();
+  return () => { alive = false; };
+}, [isMini]);
+
 const lastMintQ = useQuery({
-  queryKey: ['lastMinted', saAddress, COOKIE_ADDRESS],
-  enabled: !!saAddress && !!COOKIE_ADDRESS,
+  queryKey: ['lastMinted', saAddress, chain?.id],
+  enabled: !!address && !!COOKIE_ADDRESS,
   staleTime: 60_000,
   queryFn: async () => {
     const r = await fetch(`/api/holdings?address=${saAddress}&contract=${COOKIE_ADDRESS}`, { cache: 'no-store' });
@@ -195,19 +418,33 @@ const lastMintQ = useQuery({
 
 
   const holdingsQ = useQuery({
-    queryKey: ['holdings', saAddress, COOKIE_ADDRESS],
-    enabled: !!saAddress && !!COOKIE_ADDRESS,
+    queryKey: ['holdings', saAddress, chain?.id],
+    enabled: !!address && !!COOKIE_ADDRESS,
     staleTime: 60_000,
     queryFn: async () => {
       const r = await fetch(
-        `/api/holdings?address=${saAddress}&contract=${COOKIE_ADDRESS}`,
-        { cache: 'no-store' },
+        `/api/holdings?address=${saAddress}`, // &contract=${COOKIE_ADDRESS}
+        {
+            cache: 'no-store',
+            headers: { 'x-chain-id': String(chain?.id ?? '') },  // ← this tells the server the connected chain
+          },
       );
       if (!r.ok) return [] as number[];
+      //const j = await r.json();
+      //if (j?.note) setScanNote(j.note as string);
+      //const ids = Array.isArray(j?.tokenIds) ? (j.tokenIds as number[]) : [];
+      //return Array.from(new Set(ids)).sort((a, b) => a - b);
       const j = await r.json();
       if (j?.note) setScanNote(j.note as string);
+
       const ids = Array.isArray(j?.tokenIds) ? (j.tokenIds as number[]) : [];
-      return Array.from(new Set(ids)).sort((a, b) => a - b);
+      const imgs = Array.isArray(j?.imageIds) ? (j.imageIds as number[]) : [];
+
+      const uniqIds = Array.from(new Set(ids)).sort((a, b) => a - b);
+      const uniqImgs = Array.from(new Set(imgs)).sort((a, b) => a - b);
+
+      setImageIds(uniqImgs);
+      return uniqIds;
     },
   });
 
@@ -232,11 +469,59 @@ const lastMintQ = useQuery({
   React.useEffect(() => {
     if (!connected) return;
     const t = window.setInterval(() => {
-      qc.invalidateQueries({ queryKey: ['lastMinted', saAddress] });
-      qc.invalidateQueries({ queryKey: ['holdings', saAddress, COOKIE_ADDRESS] });
+      qc.invalidateQueries({ queryKey: ['lastMinted', saAddress, chain?.id] });
+      qc.invalidateQueries({ queryKey: ['holdings', saAddress, chain?.id] });
     }, 60_000);
     return () => window.clearInterval(t);
   }, [connected, saAddress, qc]);
+
+  const totalScore_current = React.useMemo(
+    () => (Array.isArray(holdingIds) ? holdingIds.length : 0),
+    [holdingIds]
+  );
+
+  const totalImages_current = React.useMemo(
+    () => (Array.isArray(imageIds) ? imageIds.length : 0),
+    [imageIds]
+  );
+
+    // Periodically push on-chain state into BLOB leaderboard (every 60s)
+  React.useEffect(() => {
+    if (!connected || !address) return;
+
+    let cancelled = false;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        await fetch('/api/mgid-upsert', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ address }),
+        });
+      } catch (e) {
+        console.error('periodic mgid-upsert failed', e);
+      }
+    };
+
+    // optional: first sync immediately
+    tick();
+
+    const id = window.setInterval(tick, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [connected, address]);
+
+  // Transactions == Score in your semantics
+  const totalTransactions_current = totalScore_current;
+
+  const displayedIds = React.useMemo(() => {
+  const ids = Array.isArray(holdingIds) ? holdingIds : [];
+  const desc = [...ids].sort((a, b) => b - a); // newest → oldest
+  return showAll ? desc : desc.slice(0, 10);
+  }, [holdingIds, showAll]);
 
   // ---------- Generate with AI ----------
   const onGenerate = async () => {
@@ -264,7 +549,7 @@ const lastMintQ = useQuery({
   };
 
   // ---------- Mint ----------
-  const { writeContractAsync } = useWriteContract();
+//  const { writeContractAsync } = useWriteContract();
   const [txHash, setTxHash] = React.useState<`0x${string}` | undefined>(undefined);
 
 
@@ -353,18 +638,23 @@ const onMintImage = async () => {
       const value = (typeof onchainMintPrice === 'bigint' && onchainMintPrice > 0n)
         ? onchainMintPrice : 0n;
 
-    await sendSaUo({
+    const txHash = await sendSaUo({
       sa,
-      to: COOKIE_ADDRESS as Address,
+      to: COOKIE_ADDRESS! as Address,
       data: data as `0x${string}`,
       value,
     });
+    setPendingMintType('image');
+    setTxHash(txHash);    // <-- important
     } catch (e: any) {
       setUiError(String(e?.message || e));
     } finally {
       setMintImgBusy(false);
     }
-    return; // do not run EOA path
+
+    //await upsertMgid({ address: address as `0x${string}`, incrementImages: true, SAWallet: saAddress, usernamefarcaster: undefined });
+
+   return; // do not run EOA path
   }
   // --- end Smart Account path ---
 
@@ -400,7 +690,7 @@ const onMintImage = async () => {
       setMintBusy(false);
     }
   };
-*/
+
 
   const onMint = async () => {
     setUiError(null);
@@ -430,17 +720,22 @@ const onMintImage = async () => {
       const value = (typeof onchainMintPrice === 'bigint' && onchainMintPrice > 0n)
         ? onchainMintPrice : 0n;
 
-    await sendSaUo({
+    const txHash = await sendSaUo({
       sa,
-      to: COOKIE_ADDRESS as Address,
+      to: COOKIE_ADDRESS! as Address,
       data: data as `0x${string}`,
       value,
     });
+    setPendingMintType('text');
+    setTxHash(txHash);    // <-- important
     } catch (e: any) {
       setUiError(e?.shortMessage || e?.message || 'Mint failed');
     } finally {
       setMintBusy(false);
     }
+
+    //await upsertMgid({ address: address as `0x${string}`, incrementImages: false, SAWallet: saAddress, usernamefarcaster: undefined });
+  
     return; // do not run EOA path
   }
   // --- end Smart Account path ---
@@ -453,64 +748,105 @@ const onMintImage = async () => {
   } = useWaitForTransactionReceipt({ hash: txHash });
 
   // Parse receipt logs safely with parseEventLogs
-  React.useEffect(() => {
-    if (!isConfirmed || !receipt || !address) return;
+ React.useEffect(() => {
+  if (!isConfirmed || !receipt || !address || !txHash) return;
 
-    let foundTokenId: number | null = null;
+  // Accept both shapes of success: viem's "success" or numeric 1
+  const ok =
+    (receipt as any)?.status === 'success' ||
+    (typeof (receipt as any)?.status === 'number' && (receipt as any).status === 1);
 
-    try {
-      const decoded = parseEventLogs({
-        abi: FortuneABI as Abi,
-        logs: (receipt.logs ?? []) as any,
-      });
+  // Ensure we're handling the tx we submitted (avoid reacting to someone else's tx)
+  const sameTx =
+    typeof (receipt as any)?.transactionHash === 'string' &&
+    (receipt as any).transactionHash.toLowerCase() === txHash.toLowerCase();
 
-      for (const ev of decoded) {
-        if (!ev || (ev as any).eventName == null) continue;
+  // Prevent double-processing of the same tx
+  if (!ok || !sameTx || lastProcessedTx === txHash) return;
 
-        const evAddr = (ev as any).saAddress as `0x${string}` | undefined;
-        if (evAddr && evAddr.toLowerCase() !== COOKIE_ADDRESS.toLowerCase()) continue;
+  let foundTokenId: number | null = null;
 
-        if (ev.eventName === 'CookieMinted') {
-          const args: any = ev.args;
-          const tid = Number(args?.tokenId ?? args?.tokenID ?? args?.id);
-          const minter = args?.minter as `0x${string}` | undefined;
-          if (!Number.isNaN(tid) && (!minter || isAddressEqual(minter, saAddress as `0x${string}`))) {
-            foundTokenId = tid;
-            break;
-          }
-        }
+  try {
+    const decoded = parseEventLogs({
+      abi: FortuneABI as Abi,
+      logs: (receipt.logs ?? []) as any,
+    });
 
-        if (ev.eventName === 'Transfer') {
-          const args: any = ev.args;
-          const from = args?.from as `0x${string}`;
-          const to = args?.to as `0x${string}`;
-          const tid = Number(args?.tokenId);
-          if (
-            from &&
-            to &&
-            isAddressEqual(from, zeroAddress) &&
-            isAddressEqual(to, saAddress as `0x${string}`) &&
-            !Number.isNaN(tid)
-          ) {
-            foundTokenId = tid;
-            break;
-          }
+    for (const ev of decoded) {
+      if (!ev || (ev as any).eventName == null) continue;
+
+      const evAddr = (ev as any).saAddress as `0x${string}` | undefined;
+      if (evAddr && evAddr.toLowerCase() !== COOKIE_ADDRESS!.toLowerCase()) continue;
+
+      if (ev.eventName === 'CookieMinted') {
+        const args: any = ev.args;
+        const tid = Number(args?.tokenId ?? args?.tokenID ?? args?.id);
+        const minter = args?.minter as `0x${string}` | undefined;
+        if (!Number.isNaN(tid) && (!minter || isAddressEqual(minter, saAddress as `0x${string}`))) {
+          foundTokenId = tid;
+          break;
         }
       }
-    } catch {
-      // ignore
-    }
 
-    if (foundTokenId != null) {
-      setLastMinted(foundTokenId);
+      if (ev.eventName === 'Transfer') {
+        const args: any = ev.args;
+        const from = args?.from as `0x${string}`;
+        const to = args?.to as `0x${string}`;
+        const tid = Number(args?.tokenId);
+        if (
+          from &&
+          to &&
+          isAddressEqual(from, zeroAddress) &&
+          isAddressEqual(to, saAddress as `0x${string}`) &&
+          !Number.isNaN(tid)
+        ) {
+          foundTokenId = tid;
+          break;
+        }
+      }
+    }
+  } catch {
+    // ignore parsing errors
+  }
+
+  if (foundTokenId != null) {
+    setLastMinted(foundTokenId);
+    try {
+      localStorage.setItem(`fc:lastMinted:${saAddress}`, String(foundTokenId));
+    } catch {}
+  }
+
+  // ✅ Fire once per successful tx, for BOTH pendingMintType values.
+  if (pendingMintType) {
+   // const incrementImages: boolean = pendingMintType === 'image';
+  //  upsertMgid({
+   //   address: address as `0x${string}`,
+   //   incrementImages,
+   //   SAWallet: saAddress,
+   //   usernamefarcaster: isMini ? (fcUsername || undefined) : undefined,
+  //  }).catch(() => {});
+      (async () => {
       try {
-        localStorage.setItem(`fc:lastMinted:${saAddress}`, String(foundTokenId));
-      } catch {}
-    }
+        await fetch('/api/mgid-upsert', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ address }),
+        });
+      } catch (e) {
+        console.error('mgid-upsert failed', e);
+      } finally {
+      setLastProcessedTx(txHash);     // mark processed
+      setPendingMintType(null);       // clear type
+      setTxHash(undefined);           // clear tracked tx
+      }
+    })();
+  }
 
-    qc.invalidateQueries({ queryKey: ['lastMinted', saAddress] });
-    qc.invalidateQueries({ queryKey: ['holdings', saAddress, COOKIE_ADDRESS] });
-  }, [isConfirmed, receipt, saAddress, qc]);
+  // keep your invalidations
+  qc.invalidateQueries({ queryKey: ['lastMinted', saAddress, chain?.id] });
+  qc.invalidateQueries({ queryKey: ['holdings', saAddress, chain?.id] });
+}, [isConfirmed, receipt, saAddress, qc, chain?.id, txHash, pendingMintType, lastProcessedTx]);
+
 
   // ---------- UI ----------
 /*{privyCfg ? <MonadGamesIdBanner /> : null}*/
@@ -525,12 +861,12 @@ const onMintImage = async () => {
         height: 2, width: 200, background: "linear-gradient(90deg,#7c3aed,#a855f7)",
         borderRadius: 999, marginBottom: 20
       }} />
-*/
+
 
   // [FIXED] Declare content BEFORE using it
   const content = (
     <main className="page">
-      {/* Monad Games ID banner */}
+      {/* Monad Games ID banner }
       
       {uiError ? <div className="alert">{uiError}</div> : null}
       {confirmError ? (
@@ -542,13 +878,13 @@ const onMintImage = async () => {
       ) : null}
 
       <div className="grid">
-        {/* LEFT: Mint Card */}
+        {/* LEFT: Mint Card }
         <section className="card card--fortune">
           <h2 className="card__title">Generate Fortune</h2>
 
           <div className="two-col">
             <div className="field field--full">
-              <label className="label">Prompt </label> {/*Topic / hint*/}
+              <label className="label">Prompt </label> {}
               <input
                 className="input"
                 placeholder="e.g., gas efficiency, launch day, testnet"
@@ -612,7 +948,7 @@ const onMintImage = async () => {
         </section>
 
 
-{/* Image generation + mint */}
+{/* Image generation + mint }
 <section className="card card--image">
   <h2 className="card__title">Generate Image with AI</h2>
 
@@ -674,7 +1010,7 @@ const onMintImage = async () => {
     </div>
   </div>
 
-  {/* Simple zoom modal */}
+  {/* Simple zoom modal }
   {zoom && imgB64 ? (
     <div
       onClick={() => setZoom(false)}
@@ -689,7 +1025,7 @@ const onMintImage = async () => {
 </section>
 
 
-        {/* RIGHT: Status Card */}
+        {/* RIGHT: Status Card }
         <section className="card card--status">
           <h2 className="card__title">Status</h2>
 
@@ -710,11 +1046,29 @@ const onMintImage = async () => {
                 {connected && address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '—'}
               </span>
             </div>
+            
+            <div className="status__row">
+              <span className="muted">Total mints:</span>
+              <span>{connected ? totalScore_current : '—'}</span>
+            </div>
+            <div className="status__row">
+              <span className="muted">Total Minted Images:</span>
+              <span>{connected ? totalImages_current : '—'}</span>
+            </div>
+            <div className="status__row">
+              <span className="muted">Total Minted Fortunes:</span>
+              <span>{connected ? totalScore_current-totalImages_current : '—'}</span>
+            </div>
+            <div className="status__row">
+              <span className="muted">Total Transactions:</span>
+              <span>{connected ? totalTransactions_current : '—'}</span>
+            </div>
+            
           </div>
 
           <SaStatusCard />
 
-          {/* Last minted */}
+          {/* Last minted }
           <div className="block">
             <div className="block__title">Last minted</div>
             {!connected ? (
@@ -726,17 +1080,19 @@ const onMintImage = async () => {
             ) : (
               <div className="line">
                 <span>{`COOKIE #${lastMinted}`}</span>
-                <a href={explorerNftUrl(lastMinted)} target="_blank" className="link">
-                  view
-                </a>
-                <a href={xShareUrl(lastMinted)} target="_blank" className="link">
-                  share on X
-                </a>
+                {(() => {
+                  const url = COOKIE_ADDRESS ? makeExplorerNftUrl(chain?.id, COOKIE_ADDRESS, lastMinted) : '#';
+                  const x  = makeXShareUrl(chain?.name, url, lastMinted);
+                  return <>
+                    <a href={url} target="_blank" className="link">view</a>
+                    <a href={x}   target="_blank" className="link">share on X</a>
+                  </>;
+                })()}
               </div>
             )}
           </div>
 
-          {/* Holdings */}
+          {/* Holdings }
           <div className="block">
             <div className="block__title">
               All minted to this wallet <span className="muted">(currently holding)</span>
@@ -751,18 +1107,30 @@ const onMintImage = async () => {
               <div className="dash">—</div>
             ) : (
               <ul className="list">
-                {holdingIds.map((id) => (
+                {displayedIds.map((id) => (
                   <li key={id} className="line">
                     <span>{`COOKIE #${id}`}</span>
-                    <a href={explorerNftUrl(id)} target="_blank" className="link">
-                      view
-                    </a>
-                    <a href={xShareUrl(id)} target="_blank" className="link">
-                      share on X
-                    </a>
+                    {(() => {
+                      const url = COOKIE_ADDRESS ? makeExplorerNftUrl(chain?.id, COOKIE_ADDRESS, id) : '#';
+                      const x  = makeXShareUrl(chain?.name, url, id);
+                      return (
+                        <>
+                          <a href={url} target="_blank" className="link">view</a>
+                          <a href={x}   target="_blank" className="link">share on X</a>
+                        </>
+                      );
+                    })()}
                   </li>
                 ))}
               </ul>
+            )}
+
+            {holdingIds.length > 10 && (
+              <div style={{ marginTop: 8 }}>
+                <button className="btn btn--primary" onClick={() => setShowAll(v => !v)}>
+                  {showAll ? 'Show less' : 'Show all'}
+                </button>
+              </div>
             )}
 
             {connected && scanNote ? <div className="note">{scanNote}</div> : null}
@@ -779,8 +1147,8 @@ const onMintImage = async () => {
             grid-template-columns: 1fr 1fr;
           }
         }
-*/}
-      {/* --- Card CSS --- */}
+}
+      {/* --- Card CSS --- }
       <style jsx>{`
         :global(html),
         :global(body) {
@@ -974,6 +1342,7 @@ const onMintImage = async () => {
   ) : (
     content
   );
-  */
+  
  return content;
 }
+*/

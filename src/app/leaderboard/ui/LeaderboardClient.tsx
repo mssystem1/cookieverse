@@ -2,18 +2,27 @@
 
 import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
-import { useSmartAccount } from '../../../app/SmartAccountProvider'; 
+//import { useSmartAccount } from '../../../app/SmartAccountProvider'; 
+
+import { useChainId } from 'wagmi';
+
+import * as React from 'react';
 
 type Row = {
   rank: number;
   address?: string | string[] | null; // ← allow array
+  Xusername?: string;       
+  FarcasterUsername: string;       
   mints: number;
   mintedCookies?: number;
   mintedImages?: number;
+  TotalMints?: number;
+  totalScore?: number;      // ← NEW: MGID total score from BLOB
+  localScore?: number;   // SCORE on {localchain}, depends on connected chain
 };
 
 type Api = {
-  top20: Row[];
+  top50: Row[];
   you: Row | null;
   totalMinters: number;
   updatedAt: string;
@@ -25,27 +34,105 @@ type LeaderboardSize = 'default' | 'mini';
 type LeaderboardClientProps = { size?: LeaderboardSize };
 
 export default function LeaderboardClient({ size = 'default' }: LeaderboardClientProps) {
+  const chainId = useChainId();
 
   const compact = size === 'mini';
   const { address } = useAccount();
   const [data, setData] = useState<Api | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const { saAddress } = useSmartAccount();
+//  const { saAddress } = useSmartAccount();
   const eoaLower = address?.toLowerCase();
-  const saLower  = saAddress?.toLowerCase();
-  const highlights = Array.from(new Set([eoaLower, saLower].filter(Boolean) as string[]));
+ // const saLower  = saAddress?.toLowerCase();
+  const highlights = Array.from(new Set([eoaLower].filter(Boolean) as string[])); // saLower
 
   function fetchData(fresh = false) {
     const qs = new URLSearchParams();
-    // send BOTH EOA and SA if present
-    const youList = [address, saAddress].filter(Boolean) as string[];
+    const youList = [address].filter(Boolean) as string[]; // , saAddress
     if (youList.length) qs.set("you", youList.join(","));
     if (fresh) qs.set("fresh", "1");
+    if (chainId) qs.set("chainId", String(chainId)); // (optional fallback — header is primary)
+
     setLoading(true);
-    fetch(`/api/leaderboard?${qs.toString()}`, { cache: "no-store" })
+    fetch(`/api/leaderboard?${qs.toString()}`, {
+      cache: "no-store",
+      headers: { "x-chain-id": String(chainId ?? "") }, // ⬅️ tell API the selected chain
+    })
       .then((r) => r.json())
-      .then((j) => setData(j))
+      .then(async (j) => {
+        // collect addresses from top50 (string or first element of array)
+        const addrs = Array.isArray(j?.top50)
+          ? j.top50
+              .map((r: any) => (Array.isArray(r.address) ? r.address[0] : r.address))
+              .filter(Boolean)
+          : [];
+
+        // fetch BLOB profiles once
+        const profiles = await fetchProfilesFor(addrs);
+
+        // enrich rows: attach Xusername / FarcasterUsername if EOAWallet matches address
+        if (Array.isArray(j?.top50)) {
+          j.top50 = j.top50.map((r: any) => {
+            const a = Array.isArray(r.address) ? r.address[0] : r.address;
+            const p = a ? profiles.get(String(a).toLowerCase()) : undefined;
+            const totalScore = p?.totalScore ?? r.totalScore ?? 0;
+            const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || '0');
+            let localScore = 0;
+            if (p) {
+              if (chainId === 8453) {
+                localScore = Number(p.totalScore_base ?? 0);
+              } else if (chainId === 5000) {
+                localScore = Number(p.totalScore_mantle ?? 0);
+              } else if (chainId === 59144) {
+                localScore = Number(p.totalScore_linea ?? 0);
+              } else if (mitosisId && chainId === mitosisId) {
+                localScore = Number(p.totalScore_mitosis ?? 0);
+              } else {
+                // default to monad
+                localScore = Number(p.totalScore_monad ?? 0);
+              }
+            }
+            return {
+              ...r,
+              Xusername: p?.usernameX ?? r.Xusername ?? '',
+              FarcasterUsername: p?.usernamefarcaster ?? r.FarcasterUsername ?? '',
+              totalScore,
+              localScore,
+            };
+          });
+
+
+            // 🔥 Sort Top-50 by totalScore (desc), fallback to mints if needed
+            j.top50.sort((a: any, b: any) => {
+              const as = typeof a.totalScore === 'number' ? a.totalScore : 0;
+              const bs = typeof b.totalScore === 'number' ? b.totalScore : 0;
+              if (bs !== as) return bs - as;
+              return (b.mints ?? 0) - (a.mints ?? 0);
+            });
+
+            // Recompute rank based on new order
+            j.top50 = j.top50.map((r: any, idx: number) => ({ ...r, rank: idx + 1 }));
+        }
+
+        // also enrich "you" card if present
+        if (j?.you) {
+          const youAddrs = Array.isArray(j.you.address) ? j.you.address : [j.you.address];
+          const p = youAddrs
+            .map((a: any) => (a ? profiles.get(String(a).toLowerCase()) : undefined))
+            .find(Boolean);
+          if (p) {
+            j.you = {
+              ...j.you,
+              Xusername: p.usernameX ?? j.you.Xusername ?? '',
+              FarcasterUsername: p.usernamefarcaster ?? j.you.FarcasterUsername ?? '',
+              totalScore: p.totalScore ?? j.you.totalScore ?? 0,
+            };
+          }
+        }
+
+        setData(j);
+      })
+
       .finally(() => setLoading(false));
   }
 
@@ -53,7 +140,7 @@ export default function LeaderboardClient({ size = 'default' }: LeaderboardClien
   useEffect(() => {
     fetchData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, saAddress]);
+  }, [address, ]); // saAddress
 
   // Refetch fresh when window gains focus or tab becomes visible (switching tabs)
   useEffect(() => {
@@ -66,19 +153,19 @@ export default function LeaderboardClient({ size = 'default' }: LeaderboardClien
       document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [address, chainId]); // saAddress,
 
   //const lower = address?.toLowerCase();
 
   if (loading)
     return <div style={{ opacity: 0.8, color: "#cbd5e1" }}>Loading leaderboard…</div>;
 
-  if (!data || !Array.isArray(data.top20)) {
+  if (!data || !Array.isArray(data.top50)) {
     return <div style={{ color: "#cbd5e1" }}>Leaderboard unavailable.</div>;
   }
 
 const inTopForAll = highlights.length
-  ? highlights.every((h) => data.top20.some((r) => lowers(r.address).includes(h)))
+  ? highlights.every((h) => data.top50.some((r) => lowers(r.address).includes(h)))
   : false;
   const showPinned = highlights.length > 0 && !inTopForAll;
 
@@ -97,14 +184,14 @@ const youRow: Row | null =
     : null);
 */
 
-// Derive "you" from Top-20 if API omitted it.
+// Derive "you" from Top-50 if API omitted it.
 // If any of your wallets (EOA/SA) appear in Top-20, show their real rank & totals.
 const youRow: Row | null = (data.you as any) ?? (() => {
-  const wallets = [address, saAddress].filter(Boolean) as string[];
+  const wallets = [address].filter(Boolean) as string[]; // , saAddress
   if (!wallets.length) return null;
 
   const wanted = wallets.map((w) => w.toLowerCase());
-  const hits = data.top20.filter((r) => lowers(r.address).some((a) => wanted.includes(a)));
+  const hits = data.top50.filter((r) => lowers(r.address).some((a) => wanted.includes(a)));
 
   if (!hits.length) {
     // nothing on the board yet → keep the “no mints yet” fallback
@@ -114,6 +201,7 @@ const youRow: Row | null = (data.you as any) ?? (() => {
       mints: 0,
       mintedCookies: 0,
       mintedImages: 0,
+      TotalMints: 0,
     };
   }
 
@@ -122,8 +210,9 @@ const youRow: Row | null = (data.you as any) ?? (() => {
   const mints = hits.reduce((acc, r) => acc + (r.mints || 0), 0);
   const mintedCookies = hits.reduce((acc, r) => acc + (r.mintedCookies || 0), 0);
   const mintedImages = hits.reduce((acc, r) => acc + (r.mintedImages || 0), 0);
+  const TotalMints = hits.reduce((acc, r) => acc + (r.TotalMints || 0), 0);
 
-  return { rank, address: wallets, mints, mintedCookies, mintedImages };
+  return { rank, address: wallets, mints, mintedCookies, mintedImages, TotalMints };
 })();
 
   return (
@@ -137,7 +226,7 @@ const youRow: Row | null = (data.you as any) ?? (() => {
       {/*showPinned && youRow ? <PinnedYouRow you={youRow} hasRank={!!data.you} /> : null*/}
       {showPinned && youRow ? <PinnedYouRow you={youRow} hasRank={Number.isFinite(youRow.rank)} /> : null}
 
-      <Table rows={data.top20} highlight={highlights} compact={compact} />
+      <Table rows={data.top50} highlight={highlights} compact={compact} />
       <p style={{ marginTop: 12, color: "#9ca3af" }}>
         {Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.updatedAt))}
         {" • "}
@@ -151,7 +240,8 @@ function PinnedYouRow({ you, hasRank }: { you: Row; hasRank: boolean }) {
   const mints   = you.mints ?? 0;
   const cookies = you.mintedCookies ?? 0;
   const images  = you.mintedImages ?? 0;
-  const hasAnyActivity = mints > 0 || cookies > 0 || images > 0;
+  const TotalMints = you.TotalMints ?? 0;
+  const hasAnyActivity = mints > 0 || cookies > 0 || images > 0 || TotalMints > 0;
 
   return (
     <div
@@ -171,6 +261,7 @@ function PinnedYouRow({ you, hasRank }: { you: Row; hasRank: boolean }) {
           {youLabelStr(you.address)} • {mints} mints
           {" • Cookies "}{cookies}
           {" • Images "}{images}
+          {/*" • Total Mints accros chains "*/}{/*TotalMints*/}
         </>
       ) : (
         <>
@@ -194,6 +285,38 @@ function Table({
   const showExtras = !compact; // hide extra columns in mini
   const hl = Array.isArray(highlight) ? highlight : [highlight];
 
+   const chainId = useChainId();
+
+  // label used in the header: "monad" | "base" | "mantle" | "mitosis"
+  const chainLabel = React.useMemo(() => {
+    const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || '0');
+    if (chainId === 8453) return 'base';
+    if (chainId === 5000) return 'mantle';
+    if (chainId === 59144) return 'linea';    
+    if (mitosisId && chainId === mitosisId) return 'mitosis';
+    return 'monad';
+  }, [chainId]);
+
+  // address explorer href for the WALLET link
+  const makeExplorerAddressUrl = React.useCallback((addr: string) => {
+    const mitosisBase =
+      process.env.NEXT_PUBLIC_MITOSIS_EXPLORER?.replace(/\/+$/, '') || '';
+    switch (chainLabel) {
+      case 'base':
+        return `https://basescan.org/address/${addr}`;
+      case 'mantle':
+        return `https://mantlescan.xyz/address/${addr}`;
+      case 'linea':
+        return `https://lineascan.build/address/${addr}`;        
+      case 'mitosis':
+        // allow env override if your explorer differs
+        return mitosisBase ? `${mitosisBase}/address/${addr}` : `#`;
+      default:
+        // monad testnet
+        return `https://monadvision.com/address/${addr}`;
+    }
+  }, [chainLabel]); 
+
   return (
     <div style={{ overflowX: "auto" }}>
       <table
@@ -213,20 +336,16 @@ function Table({
         <colgroup>
           {compact ? (
             <>
-            {/*
               <col style={{ width: "20%" }} />
-              <col style={{ width: "60%" }} />
-              <col style={{ width: "20%" }} />
-              */}
-              <col style={{ width: "18%" }} />
+              <col style={{ width: "40%" }} />
               <col style={{ width: "56%" }} />
               <col style={{ width: "26%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "26%" }} />
+              <col style={{ width: "26%" }} />              
             </>
           ) : (
             <>
               <col style={{ width: "18%" }} />
+              <col style={{ width: "40%" }} />
               <col style={{ width: "56%" }} />
               <col style={{ width: "26%" }} />
               <col style={{ width: "26%" }} />
@@ -240,24 +359,35 @@ function Table({
             <Th compact={compact} style={{ textAlign: "left", paddingLeft: 8, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
               RANK
             </Th>
+            { showExtras && (            
+            <Th compact={compact} style={{ textAlign: "left", paddingLeft: 8, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
+              X USERNAME
+            </Th>
+             )}
+            <Th compact={compact} style={{ textAlign: "left", paddingLeft: 8, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
+              FARCASTER USERNAME
+            </Th>
             <Th compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 16 : 28, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
               WALLET
             </Th>
             <Th compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
-              MINTS
+              SCORE on {chainLabel}
+            </Th>
+            <Th compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
+              TOTAL SCORE 
             </Th>
             {/*showExtras &&*/} 
-            {(
+            {/*showExtras && (
               <Th compact={compact} style={{ textAlign: "right", paddingRight: compact ? 12 : 25, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
                 MINTED COOKIES
               </Th>
-            )}
+            )*/}
             {/*showExtras &&*/} 
-            {(
+            {/*showExtras && (
               <Th compact={compact} style={{ textAlign: "right", paddingRight: compact ? 14 : 30, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
                 MINTED IMAGES
               </Th>
-            )}
+            )*/}
           </tr>
         </thead>
 
@@ -274,37 +404,71 @@ function Table({
                   {rankCell(r.rank)}
                 </Td>
 
-                <Td compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 16 : 28 }}>
-                  {isPlaceholder ? (
-                    <span style={{ color: "#6b7280" }}>—</span>
-                  ) : (
-                    <a
-                      href={`https://testnet.monadexplorer.com/address/${Array.isArray(r.address) ? r.address[0] : r.address}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ color: "#cbd5e1", textDecoration: "none" }}
-                    >
-                      {youLabelStr(r.address!)}
-                    </a>
-                  )}
+              {/* X USERNAME (hidden on mini) */}
+              {showExtras && (
+                <Td compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 8 : 12 }}>
+                  {isPlaceholder
+                    ? <span style={{ color: "#6b7280" }}>—</span>
+                    : (r.Xusername && r.Xusername.trim().length > 0
+                        ? <span>@{r.Xusername}</span>
+                        : <span style={{ color: "#6b7280" }}>—</span>)}
+                </Td>
+              )}
+
+              {/* FARCASTER USERNAME (always shown) */}
+              <Td compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 8 : 12 }}>
+                {isPlaceholder
+                  ? <span style={{ color: "#6b7280" }}>—</span>
+                  : (r.FarcasterUsername && String(r.FarcasterUsername).trim().length > 0
+                      ? <span>@{r.FarcasterUsername}</span>
+                      : <span style={{ color: "#6b7280" }}>—</span>)}
+              </Td>
+
+              {/* WALLET */}
+              <Td compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 16 : 28 }}>
+                {isPlaceholder ? (
+                  <span style={{ color: "#6b7280" }}>—</span>
+                ) : (
+                  (() => {
+                    const addr = Array.isArray(r.address) ? r.address[0] : r.address;
+                    const href = makeExplorerAddressUrl(String(addr));
+                    return (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "#cbd5e1", textDecoration: "none", transition: 'color .15s ease, text-decoration .15s ease' }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = 'underline'; (e.currentTarget as HTMLAnchorElement).style.color = '#ffffff'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = 'none'; (e.currentTarget as HTMLAnchorElement).style.color = '#cbd5e1'; }}
+                        title={`Open in ${chainLabel} explorer`}
+                      >
+                        {youLabelStr(addr!)}
+                      </a>
+                    );
+                  })()
+                )}
+              </Td>
+
+                <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18 }}>
+                  {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{/*r.mints*/}{r.localScore ?? 0}</span>}
                 </Td>
 
                 <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18 }}>
-                  {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{r.mints}</span>}
+                  {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{/*r.TotalMints*/}{r.totalScore ?? 0}</span>}
                 </Td>
 
                 {/*showExtras &&*/} 
-                {(
+                {/*showExtras && (
                   <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 12 : 25 }}>
                     {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{r.mintedCookies ?? 0}</span>}
                   </Td>
-                )}
+                )*/}
                 {/*showExtras &&*/} 
-                {(
+                {/*showExtras && (
                   <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 14 : 30 }}>
                     {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{r.mintedImages ?? 0}</span>}
                   </Td>
-                )}
+                )*/}
               </Tr>
             );
           })}
@@ -416,4 +580,50 @@ function toArray(v: AddrInput): string[] {
 }
 function lowers(v: AddrInput): string[] {
   return toArray(v).map((s) => s.toLowerCase());
+}
+
+type ProfileMeta = {
+  usernameX?: string;
+  usernamefarcaster?: string;
+  totalScore?: number;
+  totalScore_monad?: number;
+  totalScore_base?: number;
+  totalScore_mantle?: number;
+  totalScore_linea?: number;
+  totalScore_mitosis?: number;
+};
+
+async function fetchProfilesFor(addresses: string[]) {
+  const uniq = Array.from(new Set(addresses.map((a) => a.toLowerCase()).filter(Boolean)));
+  if (!uniq.length) return new Map<string, ProfileMeta>();
+
+  // ⬇️ CHANGE THIS
+  const res = await fetch('/api/mgid-downsert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify({ op: 'readMany', addresses: uniq }),
+  });
+
+  if (!res.ok) return new Map();
+
+  const j = await res.json().catch(() => null);
+  const out = new Map<string, ProfileMeta>();
+
+  const rows = Array.isArray(j?.rows) ? j.rows : Array.isArray(j) ? j : [];
+  for (const r of rows) {
+    const w = (r?.EOAWallet || '').toLowerCase();
+    if (!w) continue;
+    out.set(w, {
+      usernameX: r?.usernameX ?? r?.username ?? '',
+      usernamefarcaster: r?.usernamefarcaster ?? '',
+      totalScore: Number(r?.totalScore ?? 0),
+      totalScore_monad: Number(r?.totalScore_monad ?? 0),
+      totalScore_base: Number(r?.totalScore_base ?? 0),
+      totalScore_mantle: Number(r?.totalScore_mantle ?? 0),
+      totalScore_linea: Number(r?.totalScore_linea ?? 0),
+      totalScore_mitosis: Number(r?.totalScore_mitosis ?? 0),
+    });
+  }
+  return out;
 }

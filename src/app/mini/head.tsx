@@ -35,7 +35,7 @@ export default function Head() {
       <meta name="fc:miniapp:domain" content={domain} />
       {/* OG for general debuggers */}
       <meta property="og:title" content="Fortune Cookie" />
-      <meta property="og:description" content="Mint a Monad Fortune Cookie" />
+      <meta property="og:description" content="Mint a Fortune Cookie" />
       <meta property="og:image" content={`${base}/ms-logo.png`} />
     </>
   );

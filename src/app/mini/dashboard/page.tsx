@@ -1,22 +1,23 @@
-// src/app/mini/page.tsx
+// src/app/mini/dashboard/page.tsx
 'use client';
 
 import * as React from 'react';
-// lazy import the SDK so /mini can render even outside Warpcast
-const getSdk = async () => (await import('@farcaster/miniapp-sdk')).sdk;
 
-// reuse your main page 1:1 (all logic/cards/queries)
-import MainPage from '../page';
+// (kept for future – same pattern as other mini pages)
+// const getSdk = async () => (await import('@farcaster/miniapp-sdk')).sdk;
 
-export default function MiniMirrorPage() {
+import DashboardClient from '../../../app/dashboard/ui/DashboardClient';
+import MiniNav from '../../../components/mini/MiniNav';
+
+export default function MiniDashboardPage() {
   /*
+  // If you want to fully follow the Farcaster splash pattern, you can
+  // uncomment this block once you're sure miniapp-sdk is available:
   React.useEffect(() => {
     (async () => {
       try {
         const sdk = await getSdk();
-        // Hide the splash **after** your UI is ready
-        sdk.actions.ready().catch(() => {});
-        // Expose Farcaster EIP-1193 so wagmi injected() picks it up
+        await sdk.actions.ready().catch(() => {});
         const provider: any = await sdk.wallet.getEthereumProvider().catch(() => null);
         if (provider) {
           (window as any).ethereum = provider;
@@ -24,17 +25,27 @@ export default function MiniMirrorPage() {
           provider?.on?.('disconnect', () => {});
         }
       } catch {
-        // Not inside Farcaster host — safe no-op so /mini still renders
+        // Not inside Farcaster host — safe no-op so /mini/dashboard still renders in browser
       }
     })();
   }, []);
-*/
+  */
+
   return (
     <div className="mini-root">
-      {/* exact same content as app/page.tsx */}
-      <MainPage />
 
-      {/* --- MINI OVERRIDES (scoped) --- */}
+      {/* Main scrollable area per mini guidelines */}
+      <div className="page">
+        <div className="grid">
+          <div className="card">
+            <div className="card__title">Cookieverse Dashboard</div>
+            {/* Reuse your full Dashboard logic 1:1 */}
+            <DashboardClient />
+          </div>
+        </div>
+      </div>
+
+      {/* Farcaster Mini layout overrides (424x695 vertical modal) */}
       <style jsx global>{`
         /* Outer modal size per docs (web mini): 424 x 695 */
         .mini-root {
@@ -44,72 +55,79 @@ export default function MiniMirrorPage() {
           height: 695px;
           margin: 0 auto;
           padding: 8px 0 12px;
-          overflow: hidden;           /* contain the app UI to modal bounds */
+          overflow: hidden; /* contain the app UI to modal bounds */
           display: flex;
           flex-direction: column;
           background: #0b0b10;
         }
 
-        /* Make the scroll area only the main content, not the header */
+        /* Header vs scrollable area */
         .mini-header {
           flex: 0 0 auto;
           padding: 0 12px;
         }
+
         .mini-root .page {
           flex: 1 1 auto;
-          overflow: auto;             /* vertical scroll in the content only */
+          overflow: auto; /* vertical scroll in the content only */
           max-width: 100%;
-          padding: 12px;              /* tighter padding for mini */
+          padding: 12px; /* tighter padding for mini */
         }
 
-        /* Layout: stack cards in one column; keep small gaps */
+        /* Layout: stack cards in single column */
         .mini-root .grid {
+          display: grid;
           grid-template-columns: 1fr !important;
           gap: 10px !important;
         }
 
-        /* Tighter components for mini surface */
+        /* Tighter cards for mini surface */
         .mini-root .card {
           padding: 14px !important;
           border-radius: 14px !important;
         }
+
         .mini-root .card__title {
           font-size: 12px !important;
           margin-bottom: 8px !important;
           letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #9ca3af;
         }
 
-        /* Form controls trimmed to fit 424 width comfortably */
+        /* Inputs/buttons (if any inside Dashboard) fit 424px comfortably */
         .mini-root .input,
-        .mini-root .textarea {
-          width: 90% !important;
+        .mini-root input {
           padding: 8px 10px !important;
           font-size: 14px !important;
         }
-        .mini-root .textarea {
+
+        .mini-root .textarea,
+        .mini-root textarea {
           min-height: 100px !important;
         }
 
-        /* Buttons: slightly smaller padding for mini */
-        .mini-root .btn {
+        .mini-root .btn,
+        .mini-root button {
           padding: 9px 12px !important;
           font-size: 13px !important;
           border-radius: 10px !important;
         }
 
-        /* 2-col groups collapse nicely inside the 424px surface */
+        /* Generic 2-col helpers collapse on mini */
         .mini-root .two-col {
           grid-template-columns: 1fr !important;
           gap: 10px !important;
         }
 
-        /* Status list spacing tweaks */
         .mini-root .list {
           gap: 4px !important;
         }
 
-        /* Ensure the body background stays consistent when embedded */
-        :root, :global(html), :global(body) {
+        /* Keep global background consistent when embedded */
+        :root,
+        :global(html),
+        :global(body) {
           background: #0b0b10;
         }
       `}</style>
