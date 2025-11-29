@@ -67,7 +67,7 @@ async function loadBoosts(address: `0x${string}`): Promise<BoostFlags> {
   url.searchParams.set('address', address);
 
   try {
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const res = await fetch('/api/mgid-boosts', { cache: 'no-store' }); // url.toString()
     if (!res.ok) {
       console.error('[mgid-upsert] /api/mgid-boosts HTTP error', res.status);
       return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0 };
@@ -111,7 +111,7 @@ async function loadHoldingsStats(address: `0x${string}`): Promise<HoldingsStats>
       url.searchParams.set('address', address);
 
       try {
-        const res = await fetch(url.toString(), {
+        const res = await fetch('/api/holdings', { // url.toString()
           cache: 'no-store',
           headers: { 'x-chain-id': String(chainId) },
         });
@@ -150,7 +150,7 @@ async function loadAdapterSends(address: `0x${string}`): Promise<AdapterSendsByC
   url.searchParams.set('address', address);
 
   try {
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const res = await fetch('/api/adapter-sends', { cache: 'no-store' }); // url.toString()
     if (!res.ok) {
       console.error('[mgid-upsert] /api/adapter-sends HTTP error', res.status);
       return {
