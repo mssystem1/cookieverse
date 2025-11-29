@@ -62,12 +62,15 @@ type BoostFlags = {
 };
 
 async function loadBoosts(address: `0x${string}`): Promise<BoostFlags> {
-  const baseUrl = getBaseUrl();
-  const url = new URL('/api/mgid-boosts', baseUrl);
-  url.searchParams.set('address', address);
+//  const baseUrl = getBaseUrl();
+//  const url = new URL('/api/mgid-boosts', baseUrl);
+//  url.searchParams.set('address', address);
+
+  const params = new URLSearchParams();
+  params.set('address', address);
 
   try {
-    const res = await fetch('/api/mgid-boosts', { cache: 'no-store' }); // url.toString()
+    const res = await fetch(`/api/mgid-boosts?address=${params.toString()}`, { cache: 'no-store' }); // url.toString()
     if (!res.ok) {
       console.error('[mgid-upsert] /api/mgid-boosts HTTP error', res.status);
       return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0 };
@@ -97,7 +100,7 @@ type HoldingsStats = {
 
 // Call existing /api/holdings for all chains; return total unique tokenIds & imageIds per chain
 async function loadHoldingsStats(address: `0x${string}`): Promise<HoldingsStats> {
-  const baseUrl = getBaseUrl();
+ // const baseUrl = getBaseUrl();
 
   const result: HoldingsStats = {
     scoreByChain: { monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0 },
@@ -107,11 +110,16 @@ async function loadHoldingsStats(address: `0x${string}`): Promise<HoldingsStats>
   await Promise.all(
     (Object.keys(CHAIN_IDS) as ChainKey[]).map(async (chainKey) => {
       const chainId = CHAIN_IDS[chainKey];
-      const url = new URL('/api/holdings', baseUrl);
-      url.searchParams.set('address', address);
+
+      const params = new URLSearchParams();
+      params.set('address', address);
+     // params.set('chain', chainKey);
+
+//      const url = new URL('/api/holdings', baseUrl);
+//      url.searchParams.set('address', address);
 
       try {
-        const res = await fetch('/api/holdings', { // url.toString()
+        const res = await fetch(`/api/holdings?address=${params.toString()}`, { // url.toString()
           cache: 'no-store',
           headers: { 'x-chain-id': String(chainId) },
         });
@@ -145,12 +153,15 @@ type AdapterSendsByChain = {
 };
 
 async function loadAdapterSends(address: `0x${string}`): Promise<AdapterSendsByChain> {
-  const baseUrl = getBaseUrl();
-  const url = new URL('/api/adapter-sends', baseUrl);
-  url.searchParams.set('address', address);
+//  const baseUrl = getBaseUrl();
+//  const url = new URL('/api/adapter-sends', baseUrl);
+//  url.searchParams.set('address', address);
+
+  const params = new URLSearchParams();
+  params.set('address', address);
 
   try {
-    const res = await fetch('/api/adapter-sends', { cache: 'no-store' }); // url.toString()
+    const res = await fetch(`/api/adapter-sends?address=${params.toString()}`, { cache: 'no-store' }); // url.toString()
     if (!res.ok) {
       console.error('[mgid-upsert] /api/adapter-sends HTTP error', res.status);
       return {
