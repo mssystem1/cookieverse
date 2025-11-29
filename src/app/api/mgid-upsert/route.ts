@@ -540,6 +540,7 @@ const headerFcUsername =
   // 6) Protection 2.0:
   // Only short-circuit if *raw on-chain state* (mints + bridges + images)
   // and quests (daily/weekly) did NOT change vs existing snapshot.
+  /*
   if (existing) {
     // Reconstruct previous mints per chain from (tx = mints + bridges)
     const prevMints_monad =
@@ -590,7 +591,7 @@ const headerFcUsername =
       return NextResponse.json({ ok: true, row: existing, changed: false });
     }
   }
-
+*/
   // 7) Boosts – keep whatever is already stored
   //const LineaBoost = existing?.LineaBoost ?? 0;
   //const BaseBoost = existing?.BaseBoost ?? 0;
