@@ -537,61 +537,45 @@ const headerFcUsername =
     return NextResponse.json({ ok: true, row: existing,  changed: false }); // row: existing,  
   }
 */
-  // 6) Protection 2.0:
-  // Only short-circuit if *raw on-chain state* (mints + bridges + images)
-  // and quests (daily/weekly) did NOT change vs existing snapshot.
-  /*
+  // 6) Protection: no-op only if NOTHING changed (scores, bridges, quests)
   if (existing) {
-    // Reconstruct previous mints per chain from (tx = mints + bridges)
-    const prevMints_monad =
-      Math.max(0, (existing.totalTransactions_monad ?? 0) - (existing.totalBridges_monad ?? 0));
-    const prevMints_base =
-      Math.max(0, (existing.totalTransactions_base ?? 0) - (existing.totalBridges_base ?? 0));
-    const prevMints_mantle =
-      Math.max(0, (existing.totalTransactions_mantle ?? 0) - (existing.totalBridges_mantle ?? 0));
-    const prevMints_linea =
-      Math.max(0, (existing.totalTransactions_linea ?? 0) - (existing.totalBridges_linea ?? 0));
-    const prevMints_mitosis =
-      Math.max(0, (existing.totalTransactions_mitosis ?? 0) - (existing.totalBridges_mitosis ?? 0));
+    const noScoreChange =
+      existing.totalScore === totalScore &&
+      existing.totalTransactions === totalTransactions &&
+      existing.totalImages === totalImages &&
+      (existing.totalScore_monad ?? 0) === score_monad &&
+      (existing.totalScore_base ?? 0) === score_base &&
+      (existing.totalScore_mantle ?? 0) === score_mantle &&
+      (existing.totalScore_linea ?? 0) === score_linea &&
+      (existing.totalScore_mitosis ?? 0) === score_mitosis;
 
-    const noMintsChange =
-      prevMints_monad   === mints_monad &&
-      prevMints_base    === mints_base &&
-      prevMints_mantle  === mints_mantle &&
-      prevMints_linea   === mints_linea &&
-      prevMints_mitosis === mints_mitosis;
-
-    const noBridgesChange =
-      (existing.totalBridges_monad   ?? 0) === bridges_monad &&
-      (existing.totalBridges_base    ?? 0) === bridges_base &&
-      (existing.totalBridges_mantle  ?? 0) === bridges_mantle &&
-      (existing.totalBridges_linea   ?? 0) === bridges_linea &&
+    const noBridgeChange =
+      (existing.totalBridges_monad ?? 0) === bridges_monad &&
+      (existing.totalBridges_base ?? 0) === bridges_base &&
+      (existing.totalBridges_mantle ?? 0) === bridges_mantle &&
+      (existing.totalBridges_linea ?? 0) === bridges_linea &&
       (existing.totalBridges_mitosis ?? 0) === bridges_mitosis;
-
-    // images are derived from holdings (getAllMints + isImage)
-    const noImagesChange =
-      (existing.totalImages ?? 0) === totalImages;
 
     const noDailyChange =
       (existing.dailyKey ?? null) === (dailyKey ?? null) &&
-      Number(existing.dailyBaselineCookies ?? 0) === Number(dailyBaselineCookies ?? 0) &&
-      Number(existing.dailyBaselineBridges ?? 0) === Number(dailyBaselineBridges ?? 0) &&
+      (existing.dailyBaselineCookies ?? 0) === (dailyBaselineCookies ?? 0) &&
+      (existing.dailyBaselineBridges ?? 0) === (dailyBaselineBridges ?? 0) &&
       Boolean(existing.dailyMintDone) === Boolean(dailyMintDone) &&
       Boolean(existing.dailyBridgeDone) === Boolean(dailyBridgeDone);
 
     const noWeeklyChange =
       (existing.weeklyKey ?? null) === (weeklyKey ?? null) &&
-      Number(existing.weeklyBaselineCookies ?? 0) === Number(weeklyBaselineCookies ?? 0) &&
-      Number(existing.weeklyBaselineBridges ?? 0) === Number(weeklyBaselineBridges ?? 0) &&
+      (existing.weeklyBaselineCookies ?? 0) === (weeklyBaselineCookies ?? 0) &&
+      (existing.weeklyBaselineBridges ?? 0) === (weeklyBaselineBridges ?? 0) &&
       Boolean(existing.weeklyMintDone) === Boolean(weeklyMintDone) &&
       Boolean(existing.weeklyBridgeDone) === Boolean(weeklyBridgeDone);
 
-    if (noMintsChange && noBridgesChange && noImagesChange && noDailyChange && noWeeklyChange) {
-      // truly nothing new on-chain → safe no-op
-      return NextResponse.json({ ok: true, row: existing, changed: false });
+    if (noScoreChange && noBridgeChange && noDailyChange && noWeeklyChange) { //  
+      // truly nothing changed → safe no-op
+      return NextResponse.json({ ok: true, row: existing, changed: false }); // 
     }
   }
-*/
+
   // 7) Boosts – keep whatever is already stored
   //const LineaBoost = existing?.LineaBoost ?? 0;
   //const BaseBoost = existing?.BaseBoost ?? 0;
