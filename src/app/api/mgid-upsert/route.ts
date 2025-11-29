@@ -472,7 +472,7 @@ const headerFcUsername =
   if (
     !dailyMintDone &&
     totalCookiesCurrent > 0 &&
-    totalCookiesCurrent >= dailyBaselineCookies + 2
+    totalCookiesCurrent >= dailyBaselineCookies + 1
   ) {
     dailyMintDone = true;
   }
@@ -481,7 +481,7 @@ const headerFcUsername =
   // Completed if totalBridges >= baseline + 2
   if (
     !dailyBridgeDone &&
-    totalBridgesCurrent >= dailyBaselineBridges + 2
+    totalBridgesCurrent >= dailyBaselineBridges + 1
   ) {
     dailyBridgeDone = true;
   }
