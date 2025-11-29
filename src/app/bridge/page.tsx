@@ -32,6 +32,22 @@ const LZ_EIDS = {
 
 type ChainKey = keyof typeof CHAIN_IDS;
 
+const chainIdToChainKey = (chainId?: number | null): ChainKey | null => {
+  if (!chainId) return null;
+  switch (chainId) {
+    case CHAIN_IDS.base:
+      return 'base';
+    case CHAIN_IDS.mantle:
+      return 'mantle';
+    case CHAIN_IDS.linea:
+      return 'linea';
+    case CHAIN_IDS.monad:
+      return 'monad';
+    default:
+      return null;
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Env-based addresses
 // ─────────────────────────────────────────────────────────────────────────────
@@ -331,8 +347,14 @@ export default function BridgePage() {
         }
         attempts += 1;
 
+          const chainKey = chainIdToChainKey(chainId);
+          if (!chainKey) {
+            setTokenIdOptions([]);
+            return;
+          }
+
         const res = await fetch(
-          `/api/fc-token-ids?chain=${src}&owner=${address}`,
+          `/api/fc-token-ids?chain=${chainKey}&owner=${address}`,
           { cache: 'no-store' },
         );
 

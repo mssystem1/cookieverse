@@ -453,11 +453,15 @@ const headerFcUsername =
   const weekKey = getUtcIsoWeekKey(now);
 
   // ===== DAILY TASKS =====
-  let dailyKey = existing?.dailyKey;
-  let dailyBaselineCookies = existing?.dailyBaselineCookies ?? 0;
-  let dailyBaselineBridges = existing?.dailyBaselineBridges ?? 0;
-  let dailyMintDone = existing?.dailyMintDone ?? false;
-  let dailyBridgeDone = existing?.dailyBridgeDone ?? false;
+  let dailyKey = existing?.dailyKey ?? null;
+
+  // force numbers even if old rows stored strings
+  let dailyBaselineCookies = Number(existing?.dailyBaselineCookies ?? 0);
+  let dailyBaselineBridges = Number(existing?.dailyBaselineBridges ?? 0);
+
+  // normalize to booleans
+  let dailyMintDone = Boolean(existing?.dailyMintDone);
+  let dailyBridgeDone = Boolean(existing?.dailyBridgeDone);
 
   if (!dailyKey || dailyKey !== dayKey) {
     dailyKey = dayKey;
@@ -472,7 +476,7 @@ const headerFcUsername =
   if (
     !dailyMintDone &&
     totalCookiesCurrent > 0 &&
-    totalCookiesCurrent >= dailyBaselineCookies + 1
+    totalCookiesCurrent >= dailyBaselineCookies + 2
   ) {
     dailyMintDone = true;
   }
@@ -481,17 +485,19 @@ const headerFcUsername =
   // Completed if totalBridges >= baseline + 2
   if (
     !dailyBridgeDone &&
-    totalBridgesCurrent >= dailyBaselineBridges + 1
+    totalBridgesCurrent >= dailyBaselineBridges + 2
   ) {
     dailyBridgeDone = true;
   }
 
   // ===== WEEKLY TASKS =====
-  let weeklyKey = existing?.weeklyKey;
-  let weeklyBaselineCookies = existing?.weeklyBaselineCookies ?? 0;
-  let weeklyBaselineBridges = existing?.weeklyBaselineBridges ?? 0;
-  let weeklyMintDone = existing?.weeklyMintDone ?? false;
-  let weeklyBridgeDone = existing?.weeklyBridgeDone ?? false;
+  let weeklyKey = existing?.weeklyKey ?? null;
+
+  let weeklyBaselineCookies = Number(existing?.weeklyBaselineCookies ?? 0);
+  let weeklyBaselineBridges = Number(existing?.weeklyBaselineBridges ?? 0);
+
+  let weeklyMintDone = Boolean(existing?.weeklyMintDone);
+  let weeklyBridgeDone = Boolean(existing?.weeklyBridgeDone);
 
   if (!weeklyKey || weeklyKey !== weekKey) {
     weeklyKey = weekKey;
