@@ -375,61 +375,43 @@ const headerFcUsername =
   const img_linea   = imagesByChain.linea;
   const img_mitosis = imagesByChain.mitosis;
 
-    // ── Fresh TX (mints + bridges, NO boost) ─────────────────
-  const freshTx_monad   = mints_monad   + bridges_monad;
-  const freshTx_base    = mints_base    + bridges_base;
-  const freshTx_mantle  = mints_mantle  + bridges_mantle;
-  const freshTx_linea   = mints_linea   + bridges_linea;
-  const freshTx_mitosis = mints_mitosis + bridges_mitosis;
-
-  const existingTx_monad   = existing?.totalTransactions_monad   ?? 0;
-  const existingTx_base    = existing?.totalTransactions_base    ?? 0;
-  const existingTx_mantle  = existing?.totalTransactions_mantle  ?? 0;
-  const existingTx_linea   = existing?.totalTransactions_linea   ?? 0;
-  const existingTx_mitosis = existing?.totalTransactions_mitosis ?? 0;
-
-  // 🔥 Apply boost **only** where there is NEW activity vs stored TX
-  const boost_monad_effective =
-    boostFlags.monad && freshTx_monad   > existingTx_monad   ? 1 : 0;
-  const boost_base_effective =
-    boostFlags.base  && freshTx_base    > existingTx_base    ? 1 : 0;
-  const boost_mantle_effective =
-    boostFlags.mantle && freshTx_mantle > existingTx_mantle  ? 1 : 0;
-  const boost_linea_effective =
-    boostFlags.linea && freshTx_linea   > existingTx_linea   ? 1 : 0;
-  const boost_mitosis_effective =
-    boostFlags.mitosis && freshTx_mitosis > existingTx_mitosis ? 1 : 0;
-
-  // ── Fresh SCORE (mints + bridges + boost) ────────────────
-  const freshScore_monad   = mints_monad   + bridges_monad   + boost_monad_effective;
-  const freshScore_base    = mints_base    + bridges_base    + boost_base_effective;
-  const freshScore_mantle  = mints_mantle  + bridges_mantle  + boost_mantle_effective;
-  const freshScore_linea   = mints_linea   + bridges_linea   + boost_linea_effective;
-  const freshScore_mitosis = mints_mitosis + bridges_mitosis + boost_mitosis_effective;
+   // Never decrease SCORE vs existing snapshot
+  // ── RAW per-chain score (mints + bridges + on-chain boost flag) ──
+  const rawScore_monad   = mints_monad   + bridges_monad   + boostFlags.monad;
+  const rawScore_base    = mints_base    + bridges_base    + boostFlags.base;
+  const rawScore_mantle  = mints_mantle  + bridges_mantle  + boostFlags.mantle;
+  const rawScore_linea   = mints_linea   + bridges_linea   + boostFlags.linea;
+  const rawScore_mitosis = mints_mitosis + bridges_mitosis + boostFlags.mitosis;
 
   // Never decrease SCORE vs existing snapshot
   const score_monad =
-    existing ? Math.max(existing.totalScore_monad ?? 0, freshScore_monad) : freshScore_monad;
+    existing ? Math.max(existing.totalScore_monad ?? 0, rawScore_monad) : rawScore_monad;
   const score_base =
-    existing ? Math.max(existing.totalScore_base ?? 0, freshScore_base) : freshScore_base;
+    existing ? Math.max(existing.totalScore_base ?? 0, rawScore_base) : rawScore_base;
   const score_mantle =
-    existing ? Math.max(existing.totalScore_mantle ?? 0, freshScore_mantle) : freshScore_mantle;
+    existing ? Math.max(existing.totalScore_mantle ?? 0, rawScore_mantle) : rawScore_mantle;
   const score_linea =
-    existing ? Math.max(existing.totalScore_linea ?? 0, freshScore_linea) : freshScore_linea;
+    existing ? Math.max(existing.totalScore_linea ?? 0, rawScore_linea) : rawScore_linea;
   const score_mitosis =
-    existing ? Math.max(existing.totalScore_mitosis ?? 0, freshScore_mitosis) : freshScore_mitosis;
+    existing ? Math.max(existing.totalScore_mitosis ?? 0, rawScore_mitosis) : rawScore_mitosis;
 
-  // Never decrease TX vs existing snapshot
+  // Raw TX = mints + bridges (no boost)
+  const rawTx_monad   = mints_monad   + bridges_monad;
+  const rawTx_base    = mints_base    + bridges_base;
+  const rawTx_mantle  = mints_mantle  + bridges_mantle;
+  const rawTx_linea   = mints_linea   + bridges_linea;
+  const rawTx_mitosis = mints_mitosis + bridges_mitosis;
+
   const tx_monad =
-    existing ? Math.max(existing.totalTransactions_monad ?? 0, freshTx_monad) : freshTx_monad;
+    existing ? Math.max(existing.totalTransactions_monad ?? 0, rawTx_monad) : rawTx_monad;
   const tx_base =
-    existing ? Math.max(existing.totalTransactions_base ?? 0, freshTx_base) : freshTx_base;
+    existing ? Math.max(existing.totalTransactions_base ?? 0, rawTx_base) : rawTx_base;
   const tx_mantle =
-    existing ? Math.max(existing.totalTransactions_mantle ?? 0, freshTx_mantle) : freshTx_mantle;
+    existing ? Math.max(existing.totalTransactions_mantle ?? 0, rawTx_mantle) : rawTx_mantle;
   const tx_linea =
-    existing ? Math.max(existing.totalTransactions_linea ?? 0, freshTx_linea) : freshTx_linea;
+    existing ? Math.max(existing.totalTransactions_linea ?? 0, rawTx_linea) : rawTx_linea;
   const tx_mitosis =
-    existing ? Math.max(existing.totalTransactions_mitosis ?? 0, freshTx_mitosis) : freshTx_mitosis;
+    existing ? Math.max(existing.totalTransactions_mitosis ?? 0, rawTx_mitosis) : rawTx_mitosis;
 
   // ── Totals ────────────────────────────────────────────────
   const totalScore =
@@ -538,7 +520,6 @@ const headerFcUsername =
   }
 */
   // 6) Protection: no-op only if NOTHING changed (scores, bridges, quests)
-  if (existing) {
     const noScoreChange =
       existing.totalScore === totalScore &&
       existing.totalTransactions === totalTransactions &&
@@ -555,7 +536,7 @@ const headerFcUsername =
       (existing.totalBridges_mantle ?? 0) === bridges_mantle &&
       (existing.totalBridges_linea ?? 0) === bridges_linea &&
       (existing.totalBridges_mitosis ?? 0) === bridges_mitosis;
-/*
+
     const noDailyChange =
       (existing.dailyKey ?? null) === (dailyKey ?? null) &&
       (existing.dailyBaselineCookies ?? 0) === (dailyBaselineCookies ?? 0) &&
@@ -569,12 +550,12 @@ const headerFcUsername =
       (existing.weeklyBaselineBridges ?? 0) === (weeklyBaselineBridges ?? 0) &&
       Boolean(existing.weeklyMintDone) === Boolean(weeklyMintDone) &&
       Boolean(existing.weeklyBridgeDone) === Boolean(weeklyBridgeDone);
-*/
-    if (noScoreChange && noBridgeChange) { //  && noDailyChange && noWeeklyChange
+
+    if (noScoreChange && noBridgeChange && noDailyChange && noWeeklyChange) {
       // truly nothing changed → safe no-op
-      return NextResponse.json({ ok: true, row: existing, changed: false }); // 
+      return NextResponse.json({ ok: true, row: existing, changed: false });
     }
-  }
+
 
   // 7) Boosts – keep whatever is already stored
   //const LineaBoost = existing?.LineaBoost ?? 0;
