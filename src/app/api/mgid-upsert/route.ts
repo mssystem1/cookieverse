@@ -572,7 +572,7 @@ const headerFcUsername =
 */
     if (noScoreChange && noBridgeChange) { //  && noDailyChange && noWeeklyChange
       // truly nothing changed → safe no-op
-      return NextResponse.json({ ok: true, changed: false }); // row: existing, 
+      return NextResponse.json({ ok: true, row: existing, changed: false }); // 
     }
   }
 
@@ -654,5 +654,5 @@ const headerFcUsername =
   };
 
   await upsertPlayer(row);
-  return NextResponse.json({ ok: true, changed: true }); // row,
+  return NextResponse.json({ ok: true, row, changed: true }); // 
 }
