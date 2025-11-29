@@ -880,7 +880,7 @@ React.useEffect(() => {
 
   // ---------- UI ----------
 /*{privyCfg ? <MonadGamesIdBanner /> : null}*/
-/*
+/* add
       <h1 style={{
         fontSize: 40, fontWeight: 900, letterSpacing: "-0.02em",
         color: "white", marginBottom: 8
