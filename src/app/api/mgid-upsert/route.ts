@@ -555,7 +555,7 @@ const headerFcUsername =
       (existing.totalBridges_mantle ?? 0) === bridges_mantle &&
       (existing.totalBridges_linea ?? 0) === bridges_linea &&
       (existing.totalBridges_mitosis ?? 0) === bridges_mitosis;
-
+/*
     const noDailyChange =
       (existing.dailyKey ?? null) === (dailyKey ?? null) &&
       (existing.dailyBaselineCookies ?? 0) === (dailyBaselineCookies ?? 0) &&
@@ -569,8 +569,8 @@ const headerFcUsername =
       (existing.weeklyBaselineBridges ?? 0) === (weeklyBaselineBridges ?? 0) &&
       Boolean(existing.weeklyMintDone) === Boolean(weeklyMintDone) &&
       Boolean(existing.weeklyBridgeDone) === Boolean(weeklyBridgeDone);
-
-    if (noScoreChange && noBridgeChange && noDailyChange && noWeeklyChange) {
+*/
+    if (noScoreChange && noBridgeChange) { //  && noDailyChange && noWeeklyChange
       // truly nothing changed → safe no-op
       return NextResponse.json({ ok: true, changed: false }); // row: existing, 
     }
