@@ -15,7 +15,7 @@
     "splashBackgroundColor": "#0b0b10",
     "webhookUrl": "https://cookieverse-teal.vercel.app/api/farcaster-webhook",
     "subtitle": "Cookieverse",
-    "description": "Use AI to turn text into Monad blessing cookies or images, mint them on Monad as NFTs. Track COOKIE mints and climb the leaderboard",
+    "description": "Use AI to turn text into blessing cookies or images, mint them as NFTs, bridge by LayerZero. Track COOKIE mints and climb the leaderboard",
     "primaryCategory": "art-creativity"
   }
 }
