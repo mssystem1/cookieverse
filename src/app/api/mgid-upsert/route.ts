@@ -61,16 +61,16 @@ type BoostFlags = {
   mitosis: 0 | 1;
 };
 
-async function loadBoosts(address: `0x${string}`): Promise<BoostFlags> {
+async function loadBoosts(address: `0x${string}`, origin: string): Promise<BoostFlags> {
 //  const baseUrl = getBaseUrl();
-//  const url = new URL('/api/mgid-boosts', baseUrl);
-//  url.searchParams.set('address', address);
+  const url = new URL('/api/mgid-boosts', origin);
+  url.searchParams.set('address', address);
 
-  const params = new URLSearchParams();
-  params.set('address', address);
+//  const params = new URLSearchParams();
+//  params.set('address', address);
 
   try {
-    const res = await fetch(`/api/mgid-boosts?address=${address}`, { cache: 'no-store' }); // url.toString() params.toString()
+    const res = await fetch(url.toString(), { cache: 'no-store' }); // url.toString() params.toString()
     if (!res.ok) {
       console.error('[mgid-upsert] /api/mgid-boosts HTTP error', res.status);
       return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0 };
@@ -99,7 +99,7 @@ type HoldingsStats = {
 };
 
 // Call existing /api/holdings for all chains; return total unique tokenIds & imageIds per chain
-async function loadHoldingsStats(address: `0x${string}`): Promise<HoldingsStats> {
+async function loadHoldingsStats(address: `0x${string}`, origin: string): Promise<HoldingsStats> {
  // const baseUrl = getBaseUrl();
 
   const result: HoldingsStats = {
@@ -111,15 +111,15 @@ async function loadHoldingsStats(address: `0x${string}`): Promise<HoldingsStats>
     (Object.keys(CHAIN_IDS) as ChainKey[]).map(async (chainKey) => {
       const chainId = CHAIN_IDS[chainKey];
 
-      const params = new URLSearchParams();
-      params.set('address', address);
+  //    const params = new URLSearchParams();
+   //   params.set('address', address);
      // params.set('chain', chainKey);
 
-//      const url = new URL('/api/holdings', baseUrl);
-//      url.searchParams.set('address', address);
+      const url = new URL('/api/holdings', origin);
+      url.searchParams.set('address', address);
 
       try {
-        const res = await fetch(`/api/holdings?address=${address}`, { // url.toString() params.toString()
+        const res = await fetch(url.toString(), { // url.toString() params.toString()
           cache: 'no-store',
           headers: { 'x-chain-id': String(chainId) },
         });
@@ -152,16 +152,16 @@ type AdapterSendsByChain = {
   monad: { count: number; ok: boolean };
 };
 
-async function loadAdapterSends(address: `0x${string}`): Promise<AdapterSendsByChain> {
+async function loadAdapterSends(address: `0x${string}`, origin: string): Promise<AdapterSendsByChain> {
 //  const baseUrl = getBaseUrl();
-//  const url = new URL('/api/adapter-sends', baseUrl);
-//  url.searchParams.set('address', address);
+  const url = new URL('/api/adapter-sends', origin);
+  url.searchParams.set('address', address);
 
-  const params = new URLSearchParams();
-  params.set('address', address);
+//  const params = new URLSearchParams();
+//  params.set('address', address);
 
   try {
-    const res = await fetch(`/api/adapter-sends?address=${address}`, { cache: 'no-store' }); // url.toString() params.toString()
+    const res = await fetch(url.toString(), { cache: 'no-store' }); // url.toString() params.toString()
     if (!res.ok) {
       console.error('[mgid-upsert] /api/adapter-sends HTTP error', res.status);
       return {
@@ -317,17 +317,19 @@ const headerFcUsername =
     effectiveFarcasterUsername = headerFcUsername;
   }
 
+  const origin = new URL(req.url).origin;
+
   // 3) Recompute totals from chain: mints & holdings
-  const { scoreByChain, imagesByChain } = await loadHoldingsStats(address);
+  const { scoreByChain, imagesByChain } = await loadHoldingsStats(address, origin);
 
   // 4) Recompute totals from chain: bridges 
-  const sends  = await loadAdapterSends(address);
+  const sends  = await loadAdapterSends(address, origin);
   //const baseBridge = sends.base;
   //const mantleBridge = sends.mantle;
   //const lineaBridge = sends.linea;
 
   // 5) Compose per-chain scores (mints + bridge events + boosts)
-  const boostFlags = await loadBoosts(address);
+  const boostFlags = await loadBoosts(address, origin);
 
     // ── RAW components per chain ─────────────────────────────
     /*
