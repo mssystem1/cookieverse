@@ -7,13 +7,13 @@
   "miniapp": {
     "version": "1",
     "name": "Cookieverse",
-    "iconUrl": "https://monad-fortune-cookies.vercel.app/ms-logo.png",
-    "homeUrl": "https://monad-fortune-cookies.vercel.app/mini",
-    "imageUrl": "https://monad-fortune-cookies.vercel.app/ms-logo.png",
+    "iconUrl": "https://cookieverse-teal.vercel.app/ms-logo.png",
+    "homeUrl": "https://cookieverse-teal.vercel.app/mini",
+    "imageUrl": "https://cookieverse-teal.vercel.app/ms-logo.png",
     "buttonTitle": "Open",
-    "splashImageUrl": "https://monad-fortune-cookies.vercel.app/ms-logo.png",
+    "splashImageUrl": "https://cookieverse-teal.vercel.app/ms-logo.png",
     "splashBackgroundColor": "#0b0b10",
-    "webhookUrl": "https://monad-fortune-cookies.vercel.app/api/farcaster-webhook",
+    "webhookUrl": "https://cookieverse-teal.vercel.app/api/farcaster-webhook",
     "subtitle": "Cookieverse",
     "description": "Use AI to turn text into Monad blessing cookies or images, mint them on Monad as NFTs. Track COOKIE mints and climb the leaderboard",
     "primaryCategory": "art-creativity"
