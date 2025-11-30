@@ -131,7 +131,7 @@ export default function MiniNav() {
   // MON balance (live via periodic refetch)
   const { data: bal } = useBalance({
     address: (addr as Address) || undefined,
-    chainId: monadTestnet.id,
+    chainId: baseMainnet.id,
     query: { enabled: !!addr, refetchInterval: 30_000 }, // <-- removed `watch`
   });
 

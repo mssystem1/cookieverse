@@ -14,8 +14,8 @@ import { baseMainnet, monadTestnet } from '../../lib/chain';
 
 // wagmi config that will use Farcaster’s EIP-1193 provider via injected()
 const wagmiConfig = createConfig({
-  chains: [monadTestnet],
-  transports: { [monadTestnet.id]: http() }, // your RPC setup (can keep http() if set globally)
+  chains: [baseMainnet],
+  transports: { [baseMainnet.id]: http() }, // your RPC setup (can keep http() if set globally)
   connectors: [
     miniAppConnector()
   ]
