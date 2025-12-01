@@ -15,7 +15,7 @@
     "splashBackgroundColor": "#0b0b10",
     "webhookUrl": "https://cookieverse-teal.vercel.app/api/farcaster-webhook",
     "subtitle": "Cookieverse",
-    "description": "Mint AI-powered blessing cookies & images as NFTs. Bridge via LayerZero. Climb the leaderboard",
+    "description": "Mint AI-powered blessing cookies, images as NFTs. Bridge via LayerZero. Climb the leaderboard",
     "primaryCategory": "games"
   }
 }
