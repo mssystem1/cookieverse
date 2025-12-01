@@ -667,5 +667,5 @@ const headerFcUsername =
   };
 
   await upsertPlayer(row);
-  return NextResponse.json({ ok: true, changed: true }); // row,
+  return NextResponse.json({ ok: true, changed: true }); // row, 
 }
