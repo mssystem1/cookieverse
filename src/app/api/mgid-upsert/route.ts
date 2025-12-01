@@ -472,11 +472,25 @@ const headerFcUsername =
   let dailyBaselineCookies = Number(existing?.dailyBaselineCookies ?? 0);
   let dailyBaselineBridges = Number(existing?.dailyBaselineBridges ?? 0);
 
-  // normalize to booleans
-  let dailyMintDone = Boolean(existing?.dailyMintDone);
-  let dailyBridgeDone = Boolean(existing?.dailyBridgeDone);
+  // normalize to real booleans (handle "true"/"false", 1/0, etc.)
+  const normalizeBool = (v: any): boolean => {
+    if (v === true || v === 1) return true;
+    if (v === false || v === 0 || v == null) return false;
+    if (typeof v === "string") {
+      const s = v.trim().toLowerCase();
+      if (s === "true" || s === "1" || s === "yes") return true;
+      if (s === "false" || s === "0" || s === "no" || s === "") return false;
+    }
+    return Boolean(v);
+  };
 
-  if (!dailyKey || dailyKey !== dayKey) {
+  let dailyMintDone = normalizeBool(existing?.dailyMintDone);
+  let dailyBridgeDone = normalizeBool(existing?.dailyBridgeDone);
+
+  const isSameDay = dailyKey === dayKey;
+
+  // NEW DAY → reset baselines and flags
+  if (!isSameDay || !dailyKey) {
     dailyKey = dayKey;
     dailyBaselineCookies = totalCookiesCurrent;
     dailyBaselineBridges = totalBridgesCurrent;
@@ -484,40 +498,72 @@ const headerFcUsername =
     dailyBridgeDone = false;
   }
 
+  // SAFETY: if we already had the same day in storage AND mint was done,
+  // never downgrade it because of any recalculation.
+  if (existing && existing.dailyKey === dayKey && normalizeBool(existing.dailyMintDone)) {
+    dailyMintDone = true;
+    // keep the original baseline from storage if present
+    if (typeof existing.dailyBaselineCookies !== "undefined") {
+      dailyBaselineCookies = Number(existing.dailyBaselineCookies);
+    }
+  }
+
+  // SAFETY: same for bridge
+  if (existing && existing.dailyKey === dayKey && normalizeBool(existing.dailyBridgeDone)) {
+    dailyBridgeDone = true;
+    if (typeof existing.dailyBaselineBridges !== "undefined") {
+      dailyBaselineBridges = Number(existing.dailyBaselineBridges);
+    }
+  }
+
   // Daily Mint – “Mint at least 2 COOKIEs on any chain”
-  // Completed if total cookies > 0 AND totalCookies >= baseline + 2
-  if (
-    !dailyMintDone &&
-    totalCookiesCurrent > 0 &&
-    totalCookiesCurrent >= dailyBaselineCookies + 2
-  ) {
+  const dailyMintDiff = totalCookiesCurrent - dailyBaselineCookies;
+  if (!dailyMintDone && totalCookiesCurrent > 0 && dailyMintDiff >= 2) {
     dailyMintDone = true;
   }
 
   // Daily Bridge – “Bridge 2 COOKIEs between any chains”
-  // Completed if totalBridges >= baseline + 2
-  if (
-    !dailyBridgeDone &&
-    totalBridgesCurrent >= dailyBaselineBridges + 2
-  ) {
+  const dailyBridgeDiff = totalBridgesCurrent - dailyBaselineBridges;
+  if (!dailyBridgeDone && dailyBridgeDiff >= 2) {
     dailyBridgeDone = true;
   }
 
+  // ===== WEEKLY TASKS =====
   // ===== WEEKLY TASKS =====
   let weeklyKey = existing?.weeklyKey ?? null;
 
   let weeklyBaselineCookies = Number(existing?.weeklyBaselineCookies ?? 0);
   let weeklyBaselineBridges = Number(existing?.weeklyBaselineBridges ?? 0);
 
-  let weeklyMintDone = Boolean(existing?.weeklyMintDone);
-  let weeklyBridgeDone = Boolean(existing?.weeklyBridgeDone);
+  let weeklyMintDone = normalizeBool(existing?.weeklyMintDone);
+  let weeklyBridgeDone = normalizeBool(existing?.weeklyBridgeDone);
 
-  if (!weeklyKey || weeklyKey !== weekKey) {
+  const isSameWeek = weeklyKey === weekKey;
+
+  // NEW WEEK → reset baselines and flags
+  if (!isSameWeek || !weeklyKey) {
     weeklyKey = weekKey;
     weeklyBaselineCookies = totalCookiesCurrent;
     weeklyBaselineBridges = totalBridgesCurrent;
     weeklyMintDone = false;
     weeklyBridgeDone = false;
+  }
+
+  // SAFETY: if for this week we already stored weeklyMintDone = true,
+  // never downgrade it just because of re-calculation.
+  if (existing && existing.weeklyKey === weekKey && normalizeBool(existing.weeklyMintDone)) {
+    weeklyMintDone = true;
+    if (typeof existing.weeklyBaselineCookies !== "undefined") {
+      weeklyBaselineCookies = Number(existing.weeklyBaselineCookies);
+    }
+  }
+
+  // Same safety for weeklyBridgeDone
+  if (existing && existing.weeklyKey === weekKey && normalizeBool(existing.weeklyBridgeDone)) {
+    weeklyBridgeDone = true;
+    if (typeof existing.weeklyBaselineBridges !== "undefined") {
+      weeklyBaselineBridges = Number(existing.weeklyBaselineBridges);
+    }
   }
 
   const weeklyMintDiff   = totalCookiesCurrent - weeklyBaselineCookies;
@@ -532,7 +578,7 @@ const headerFcUsername =
   if (!weeklyBridgeDone && weeklyBridgeDiff >= 8) {
     weeklyBridgeDone = true;
   }
-  
+
   /*
   // 6) Protection: if totals didn't change vs existing snapshot → no-op
   if (
@@ -573,15 +619,15 @@ const headerFcUsername =
       (existing.dailyKey ?? null) === (dailyKey ?? null) &&
       (existing.dailyBaselineCookies ?? 0) === (dailyBaselineCookies ?? 0) &&
       (existing.dailyBaselineBridges ?? 0) === (dailyBaselineBridges ?? 0) &&
-      Boolean(existing.dailyMintDone) === Boolean(dailyMintDone) &&
-      Boolean(existing.dailyBridgeDone) === Boolean(dailyBridgeDone);
+      normalizeBool(existing.dailyMintDone) === dailyMintDone &&
+      normalizeBool(existing.dailyBridgeDone) === dailyBridgeDone;
 
     const noWeeklyChange =
       (existing.weeklyKey ?? null) === (weeklyKey ?? null) &&
       (existing.weeklyBaselineCookies ?? 0) === (weeklyBaselineCookies ?? 0) &&
       (existing.weeklyBaselineBridges ?? 0) === (weeklyBaselineBridges ?? 0) &&
-      Boolean(existing.weeklyMintDone) === Boolean(weeklyMintDone) &&
-      Boolean(existing.weeklyBridgeDone) === Boolean(weeklyBridgeDone);
+      normalizeBool(existing.weeklyMintDone) === weeklyMintDone &&
+      normalizeBool(existing.weeklyBridgeDone) === weeklyBridgeDone;
 
     if (noScoreChange && noBridgeChange && noDailyChange && noWeeklyChange) { //  
       // truly nothing changed → safe no-op
