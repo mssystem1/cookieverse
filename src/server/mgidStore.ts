@@ -142,12 +142,40 @@ async function writeSnapshot(next: Snapshot): Promise<void> {
 }
 
 
-
+/*
 export async function upsertPlayer(row: MgidRow) {
   const snap = await readSnapshot();
   snap.players[row.EOAWallet.toLowerCase() as `0x${string}`] = row;
   await writeSnapshot(snap);
 }
+*/
+
+export async function upsertPlayer(row: MgidRow) {
+  const key = row.EOAWallet.toLowerCase() as `0x${string}`;
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const snap = await readSnapshot();
+
+    // merge
+    const next: Snapshot = {
+      players: {
+        ...snap.players,
+        [key]: row,
+      },
+    };
+
+    await writeSnapshot(next);
+
+    // verify we didn't get overwritten by another writer
+    const check = await readSnapshot();
+    const got = check.players[key];
+
+    if (got && got.updatedAt === row.updatedAt) return;
+  }
+
+  throw new Error("MGID upsert failed: concurrent overwrite");
+}
+
 
 export async function getPlayer(EOAWallet: `0x${string}`) {
   const snap = await readSnapshot();
