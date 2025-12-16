@@ -68,6 +68,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 // <SmartAccountProvider>{children}</SmartAccountProvider>
   return (
     <html lang="en">
+    <head>
+      <meta name="base:app_id" content="69413c95d19763ca26ddc346" />
+    </head>
       <body
         style={{
           background: "#000", // global BG black

@@ -431,18 +431,34 @@ function Table({
                 ) : (
                   (() => {
                     const addr = Array.isArray(r.address) ? r.address[0] : r.address;
+                    const label = youLabelStr(addr!);
+
+                    // ✅ Clickable ONLY for connected (active/highlighted) wallet row
+                    if (!active) {
+                      return <span style={{ color: "#cbd5e1" }}>{label}</span>;
+                    }
+
                     const href = makeExplorerAddressUrl(String(addr));
                     return (
                       <a
                         href={href}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ color: "#cbd5e1", textDecoration: "none", transition: 'color .15s ease, text-decoration .15s ease' }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = 'underline'; (e.currentTarget as HTMLAnchorElement).style.color = '#ffffff'; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = 'none'; (e.currentTarget as HTMLAnchorElement).style.color = '#cbd5e1'; }}
-                        title={`Open in ${chainLabel} explorer`}
+                        style={{
+                          color: "#ffffff",          // make connected wallet stand out
+                          fontWeight: 800,           // highlight connected wallet text
+                          textDecoration: "none",
+                          transition: "color .15s ease, text-decoration .15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none";
+                        }}
+                        title={`Open connected wallet in ${chainLabel} explorer`}
                       >
-                        {youLabelStr(addr!)}
+                        {label}
                       </a>
                     );
                   })()
