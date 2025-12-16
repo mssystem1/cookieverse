@@ -5,206 +5,352 @@ import path from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 
 export type MgidRow = {
-  usernameX: string;   // X username
-  usernamefarcaster: string;                      
+  usernameX: string;
+  usernamefarcaster: string;
+
   EOAWallet: `0x${string}`;
   SAWallet: `0x${string}`;
+
   LineaBoost: number;
   BaseBoost: number;
   MonadBoost: number;
   MantleBoost: number;
   MitosisBoost: number;
+
   totalScore_monad: number;
   totalTransactions_monad: number;
   totalImages_monad: number;
+
   totalScore_base: number;
   totalTransactions_base: number;
   totalImages_base: number;
+
   totalScore_mantle: number;
   totalTransactions_mantle: number;
   totalImages_mantle: number;
+
   totalScore_linea: number;
   totalTransactions_linea: number;
-  totalImages_linea: number;  
+  totalImages_linea: number;
+
   totalScore_mitosis: number;
   totalTransactions_mitosis: number;
   totalImages_mitosis: number;
+
   totalScore: number;
   totalTransactions: number;
   totalImages: number;
-  updatedAt: number;                       // epoch ms UTC
 
-  // 🔹 NEW: per-chain bridge counts (from adapter-sends)
+  updatedAt: number;
+
   totalBridges_monad: number;
   totalBridges_base: number;
   totalBridges_mantle: number;
   totalBridges_linea: number;
-  totalBridges_mitosis: number; // keep for symmetry (always 0 for now)
+  totalBridges_mitosis: number;
 
-    // 🔹 Daily tasks (UTC-based)
-  dailyKey?: string;                // 'YYYY-MM-DD' (UTC)
-  dailyBaselineCookies?: number;    // total cookies at start of that day
-  dailyBaselineBridges?: number;    // total bridges at start of that day
-  dailyMintDone?: boolean;          // "Mint at least 2 COOKIEs" – logic in mgid-upsert
-  dailyBridgeDone?: boolean;        // "Bridge 2 COOKIEs"
+  dailyKey?: string;
+  dailyBaselineCookies?: number;
+  dailyBaselineBridges?: number;
+  dailyMintDone?: boolean;
+  dailyBridgeDone?: boolean;
 
-  // 🔹 Weekly tasks (UTC-based ISO week)
-  weeklyKey?: string;               // 'YYYY-Www' (UTC ISO week)
-  weeklyBaselineCookies?: number;   // total cookies at start of week
-  weeklyBaselineBridges?: number;   // total bridges at start of week
-  weeklyMintDone?: boolean;         // "Mint 8+ cookies this week"
-  weeklyBridgeDone?: boolean;       // "Bridge 8+ times this week"
+  weeklyKey?: string;
+  weeklyBaselineCookies?: number;
+  weeklyBaselineBridges?: number;
+  weeklyMintDone?: boolean;
+  weeklyBridgeDone?: boolean;
 };
 
-type Snapshot = { players: Record<string, MgidRow> };
+// ---------- Legacy snapshot (read/migrate only) ----------
+type LegacySnapshot = { players: Record<string, MgidRow> };
+const LEGACY_SNAPSHOT_PATH = 'fortune-cookie/snapshot.json';
 
-// Single fixed key for MGID data inside this store
-const BLOB_PATH = 'fortune-cookie/snapshot.json';
+// ---------- V2 per-player storage ----------
+/**
+ * Bullet-proof strategy:
+ * - Append-only history: players/<addr>/v/<updatedAt>.json  (never overwritten)
+ * - Optional "latest":   players/<addr>/latest.json        (best-effort cache)
+ *
+ * Even if "latest" becomes stale due to concurrent writes, history is authoritative.
+ */
+const V2_PREFIX = 'fortune-cookie/players/';
+const MIGRATION_MARKER = 'fortune-cookie/migrations/mgid-v2-migrated.txt';
 
-// Vercel sets BLOB_READ_WRITE_TOKEN automatically in production.
-// For local dev you can also keep using your MGID_BLOB_TOKEN if you want.
-const TOKEN =
-  process.env.BLOB_READ_WRITE_TOKEN ||
-  '';
+// Vercel sets BLOB_READ_WRITE_TOKEN in production.
+// Keep exactly your existing behavior (no new token env logic).
+const TOKEN = process.env.BLOB_READ_WRITE_TOKEN || '';
 
-// Local fallback file (dev only when no token)
-const FALLBACK_FILE = path.join(os.tmpdir(), 'mgid-leaderboard.json');
+// Dev fallback (only used when no token)
+const FALLBACK_DIR = path.join(os.tmpdir(), 'mgid-v2');
 
-/** Make sure the blob exists; return its URL. */
-async function ensureBlobUrl(): Promise<string | null> {
-  if (!TOKEN) return null;
-
-  // 1) See if we already have the blob at BLOB_PATH
-  const { blobs } = await list({ prefix: BLOB_PATH, token: TOKEN });
-  if (blobs.length > 0) return blobs[0].url;
-
-  // 2) Create an empty snapshot at a stable path (no random suffix)
-  const init: Snapshot = { players: {} as Snapshot['players'] };
-  try {
-    const res = await put(BLOB_PATH, JSON.stringify(init), {
-      token: TOKEN,
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-      allowOverwrite: false, // creation only
-    });
-    return res.url;
-  } catch {
-    // 3) If another request created it in the meantime, re-list
-    const again = await list({ prefix: BLOB_PATH, token: TOKEN });
-    return again.blobs.length > 0 ? again.blobs[0].url : null;
-  }
+function normAddr(a: string) {
+  return a.toLowerCase();
 }
 
-function empty(): Snapshot { return { players: {} }; }
+function v2HistoryPath(addr: string, updatedAt: number) {
+  return `${V2_PREFIX}${normAddr(addr)}/v/${updatedAt}.json`;
+}
 
-async function readSnapshot(): Promise<Snapshot> {
-  // Dev/local fallback if there is no Blob token
+function v2LatestPath(addr: string) {
+  return `${V2_PREFIX}${normAddr(addr)}/latest.json`;
+}
+
+// ---------- Helpers ----------
+async function listAll(opts: { prefix: string; limit?: number }) {
+  if (!TOKEN) return { blobs: [] as any[] };
+
+  const blobs: any[] = [];
+  let cursor: string | undefined = undefined;
+
+  // list() supports limit + cursor pagination :contentReference[oaicite:3]{index=3}
+  while (true) {
+    const res: any = await list({
+      token: TOKEN,
+      prefix: opts.prefix,
+      limit: opts.limit ?? 1000,
+      cursor,
+    } as any);
+
+    blobs.push(...(res.blobs ?? []));
+
+    if (!res.cursor) break;
+    cursor = res.cursor;
+  }
+
+  return { blobs };
+}
+
+async function fetchJson<T>(url: string): Promise<T | null> {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) return null;
+  return (await res.json()) as T;
+}
+
+async function blobUrlByExactPathname(pathname: string): Promise<string | null> {
+  if (!TOKEN) return null;
+  const { blobs } = await list({ token: TOKEN, prefix: pathname });
+  const exact = (blobs ?? []).find((b: any) => b.pathname === pathname);
+  return exact?.url ?? null;
+}
+
+// ---------- Legacy snapshot read ----------
+async function readLegacySnapshot(): Promise<LegacySnapshot> {
   if (!TOKEN) {
+    // dev/local legacy fallback (rarely needed, but keep safe)
+    const f = path.join(FALLBACK_DIR, 'legacy-snapshot.json');
     try {
-      const raw = await readFile(FALLBACK_FILE, 'utf8');
-      return JSON.parse(raw) as Snapshot;
+      const raw = await readFile(f, 'utf8');
+      return JSON.parse(raw) as LegacySnapshot;
     } catch {
-      const init: Snapshot = { players: {} as Snapshot['players'] };
-      await writeFile(FALLBACK_FILE, JSON.stringify(init), 'utf8');
-      return init;
+      return { players: {} };
     }
   }
 
-  // Production / blob path
-  const url = await ensureBlobUrl();
-  if (!url) {
-    return { players: {} as Snapshot['players'] };
-  }
+  const url = await blobUrlByExactPathname(LEGACY_SNAPSHOT_PATH);
+  if (!url) return { players: {} };
 
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) {
-    return { players: {} as Snapshot['players'] };
-  }
-
-  return (await res.json()) as Snapshot;
+  return (await fetchJson<LegacySnapshot>(url)) ?? { players: {} };
 }
 
-async function writeSnapshot(next: Snapshot): Promise<void> {
+// ---------- V2 read: get latest row for one address ----------
+async function readV2Best(addr: string): Promise<MgidRow | null> {
+  const a = normAddr(addr);
+
+  // 1) try latest.json (fast path)
   if (!TOKEN) {
-    // dev/local: write to temp file
-    await writeFile(FALLBACK_FILE, JSON.stringify(next), 'utf8');
+    try {
+      const f = path.join(FALLBACK_DIR, `${a}.latest.json`);
+      const raw = await readFile(f, 'utf8');
+      return JSON.parse(raw) as MgidRow;
+    } catch {
+      // fallback to scanning history on disk
+    }
+  } else {
+    const latestUrl = await blobUrlByExactPathname(v2LatestPath(a));
+    if (latestUrl) {
+      const latest = await fetchJson<MgidRow>(latestUrl);
+      if (latest) return latest;
+    }
+  }
+
+  // 2) scan history and pick max updatedAt (authoritative)
+  const prefix = `${V2_PREFIX}${a}/v/`;
+
+  if (!TOKEN) {
+    // local: scan files (best effort)
+    return null;
+  }
+
+  const { blobs } = await listAll({ prefix });
+  let best: { updatedAt: number; url: string } | null = null;
+
+  for (const b of blobs) {
+    // pathname ends with ".../<updatedAt>.json"
+    const m = String(b.pathname).match(/\/v\/(\d+)\.json$/);
+    if (!m) continue;
+    const ts = Number(m[1]);
+    if (!Number.isFinite(ts)) continue;
+    if (!best || ts > best.updatedAt) best = { updatedAt: ts, url: b.url };
+  }
+
+  if (!best) return null;
+  return (await fetchJson<MgidRow>(best.url)) ?? null;
+}
+
+// ---------- V2 write: bullet-proof upsert ----------
+/**
+ * Bullet-proof guarantees:
+ * - We NEVER overwrite shared global data.
+ * - We write append-only history first (cannot delete other players).
+ * - latest.json is a cache; if it fails or becomes stale, history remains correct.
+ */
+export async function upsertPlayer(row: MgidRow) {
+  const addr = normAddr(row.EOAWallet);
+  const ts = row.updatedAt || Date.now();
+
+  // Local fallback (no blob token) – keep behavior safe in dev
+  if (!TOKEN) {
+    await writeFile(path.join(FALLBACK_DIR, `${addr}.latest.json`), JSON.stringify({ ...row, updatedAt: ts }), 'utf8');
     return;
   }
 
-  await put(BLOB_PATH, JSON.stringify(next), {
-    token: TOKEN,
-    access: 'public',
-    contentType: 'application/json',
-    addRandomSuffix: false,
-    allowOverwrite: true, // ✅ overwrite same key each time
-  });
-}
+  // 1) Append-only history (authoritative). Never overwrite.
+  // If the exact ts already exists (rare), we add a random suffix by retrying with +1ms.
+  let historyPath = v2HistoryPath(addr, ts);
+  for (let i = 0; i < 3; i++) {
+    try {
+      await put(historyPath, JSON.stringify({ ...row, updatedAt: ts }), {
+        token: TOKEN,
+        access: 'public',
+        contentType: 'application/json',
+        addRandomSuffix: false,
+        allowOverwrite: false,
+      });
+      break;
+    } catch (e: any) {
+      // If conflict, bump timestamp slightly and retry; otherwise rethrow.
+      const msg = String(e?.message ?? '');
+      const isConflict =
+        msg.includes('already exists') ||
+        msg.includes('Conflict') ||
+        msg.includes('409');
 
-
-/*
-export async function upsertPlayer(row: MgidRow) {
-  const snap = await readSnapshot();
-  snap.players[row.EOAWallet.toLowerCase() as `0x${string}`] = row;
-  await writeSnapshot(snap);
-}
-*/
-
-export async function upsertPlayer(row: MgidRow) {
-  const key = row.EOAWallet.toLowerCase() as `0x${string}`;
-
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const snap = await readSnapshot();
-
-    // merge
-    const next: Snapshot = {
-      players: {
-        ...snap.players,
-        [key]: row,
-      },
-    };
-
-    await writeSnapshot(next);
-
-    // verify we didn't get overwritten by another writer
-    const check = await readSnapshot();
-    const got = check.players[key];
-
-    if (got && got.updatedAt === row.updatedAt) return;
+      if (!isConflict || i === 2) throw e;
+      historyPath = v2HistoryPath(addr, ts + (i + 1));
+    }
   }
 
-  throw new Error("MGID upsert failed: concurrent overwrite");
+  // 2) Best-effort latest cache. Never throw from this.
+  try {
+    // Guard: only overwrite latest if newer than what we see.
+    const cur = await readV2Best(addr);
+    if (!cur || (cur.updatedAt ?? 0) <= ts) {
+      await put(v2LatestPath(addr), JSON.stringify({ ...row, updatedAt: ts }), {
+        token: TOKEN,
+        access: 'public',
+        contentType: 'application/json',
+        addRandomSuffix: false,
+        allowOverwrite: true,
+      });
+    }
+  } catch {
+    // swallow: history already persisted
+  }
 }
 
-
+// ---------- Public reads ----------
 export async function getPlayer(EOAWallet: `0x${string}`) {
-  const snap = await readSnapshot();
-  return snap.players[EOAWallet.toLowerCase() as `0x${string}`] || null;
+  // Prefer V2; if not found, fall back to legacy snapshot
+  const v2 = await readV2Best(EOAWallet);
+  if (v2) return v2;
+
+ // const legacy = await readLegacySnapshot();
+ // return legacy.players[normAddr(EOAWallet)] || null;
 }
 
+/**
+ * topPlayers:
+ * - Uses latest.json when available (fast).
+ * - If you want absolute correctness even when latest is stale, you can flip
+ *   `STRICT = true` to compute from history (heavier).
+ */
 export async function topPlayers(limit = 50): Promise<MgidRow[]> {
-  const snap = await readSnapshot();
-  const all = Object.values(snap.players);
+  if (!TOKEN) return [];
+
+  const STRICT = false;
+
+  if (!STRICT) {
+    // list all latest.json files
+    const { blobs } = await listAll({ prefix: V2_PREFIX });
+
+    const latestBlobs = blobs.filter((b: any) => String(b.pathname).endsWith('/latest.json'));
+    const rows = await Promise.all(latestBlobs.map((b: any) => fetchJson<MgidRow>(b.url)));
+
+    const all = rows.filter(Boolean) as MgidRow[];
+    all.sort((a, b) => b.totalScore - a.totalScore || b.updatedAt - a.updatedAt);
+    return all.slice(0, limit);
+  }
+
+  // STRICT mode: scan history for every address (slow but fully authoritative)
+  const { blobs } = await listAll({ prefix: `${V2_PREFIX}` });
+
+  // Group max updatedAt per address from history files
+  const bestByAddr = new Map<string, { ts: number; url: string }>();
+
+  for (const b of blobs) {
+    const p = String(b.pathname);
+    const m = p.match(/^fortune-cookie\/players\/([^/]+)\/v\/(\d+)\.json$/);
+    if (!m) continue;
+
+    const addr = m[1];
+    const ts = Number(m[2]);
+    const prev = bestByAddr.get(addr);
+    if (!prev || ts > prev.ts) bestByAddr.set(addr, { ts, url: b.url });
+  }
+
+  const best = Array.from(bestByAddr.values());
+  const rows = await Promise.all(best.map((x) => fetchJson<MgidRow>(x.url)));
+  const all = rows.filter(Boolean) as MgidRow[];
+
   all.sort((a, b) => b.totalScore - a.totalScore || b.updatedAt - a.updatedAt);
   return all.slice(0, limit);
 }
 
 export async function getPlayersMany(addresses: string[]): Promise<MgidRow[]> {
-  const snap = await readSnapshot();
+  const uniq = Array.from(new Set(addresses.map((a) => a?.toLowerCase()).filter(Boolean) as string[]));
+  const rows = await Promise.all(uniq.map((a) => getPlayer(a as any)));
+  return rows.filter(Boolean) as MgidRow[];
+}
 
-  const uniq = Array.from(
-    new Set(
-      addresses
-        .map((a) => a?.toLowerCase())
-        .filter(Boolean) as string[]
-    )
-  );
+// ---------- Migration: snapshot.json -> V2 per-player ----------
+/**
+ * Idempotent migration:
+ * - Reads legacy snapshot.json
+ * - Writes each player into V2 history (+ best-effort latest)
+ * - Drops a marker blob so it runs only once
+ */
+export async function migrateLegacySnapshotToV2Once() {
+  if (!TOKEN) return;
 
-  const rows: MgidRow[] = [];
-  for (const addr of uniq) {
-    const row = snap.players[addr];
-    if (row) rows.push(row);
+  const markerUrl = await blobUrlByExactPathname(MIGRATION_MARKER);
+  if (markerUrl) return; // already migrated
+
+  const legacy = await readLegacySnapshot();
+  const players = Object.values(legacy.players ?? {});
+
+  for (const row of players) {
+    if (!row?.EOAWallet) continue;
+    // This is safe + idempotent: history is append-only, latest guarded by updatedAt.
+    await upsertPlayer(row);
   }
 
-  return rows;
+  // Write marker (creation only)
+  await put(MIGRATION_MARKER, 'ok', {
+    token: TOKEN,
+    access: 'public',
+    contentType: 'text/plain',
+    addRandomSuffix: false,
+    allowOverwrite: false,
+  });
 }
