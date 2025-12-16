@@ -28,10 +28,10 @@ export async function POST(req: NextRequest) {
     await req.json().catch(() => ({} as any));
 
   const prompt = [
-    //'Write a short, punchy fortune cookie message.',
-    //`Tone: ${vibe}.`,
+    'Write a short, punchy fortune cookie message.',
+    `Tone: ${vibe}.`,
     topic ? `${topic}.` : '', // topic: 
-    //name ? `Sign as: ${name}.` : '',
+    name ? `Sign as: ${name}.` : '',
     'Response please no more 160 charachters.',
   ].filter(Boolean).join(' ');
 
