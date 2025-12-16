@@ -187,8 +187,8 @@ export default function MiniNav() {
       const accounts = (await provider.request({ method: 'eth_accounts' })) as string[];
       setAddr((accounts?.[0] ?? null) as Address | null);
     } catch (e) {
-      console.error('Farcaster sign-in failed:', e);
-      alert('Sign in failed. Please try again inside Farcaster.');
+      console.error('sign-in failed:', e);
+      alert('Sign in failed. Please try again.');
     } finally {
       clearTimeout(guard);
       setBusy(false);
@@ -218,7 +218,7 @@ export default function MiniNav() {
               ? `Disconnect ${addr.slice(0, 6)}…${addr.slice(-4)}`
               : busy
               ? 'Signing…'
-              : 'Sign in with Farcaster'}
+              : 'Sign in'}
           </button>
 
           {/* ETH balance pill (only when signed) */}
