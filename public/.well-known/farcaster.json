@@ -1,8 +1,9 @@
 {
+
   "accountAssociation": {
-    "header": "eyJmaWQiOjM1NTA0NiwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDYwNjFjQTVlMUZiRDE4NmU1MjZiNmU4ZUI4N2Q0MjFjZjk4ODFjQTIifQ",
-    "payload": "eyJkb21haW4iOiJjb29raWV2ZXJzZS10ZWFsLnZlcmNlbC5hcHAifQ",
-    "signature": "NgxN/owldLuuTuUiJMWFxFPEiNxqtrsYpzIkHIn4Kr05JjmhGRo/vnFk9JaQnEBP5K8GO+Ma8X0vSCqywMb8fxs="
+    "header": "eyJmaWQiOjM1NTA0NiwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDEzNkEzNjgxRTJFYzZGNjg5NTRmOGJkOGQxOGJkNTVjRmQzMTk2QzcifQ",
+    "payload": "eyJkb21haW4iOiJ3d3cuY29va2lldmVyc2UudGVjaCJ9",
+    "signature": "t+OW1m9rKKsLlXFu+6RIA5W6shI8Rmtco+FAD/8Lo8U/FzE6gCTZ8Qro3PzKo2roTLK4s2iFJXZ5OiJI40Pt8hs="
   },
   "miniapp": {
     "version": "1",
@@ -14,13 +15,13 @@
       "nft"
     ],
     "name": "Cookieverse",
-    "iconUrl": "https://cookieverse-teal.vercel.app/ms-logo.png",
-    "homeUrl": "https://cookieverse-teal.vercel.app/mini",
-    "imageUrl": "https://cookieverse-teal.vercel.app/ms-logo.png",
+    "iconUrl": "https://www.cookieverse.tech/ms-logo.png",
+    "homeUrl": "https://www.cookieverse.tech/mini",
+    "imageUrl": "https://www.cookieverse.tech/ms-logo.png",
     "buttonTitle": "Open",
-    "splashImageUrl": "https://cookieverse-teal.vercel.app/ms-logo.png",
+    "splashImageUrl": "https://www.cookieverse.tech/ms-logo.png",
     "splashBackgroundColor": "#0b0b10",
-    "webhookUrl": "https://cookieverse-teal.vercel.app/api/farcaster-webhook",
+    "webhookUrl": "https://www.cookieverse.tech/api/farcaster-webhook",
     "subtitle": "Cookieverse",
     "description": "Mint AI-powered blessing cookies, images as NFTs. Bridge via LayerZero. Climb the leaderboard",
     "primaryCategory": "games"
