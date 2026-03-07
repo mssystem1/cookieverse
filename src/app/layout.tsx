@@ -15,7 +15,7 @@ import TopUpMenu from '../components/TopUpMenu';
 import { getServerSession } from "next-auth";
 import { authOptions } from "../lib/auth"; // we'll create this in step 2
 import XAuthButton from "../components/XAuthButton";
-
+/*
 export async function generateMetadata(): Promise<Metadata> {
   const h = await headers()
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
@@ -47,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
   }
 }
-
+*/
 /*
 export const metadata: Metadata = {
   title: "Fortune Cookie",
@@ -93,6 +93,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
     <head>
       <meta name="base:app_id" content="69413c95d19763ca26ddc346" />
+        <title>Cookieverse</title>
+        <meta
+          name="fc:miniapp"
+          content='{
+            "title": "Cookieverse",
+            "description": "AI blessing cookies",
+            "version": "1",
+            "imageUrl": "https://www.cookieverse.tech/ms-logo.png",
+            "button": {
+              "title": "Open App",
+              "action": {
+                "type": "launch_miniapp",
+                "name": "Cookieverse",
+                "url": "https://www.cookieverse.tech/mini",
+                "splashImageUrl": "https://www.cookieverse.tech/ms-logo-mini.png",
+                "splashBackgroundColor": "#0B0118",  
+              }
+            }
+          }'
+        />
     </head>
       <body
         style={{
