@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
         type: 'launch_frame',
         name: 'Cookieverse',
         url: `${origin}/mini`,
-        splashImageUrl: `${origin}/ms-logo.png`,
+        splashImageUrl: `${origin}/ms-logo-mini.png`,
         splashBackgroundColor: '#0B0118',
       },
     },
