@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
     version: '1',
     imageUrl: `${origin}/ms-logo.png`,
     button: {
-      title: 'Open',
+      title: 'Open App',
       action: {
         type: 'launch_frame',
         name: 'Cookieverse',
@@ -69,6 +69,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
     <head>
+      <title>Cookieverse</title>
+        <meta
+          name="fc:miniapp"
+          content='{
+            "title": "Cookieverse",
+            "description": "AI blessing cookies",
+            "version": "1",
+            "imageUrl": "https://www.cookieverse.tech/ms-logo.png",
+            "button": {
+              "title": "Open App",
+              "action": {
+                "type": "launch_miniapp",
+                "name": "Cookieverse",
+                "url": "https://www.cookieverse.tech/mini:,
+                "splashImageUrl": "https://www.cookieverse.tech/ms-logo-mini.png",
+                "splashBackgroundColor": "#0B0118",  
+              }
+            }
+          }'
+        />
       <meta name="base:app_id" content="69413c95d19763ca26ddc346" />
     </head>
       <body
