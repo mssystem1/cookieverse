@@ -26,12 +26,12 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Cookieverse",
     description: "AI blessing cookies",
     version: '1',
-    imageUrl: `${origin}/ms-logo.png`,
+    imageUrl: `${origin}/ms-logo-32.png`,
     button: {
       title: 'Open App',
       action: {
         type: 'launch_frame',
-        name: 'Cookieverse',
+        name: 'Open App',
         url: `${origin}/mini`,
         splashImageUrl: `${origin}/ms-logo-mini.png`,
         splashBackgroundColor: '#0B0118',
@@ -66,9 +66,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const twitterImage =
     (session as any)?.twitter_image as string | undefined;
 // <SmartAccountProvider>{children}</SmartAccountProvider>
-  return (
-    <html lang="en">
-    <head>
+
+/*
       <title>Cookieverse</title>
         <meta
           name="fc:miniapp"
@@ -89,6 +88,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             }
           }'
         />
+*/
+  return (
+    <html lang="en">
+    <head>
       <meta name="base:app_id" content="69413c95d19763ca26ddc346" />
     </head>
       <body
