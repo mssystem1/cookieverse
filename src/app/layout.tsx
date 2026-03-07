@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
         type: 'launch_miniapp',
         name: 'Open App',
         url: `${origin}/mini`,
-        splashImageUrl: `${origin}/ms-logo-32.png`,
+        splashImageUrl: `${origin}/ms-logo-mini.png`,
         splashBackgroundColor: '#0B0118',
       },
     },
