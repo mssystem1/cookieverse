@@ -23,9 +23,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const origin = `${proto}://${host}`
 
   const embed = {
-    title: "Cookieverse",
-    description: "AI blessing cookies",
-    version: '1',
+  //  title: "Cookieverse",
+  //  description: "AI blessing cookies",
+    version: 'next',
     imageUrl: `${origin}/ms-logo-32.png`,
     button: {
       title: 'Open App',
@@ -33,17 +33,19 @@ export async function generateMetadata(): Promise<Metadata> {
         type: 'launch_miniapp',
         name: 'Open App',
         url: `${origin}/mini`,
-        splashImageUrl: `${origin}/ms-logo-mini.png`,
+        splashImageUrl: `${origin}/ms-logo-32.png`,
         splashBackgroundColor: '#0B0118',
       },
     },
   }
 
   return {
+    title: "Cookieverse",
+    description: "AI blessing cookies",  
     other: {
       'base:app_id': '69413c95d19763ca26ddc346',
       'fc:miniapp': JSON.stringify(embed),
-    //  'fc:frame': JSON.stringify(embed),
+      'fc:frame': JSON.stringify(embed),
     },
   }
 }
