@@ -82,7 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               "action": {
                 "type": "launch_miniapp",
                 "name": "Cookieverse",
-                "url": "https://www.cookieverse.tech/mini:,
+                "url": "https://www.cookieverse.tech/mini",
                 "splashImageUrl": "https://www.cookieverse.tech/ms-logo-mini.png",
                 "splashBackgroundColor": "#0B0118",  
               }
