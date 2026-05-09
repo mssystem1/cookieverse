@@ -61,6 +61,13 @@ async function getSafeTemplatePath(archetype: string) {
   }
 }
 
+async function loadLocalImage(filePath: string) {
+  // @napi-rs/canvas can treat string input as a URL in some runtime/version
+  // combinations. Loading from bytes is stable for local files on Vercel/Node.
+  const imageBytes = await fs.readFile(filePath);
+  return await loadImage(imageBytes);
+}
+
 async function tryLoadIcon(name: string) {
   try {
     const iconPath = path.join(
@@ -72,7 +79,7 @@ async function tryLoadIcon(name: string) {
       `${name}.png`
     );
     await fs.access(iconPath);
-    return await loadImage(iconPath);
+    return await loadLocalImage(iconPath);
   } catch {
     return null;
   }
@@ -89,7 +96,7 @@ async function tryLoadTagIcon(name: string) {
       `${name}.png`
     );
     await fs.access(iconPath);
-    return await loadImage(iconPath);
+    return await loadLocalImage(iconPath);
   } catch {
     return null;
   }
@@ -1243,7 +1250,7 @@ export async function renderCard(data: WalletRoastAnalysis): Promise<Buffer> {
   const theme = getThemeLayout(archetype);
   const templatePath = await getSafeTemplatePath(archetype);
 
-  const template = await loadImage(templatePath);
+  const template = await loadLocalImage(templatePath);
   const width = template.width;
   const height = template.height;
 
