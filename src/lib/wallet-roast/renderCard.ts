@@ -833,7 +833,7 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
     tagInline: {
       textStyle: { startSize: 0.04, minSize: 0.035, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#FDE6FF" },
       iconSize: 0.055,
-      iconGap: 0.02,
+      iconGap: 0.017,
       textOffsetY: -12,
     },
   },
