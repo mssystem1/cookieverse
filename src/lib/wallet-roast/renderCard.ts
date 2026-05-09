@@ -61,43 +61,107 @@ async function getSafeTemplatePath(archetype: string) {
   }
 }
 
+const PNG_SIGNATURE = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
+
+function isPng(buffer: Buffer) {
+  return buffer.length >= 8 && buffer.subarray(0, 8).equals(PNG_SIGNATURE);
+}
+
+function stripPngMetadata(input: Buffer): Buffer {
+  if (!isPng(input)) return input;
+
+  const chunks: Buffer[] = [input.subarray(0, 8)];
+  let offset = 8;
+
+  while (offset + 12 <= input.length) {
+    const length = input.readUInt32BE(offset);
+    const typeStart = offset + 4;
+    const dataStart = offset + 8;
+    const chunkEnd = dataStart + length + 4;
+
+    if (chunkEnd > input.length) {
+      return input;
+    }
+
+    const type = input.toString("ascii", typeStart, typeStart + 4);
+
+    // Keep critical PNG chunks only:
+    // IHDR, PLTE, IDAT, IEND.
+    // Also keep tRNS because some palette PNGs need it for transparency.
+    const isCriticalChunk = type[0] >= "A" && type[0] <= "Z";
+    const shouldKeep = isCriticalChunk || type === "tRNS";
+
+    if (shouldKeep) {
+      chunks.push(input.subarray(offset, chunkEnd));
+    }
+
+    offset = chunkEnd;
+
+    if (type === "IEND") break;
+  }
+
+  return Buffer.concat(chunks);
+}
+
 async function loadLocalImage(filePath: string) {
-  // @napi-rs/canvas can treat string input as a URL in some runtime/version
-  // combinations. Loading from bytes is stable for local files on Vercel/Node.
-  const imageBytes = await fs.readFile(filePath);
-  return await loadImage(imageBytes);
+  const rawBytes = await fs.readFile(filePath);
+  const safeBytes = stripPngMetadata(rawBytes);
+
+  try {
+    return await loadImage(safeBytes);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    throw new Error(`Image decode failed for ${filePath}: ${message}`);
+  }
 }
 
 async function tryLoadIcon(name: string) {
+  const iconPath = path.join(
+    process.cwd(),
+    "public",
+    "wallet-roast",
+    "icons",
+    "stats",
+    `${name}.png`
+  );
+
   try {
-    const iconPath = path.join(
-      process.cwd(),
-      "public",
-      "wallet-roast",
-      "icons",
-      "stats",
-      `${name}.png`
-    );
     await fs.access(iconPath);
     return await loadLocalImage(iconPath);
-  } catch {
+  } catch (error) {
+    console.warn("wallet roast stat icon skipped", {
+      name,
+      iconPath,
+      message: error instanceof Error ? error.message : String(error),
+    });
+
     return null;
   }
 }
 
 async function tryLoadTagIcon(name: string) {
+  const iconPath = path.join(
+    process.cwd(),
+    "public",
+    "wallet-roast",
+    "icons",
+    "tags",
+    `${name}.png`
+  );
+
   try {
-    const iconPath = path.join(
-      process.cwd(),
-      "public",
-      "wallet-roast",
-      "icons",
-      "tags",
-      `${name}.png`
-    );
     await fs.access(iconPath);
     return await loadLocalImage(iconPath);
-  } catch {
+  } catch (error) {
+    console.warn("wallet roast tag icon skipped", {
+      name,
+      iconPath,
+      message: error instanceof Error ? error.message : String(error),
+    });
+
     return null;
   }
 }
