@@ -127,4 +127,120 @@ export const baseAppStyles = `
       padding: 7px 6px !important;
     }
   }
+
+  .base-app-root .card--leaderboard {
+    overflow: hidden;
+  }
+
+  .base-app-root .card--leaderboard .leaderboard-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .base-app-root .card--leaderboard .leaderboard-table--compact {
+    width: 100% !important;
+    min-width: 368px !important;
+    table-layout: fixed !important;
+    font-size: 11px !important;
+  }
+
+  .base-app-root .card--leaderboard th,
+  .base-app-root .card--leaderboard td {
+    box-sizing: border-box;
+    vertical-align: middle;
+    line-height: 1.15;
+  }
+
+  .base-app-root .card--leaderboard td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .base-app-root .card--leaderboard th:nth-child(1),
+  .base-app-root .card--leaderboard td:nth-child(1) {
+    width: 44px !important;
+    min-width: 44px !important;
+    padding-left: 6px !important;
+    padding-right: 2px !important;
+    white-space: nowrap !important;
+  }
+
+  .base-app-root .card--leaderboard th:nth-child(2),
+  .base-app-root .card--leaderboard td:nth-child(2) {
+    width: 108px !important;
+    min-width: 108px !important;
+    padding-left: 6px !important;
+    padding-right: 4px !important;
+  }
+
+  .base-app-root .card--leaderboard th:nth-child(3),
+  .base-app-root .card--leaderboard td:nth-child(3) {
+    width: 92px !important;
+    min-width: 92px !important;
+    padding-left: 6px !important;
+    padding-right: 4px !important;
+  }
+
+  .base-app-root .card--leaderboard th:nth-child(4),
+  .base-app-root .card--leaderboard td:nth-child(4),
+  .base-app-root .card--leaderboard th:nth-child(5),
+  .base-app-root .card--leaderboard td:nth-child(5) {
+    width: 62px !important;
+    min-width: 62px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+    text-align: center !important;
+  }
+
+  .base-app-root .card--leaderboard td:nth-child(4) span,
+  .base-app-root .card--leaderboard td:nth-child(5) span {
+    min-width: 42px !important;
+    padding: 3px 7px !important;
+    font-size: 11px !important;
+  }
+
+  .base-app-root .card--leaderboard th {
+    font-size: 10px !important;
+    letter-spacing: 0.07em !important;
+    line-height: 1.15 !important;
+  }
+
+  .base-app-root .card--dashboard .dashboard-rank-zone {
+    gap: 7px !important;
+  }
+
+  .base-app-root .card--dashboard .dashboard-rank-pill {
+    padding: 4px 9px !important;
+    gap: 5px !important;
+    max-width: 118px !important;
+    box-shadow: 0 0 20px rgba(250, 204, 21, 0.45) !important;
+  }
+
+  .base-app-root .card--dashboard .dashboard-rank-pill span:first-child {
+    font-size: 9px !important;
+    letter-spacing: 0.04em !important;
+  }
+
+  .base-app-root .card--dashboard .dashboard-rank-pill span:last-child {
+    font-size: 11px !important;
+    line-height: 1.05 !important;
+    max-width: 64px !important;
+    text-align: right !important;
+  }
+
+  .base-app-root .card--dashboard .dashboard-level-ring {
+    width: 58px !important;
+    height: 58px !important;
+    box-shadow: 0 0 24px rgba(129, 140, 248, 0.38) !important;
+  }
+
+  .base-app-root .card--dashboard .dashboard-tier-caption {
+    max-width: 120px !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+
 `;

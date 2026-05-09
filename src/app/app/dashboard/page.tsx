@@ -9,7 +9,7 @@ export default function BaseAppDashboardPage() {
     <div className="base-app-root">
       <div className="page">
         <div className="grid">
-          <div className="card card--wallet-roast">
+          <div className="card card--wallet-roast card--dashboard">
             <div className="card__title">Cookieverse Dashboard</div>
             <DashboardClient />
           </div>

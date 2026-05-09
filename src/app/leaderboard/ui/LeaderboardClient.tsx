@@ -458,10 +458,15 @@ function renderUsernameCell(r: Row, isPlaceholder: boolean) {
 }
 
   return (
-    <div style={{ overflowX: "auto" }}>
+      <div
+        className={compact ? "leaderboard-scroll leaderboard-scroll--compact" : "leaderboard-scroll"}
+        style={{ overflowX: "auto" }}
+      >
       <table
+        className={compact ? "leaderboard-table leaderboard-table--compact" : "leaderboard-table"}
         style={{
           width: "100%",
+          minWidth: compact ? 368 : 680,
           borderCollapse: "separate",
           borderSpacing: 0,
           tableLayout: "fixed",
@@ -470,19 +475,19 @@ function renderUsernameCell(r: Row, isPlaceholder: boolean) {
           borderRadius: 12,
           overflow: "hidden",
           border: "1px solid #1f1f26",
-          fontSize: compact ? 12 : 14,
+          fontSize: compact ? 11 : 14,
         }}
       >
         <colgroup>
-          {compact ? (
-            <>
-              <col style={{ width: "20%" }} />
-              <col style={{ width: "40%" }} />
-              <col style={{ width: "56%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "26%" }} />              
-            </>
-          ) : (
+            {compact ? (
+              <>
+                <col style={{ width: "44px" }} />
+                <col style={{ width: "108px" }} />
+                <col style={{ width: "92px" }} />
+                <col style={{ width: "62px" }} />
+                <col style={{ width: "62px" }} />
+              </>
+            ) : (
             <>
               <col style={{ width: "18%" }} />
               <col style={{ width: "40%" }} />

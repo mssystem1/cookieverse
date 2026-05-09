@@ -471,6 +471,7 @@ function SummaryCard(props: {
       </div>
 
       <div
+        className="dashboard-rank-zone"
         style={{
           justifySelf: "flex-end",
           textAlign: "right",
@@ -482,6 +483,7 @@ function SummaryCard(props: {
       >
         {/* Rank pill */}
         <div
+          className="dashboard-rank-pill"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -516,6 +518,7 @@ function SummaryCard(props: {
 
         {/* Level circle */}
         <div
+          className="dashboard-level-ring"
           style={{
             width: 72,
             height: 72,
@@ -552,6 +555,7 @@ function SummaryCard(props: {
         </div>
 
         <div
+          className="dashboard-tier-caption"
           style={{
             fontSize: 11,
             color: "#a5b4fc",
