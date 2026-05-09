@@ -30,16 +30,40 @@ type Api = {
   error?: string;
 };
 
-type LeaderboardSize = 'default' | 'mini';
-type LeaderboardClientProps = { size?: LeaderboardSize };
+type LeaderboardMode = 'default' | 'FarcasterMini' | 'compact';
 
-export default function LeaderboardClient({ size = 'default' }: LeaderboardClientProps) {
+type LeaderboardClientProps = {
+  mode?: LeaderboardMode;
+};
+
+  function n(value: unknown): number {
+    const x = Number(value);
+    return Number.isFinite(x) ? x : 0;
+  }
+
+  function pickPositive(...values: unknown[]): number {
+    for (const value of values) {
+      const x = n(value);
+      if (x > 0) return x;
+    }
+    return 0;
+  }
+
+export default function LeaderboardClient({ mode = 'default' }: LeaderboardClientProps) {
   const chainId = useChainId();
 
-  const compact = size === 'mini';
+  const compact = mode === 'FarcasterMini' || mode === 'compact';
   const { address } = useAccount();
   const [data, setData] = useState<Api | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  const dataRef = React.useRef<Api | null>(null);
+
+  React.useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
 //  const { saAddress } = useSmartAccount();
   const eoaLower = address?.toLowerCase();
@@ -49,14 +73,24 @@ export default function LeaderboardClient({ size = 'default' }: LeaderboardClien
   function fetchData(fresh = false) {
     const qs = new URLSearchParams();
     const youList = [address].filter(Boolean) as string[]; // , saAddress
+
     if (youList.length) qs.set("you", youList.join(","));
     if (fresh) qs.set("fresh", "1");
-    if (chainId) qs.set("chainId", String(chainId)); // (optional fallback — header is primary)
+    if (chainId) qs.set("chainId", String(chainId));
 
-    setLoading(true);
+    const hasExistingData = !!dataRef.current;
+
+    if (hasExistingData) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    setRefreshError(null);
+
     fetch(`/api/leaderboard?${qs.toString()}`, {
       cache: "no-store",
-      headers: { "x-chain-id": String(chainId ?? "") }, // ⬅️ tell API the selected chain
+      headers: { "x-chain-id": String(chainId ?? "") },
     })
       .then((r) => r.json())
       .then(async (j) => {
@@ -75,23 +109,42 @@ export default function LeaderboardClient({ size = 'default' }: LeaderboardClien
           j.top50 = j.top50.map((r: any) => {
             const a = Array.isArray(r.address) ? r.address[0] : r.address;
             const p = a ? profiles.get(String(a).toLowerCase()) : undefined;
-            const totalScore = p?.totalScore ?? r.totalScore ?? 0;
+
             const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || '0');
-            let localScore = 0;
+
+            let profileLocalScore = 0;
+
             if (p) {
               if (chainId === 8453) {
-                localScore = Number(p.totalScore_base ?? 0);
+                profileLocalScore = n(p.totalScore_base);
               } else if (chainId === 5000) {
-                localScore = Number(p.totalScore_mantle ?? 0);
+                profileLocalScore = n(p.totalScore_mantle);
               } else if (chainId === 59144) {
-                localScore = Number(p.totalScore_linea ?? 0);
+                profileLocalScore = n(p.totalScore_linea);
               } else if (mitosisId && chainId === mitosisId) {
-                localScore = Number(p.totalScore_mitosis ?? 0);
+                profileLocalScore = n(p.totalScore_mitosis);
               } else {
-                // default to monad
-                localScore = Number(p.totalScore_monad ?? 0);
+                profileLocalScore = n(p.totalScore_monad);
               }
             }
+
+            // IMPORTANT:
+            // /api/leaderboard returns `mints` for selected chain.
+            // mgid profile can exist but contain 0. Do not let that erase API data.
+            const localScore = pickPositive(
+              profileLocalScore,
+              r.localScore,
+              r.mints,
+            );
+
+            const totalScore = pickPositive(
+              p?.totalScore,
+              r.totalScore,
+              r.TotalMints,
+              localScore,
+              r.mints,
+            );
+
             return {
               ...r,
               Xusername: p?.usernameX ?? r.Xusername ?? '',
@@ -101,25 +154,33 @@ export default function LeaderboardClient({ size = 'default' }: LeaderboardClien
             };
           });
 
+          // 🔥 Sort Top-50 by totalScore (desc), fallback to mints if needed
+          j.top50.sort((a: any, b: any) => {
+            const as = typeof a.totalScore === 'number' ? a.totalScore : 0;
+            const bs = typeof b.totalScore === 'number' ? b.totalScore : 0;
 
-            // 🔥 Sort Top-50 by totalScore (desc), fallback to mints if needed
-            j.top50.sort((a: any, b: any) => {
-              const as = typeof a.totalScore === 'number' ? a.totalScore : 0;
-              const bs = typeof b.totalScore === 'number' ? b.totalScore : 0;
-              if (bs !== as) return bs - as;
-              return (b.mints ?? 0) - (a.mints ?? 0);
-            });
+            if (bs !== as) return bs - as;
 
-            // Recompute rank based on new order
-            j.top50 = j.top50.map((r: any, idx: number) => ({ ...r, rank: idx + 1 }));
+            return (b.mints ?? 0) - (a.mints ?? 0);
+          });
+
+          // Recompute rank based on new order
+          j.top50 = j.top50.map((r: any, idx: number) => ({
+            ...r,
+            rank: idx + 1,
+          }));
         }
 
         // also enrich "you" card if present
         if (j?.you) {
-          const youAddrs = Array.isArray(j.you.address) ? j.you.address : [j.you.address];
+          const youAddrs = Array.isArray(j.you.address)
+            ? j.you.address
+            : [j.you.address];
+
           const p = youAddrs
             .map((a: any) => (a ? profiles.get(String(a).toLowerCase()) : undefined))
             .find(Boolean);
+
           if (p) {
             j.you = {
               ...j.you,
@@ -131,16 +192,26 @@ export default function LeaderboardClient({ size = 'default' }: LeaderboardClien
         }
 
         setData(j);
+        dataRef.current = j;
+        setRefreshError(null);
       })
+      .catch((e: any) => {
+        console.error('leaderboard refresh failed', e);
 
-      .finally(() => setLoading(false));
+        // Keep previous table visible.
+        setRefreshError(e?.message || 'Leaderboard refresh failed.');
+      })
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
   }
 
   // Fetch on mount and when wallet changes (fresh)
   useEffect(() => {
     fetchData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, ]); // saAddress
+  }, [address, chainId]); // saAddress
 
   // Refetch fresh when window gains focus or tab becomes visible (switching tabs)
   useEffect(() => {
@@ -157,8 +228,13 @@ export default function LeaderboardClient({ size = 'default' }: LeaderboardClien
 
   //const lower = address?.toLowerCase();
 
-  if (loading)
-    return <div style={{ opacity: 0.8, color: "#cbd5e1" }}>Loading leaderboard…</div>;
+  if (loading && !data) {
+    return (
+      <div style={{ opacity: 0.8, color: '#cbd5e1' }}>
+        Loading leaderboard…
+      </div>
+    );
+  }
 
   if (!data || !Array.isArray(data.top50)) {
     return <div style={{ color: "#cbd5e1" }}>Leaderboard unavailable.</div>;
@@ -223,10 +299,41 @@ const youRow: Row | null = (data.you as any) ?? (() => {
         </div>
       ) : null}
 
+    {refreshing ? (
+      <div
+        style={{
+          color: '#9ca3af',
+          marginBottom: 8,
+          fontSize: 12,
+          fontWeight: 700,
+        }}
+      >
+        Refreshing leaderboard…
+      </div>
+    ) : null}
+
+    {refreshError && data ? (
+      <div
+        style={{
+          color: '#fbbf24',
+          marginBottom: 8,
+          fontSize: 12,
+          fontWeight: 700,
+        }}
+      >
+        Last refresh failed. Showing previous leaderboard.
+      </div>
+    ) : null}
+
       {/*showPinned && youRow ? <PinnedYouRow you={youRow} hasRank={!!data.you} /> : null*/}
       {showPinned && youRow ? <PinnedYouRow you={youRow} hasRank={Number.isFinite(youRow.rank)} /> : null}
 
-      <Table rows={data.top50} highlight={highlights} compact={compact} />
+      <Table
+        rows={data.top50}
+        highlight={highlights}
+        compact={compact}
+        mode={mode}
+      />
       <p style={{ marginTop: 12, color: "#9ca3af" }}>
         {Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.updatedAt))}
         {" • "}
@@ -277,12 +384,13 @@ function Table({
   rows,
   highlight,
   compact = false,
+  mode,
 }: {
   rows: Row[];
   highlight: string | string[];
   compact?: boolean;
+  mode: LeaderboardMode;
 }) {
-  const showExtras = !compact; // hide extra columns in mini
   const hl = Array.isArray(highlight) ? highlight : [highlight];
 
    const chainId = useChainId();
@@ -316,6 +424,38 @@ function Table({
         return `https://monadvision.com/address/${addr}`;
     }
   }, [chainLabel]); 
+
+  const usernameHeader =
+  mode === 'compact'
+    ? 'X USERNAME'
+    : mode === 'FarcasterMini'
+    ? 'FARCASTER USERNAME'
+    : null;
+
+function renderUsernameCell(r: Row, isPlaceholder: boolean) {
+  if (isPlaceholder) {
+    return <span style={{ color: '#6b7280' }}>—</span>;
+  }
+
+  if (mode === 'compact') {
+    return r.Xusername && r.Xusername.trim().length > 0 ? (
+      <span>@{r.Xusername}</span>
+    ) : (
+      <span style={{ color: '#6b7280' }}>—</span>
+    );
+  }
+
+  if (mode === 'FarcasterMini') {
+    return r.FarcasterUsername &&
+      String(r.FarcasterUsername).trim().length > 0 ? (
+      <span>@{r.FarcasterUsername}</span>
+    ) : (
+      <span style={{ color: '#6b7280' }}>—</span>
+    );
+  }
+
+  return null;
+}
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -356,38 +496,93 @@ function Table({
 
         <thead>
           <tr>
-            <Th compact={compact} style={{ textAlign: "left", paddingLeft: 8, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
+            <Th
+              compact={compact}
+              style={{
+                textAlign: 'left',
+                paddingLeft: 8,
+                background: '#14141a',
+                borderBottom: '1px solid #1f1f26',
+              }}
+            >
               RANK
             </Th>
-            { showExtras && (            
-            <Th compact={compact} style={{ textAlign: "left", paddingLeft: 8, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
-              X USERNAME
-            </Th>
-             )}
-            <Th compact={compact} style={{ textAlign: "left", paddingLeft: 8, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
-              FARCASTER USERNAME
-            </Th>
-            <Th compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 16 : 28, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
+
+            {mode === 'default' ? (
+              <>
+                <Th
+                  compact={compact}
+                  style={{
+                    textAlign: 'left',
+                    paddingLeft: 8,
+                    background: '#14141a',
+                    borderBottom: '1px solid #1f1f26',
+                  }}
+                >
+                  X USERNAME
+                </Th>
+
+                <Th
+                  compact={compact}
+                  style={{
+                    textAlign: 'left',
+                    paddingLeft: 8,
+                    background: '#14141a',
+                    borderBottom: '1px solid #1f1f26',
+                  }}
+                >
+                  FARCASTER USERNAME
+                </Th>
+              </>
+            ) : (
+              <Th
+                compact={compact}
+                style={{
+                  textAlign: 'left',
+                  paddingLeft: 8,
+                  background: '#14141a',
+                  borderBottom: '1px solid #1f1f26',
+                }}
+              >
+                {usernameHeader}
+              </Th>
+            )}
+
+            <Th
+              compact={compact}
+              style={{
+                textAlign: 'left',
+                paddingLeft: compact ? 16 : 28,
+                background: '#14141a',
+                borderBottom: '1px solid #1f1f26',
+              }}
+            >
               WALLET
             </Th>
-            <Th compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
+
+            <Th
+              compact={compact}
+              style={{
+                textAlign: 'right',
+                paddingRight: compact ? 10 : 18,
+                background: '#14141a',
+                borderBottom: '1px solid #1f1f26',
+              }}
+            >
               SCORE on {chainLabel}
             </Th>
-            <Th compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
-              TOTAL SCORE 
+
+            <Th
+              compact={compact}
+              style={{
+                textAlign: 'right',
+                paddingRight: compact ? 10 : 18,
+                background: '#14141a',
+                borderBottom: '1px solid #1f1f26',
+              }}
+            >
+              TOTAL SCORE
             </Th>
-            {/*showExtras &&*/} 
-            {/*showExtras && (
-              <Th compact={compact} style={{ textAlign: "right", paddingRight: compact ? 12 : 25, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
-                MINTED COOKIES
-              </Th>
-            )*/}
-            {/*showExtras &&*/} 
-            {/*showExtras && (
-              <Th compact={compact} style={{ textAlign: "right", paddingRight: compact ? 14 : 30, background: "#14141a", borderBottom: "1px solid #1f1f26" }}>
-                MINTED IMAGES
-              </Th>
-            )*/}
           </tr>
         </thead>
 
@@ -404,25 +599,45 @@ function Table({
                   {rankCell(r.rank)}
                 </Td>
 
-              {/* X USERNAME (hidden on mini) */}
-              {showExtras && (
-                <Td compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 8 : 12 }}>
-                  {isPlaceholder
-                    ? <span style={{ color: "#6b7280" }}>—</span>
-                    : (r.Xusername && r.Xusername.trim().length > 0
-                        ? <span>@{r.Xusername}</span>
-                        : <span style={{ color: "#6b7280" }}>—</span>)}
+            {mode === 'default' ? (
+              <>
+                {/* X USERNAME */}
+                <Td
+                  compact={compact}
+                  style={{ textAlign: 'left', paddingLeft: compact ? 8 : 12 }}
+                >
+                  {isPlaceholder ? (
+                    <span style={{ color: '#6b7280' }}>—</span>
+                  ) : r.Xusername && r.Xusername.trim().length > 0 ? (
+                    <span>@{r.Xusername}</span>
+                  ) : (
+                    <span style={{ color: '#6b7280' }}>—</span>
+                  )}
                 </Td>
-              )}
 
-              {/* FARCASTER USERNAME (always shown) */}
-              <Td compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 8 : 12 }}>
-                {isPlaceholder
-                  ? <span style={{ color: "#6b7280" }}>—</span>
-                  : (r.FarcasterUsername && String(r.FarcasterUsername).trim().length > 0
-                      ? <span>@{r.FarcasterUsername}</span>
-                      : <span style={{ color: "#6b7280" }}>—</span>)}
+                {/* FARCASTER USERNAME */}
+                <Td
+                  compact={compact}
+                  style={{ textAlign: 'left', paddingLeft: compact ? 8 : 12 }}
+                >
+                  {isPlaceholder ? (
+                    <span style={{ color: '#6b7280' }}>—</span>
+                  ) : r.FarcasterUsername &&
+                    String(r.FarcasterUsername).trim().length > 0 ? (
+                    <span>@{r.FarcasterUsername}</span>
+                  ) : (
+                    <span style={{ color: '#6b7280' }}>—</span>
+                  )}
+                </Td>
+              </>
+            ) : (
+              <Td
+                compact={compact}
+                style={{ textAlign: 'left', paddingLeft: compact ? 8 : 12 }}
+              >
+                {renderUsernameCell(r, isPlaceholder)}
               </Td>
+            )}
 
               {/* WALLET */}
               <Td compact={compact} style={{ textAlign: "left", paddingLeft: compact ? 16 : 28 }}>
@@ -466,11 +681,11 @@ function Table({
               </Td>
 
                 <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18 }}>
-                  {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{/*r.mints*/}{r.localScore ?? 0}</span>}
+                  {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{/*r.mints*/}{pickPositive(r.localScore)}</span>}
                 </Td>
 
                 <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18 }}>
-                  {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{/*r.TotalMints*/}{r.totalScore ?? 0}</span>}
+                  {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{/*r.TotalMints*/}{pickPositive(r.totalScore)}</span>}
                 </Td>
 
                 {/*showExtras &&*/} 

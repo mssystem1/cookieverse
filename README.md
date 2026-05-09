@@ -1,453 +1,528 @@
-# 🍪 Fortune Cookies – Cookieverse dApp & Farcaster Mini
+# 🍪 Cookieverse
 
 <p align="center">
-  <!-- Release -->
-  <a href="https://github.com/mssystem1/cookieverse/releases">
-    <img src="https://img.shields.io/github/v/release/mssystem1/cookieverse?style=for-the-badge&label=Release&color=blue" alt="Release" />
-  </a>
-
-  <!-- Last Commit -->
-  <a href="https://github.com/mssystem1/cookieverse/commits/main">
-    <img src="https://img.shields.io/github/last-commit/mssystem1/cookieverse?style=for-the-badge&color=brightgreen&label=Last%20Commit" alt="Last Commit" />
-  </a>
-
-  <!-- Stars -->
-  <a href="https://github.com/mssystem1/cookieverse/stargazers">
-    <img src="https://img.shields.io/github/stars/mssystem1/cookieverse?style=for-the-badge&color=ff69b4" alt="Stars" />
-  </a>
-
-  <!-- Issues -->
-  <a href="https://github.com/mssystem1/cookieverse/issues">
-    <img src="https://img.shields.io/github/issues/mssystem1/cookieverse?style=for-the-badge&color=yellow" alt="Issues" />
-  </a>
-
-  <!-- PRs Welcome -->
-  <a href="https://github.com/mssystem1/cookieverse/pulls">
-    <img src="https://img.shields.io/badge/PRs-Welcome-22C55E?style=for-the-badge" alt="PRs Welcome" />
-  </a>
-
-  <!-- License -->
-  <a href="https://github.com/mssystem1/cookieverse/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/mssystem1/cookieverse?style=for-the-badge&color=orange" alt="License" />
-  </a>
-</p>
-
-<!-- Divider -->
-<p align="center">
-  <img src="https://img.shields.io/badge/–%20POWERED%20BY%20–-6B21A8?style=for-the-badge&labelColor=000000&color=6B21A8" />
+  <img src="public/ms-logo.png" alt="Cookieverse" width="160" />
 </p>
 
 <p align="center">
-
-  <!-- LayerZero -->
-  <img src="https://img.shields.io/badge/LayerZero-000000?logo=LayerZero&style=for-the-badge" alt="LayerZero" />
-
-  <!-- OpenAI -->
-  <img src="https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white&style=for-the-badge" alt="OpenAI" />
-
-  <!-- Farcaster -->
-  <img src="https://img.shields.io/badge/Farcaster-855DCD?logo=farcaster&logoColor=white&style=for-the-badge" alt="Farcaster" />
-
-  <!-- Next.js -->
-  <img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&style=for-the-badge" alt="Next.js" />
-
-  <!-- Wagmi -->
-  <img src="https://img.shields.io/badge/Wagmi-1E293B?style=for-the-badge" alt="Wagmi" />
-
-  <!-- RainbowKit -->
-  <img src="https://img.shields.io/badge/RainbowKit-FF7AC3?style=for-the-badge" alt="RainbowKit" />
-
-  <!-- Vercel -->
-  <img src="https://img.shields.io/badge/Vercel-000000?logo=vercel&style=for-the-badge" alt="Vercel" />
-
-</p>
-
-<!-- Divider -->
-<p align="center">
-  <img src="https://img.shields.io/badge/–%20SUPPORTED%20CHAINS%20–-2563EB?style=for-the-badge&labelColor=000000&color=2563EB" />
+  <b>Cookieverse: mint AI fortune COOKIE NFTs, roast wallets, bridge cross-chain, and climb the leaderboard.</b>
 </p>
 
 <p align="center">
-
-  <!-- Monad -->
-  <img src="https://img.shields.io/badge/Monad-5936F5?style=for-the-badge&logo=ethereum&logoColor=white" alt="Monad" />
-
-  <!-- Base -->
-  <img src="https://img.shields.io/badge/Base-0052FF?style=for-the-badge&logo=coinbase&logoColor=white" alt="Base" />
-
-  <!-- Mantle -->
-  <img src="https://img.shields.io/badge/Mantle-00E599?style=for-the-badge&logo=ethereum&logoColor=black" alt="Mantle" />
-
-  <!-- Linea -->
-  <img src="https://img.shields.io/badge/Linea-2BBDF7?style=for-the-badge&logo=ethereum&logoColor=white" alt="Linea" />
-
-  <!-- Mitosis -->
-  <img src="https://img.shields.io/badge/Mitosis-9C40FF?style=for-the-badge&logo=intercom&logoColor=white" alt="Mitosis" />
-
-</p>
-
-<!-- Divider -->
-<p align="center">
-  <img src="https://img.shields.io/badge/–%20COOKIEVERSE%20SPECIAL%20–-ec4899?style=for-the-badge&labelColor=000000&color=ec4899" />
+  <img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=nextdotjs" alt="Next.js 15" />
+  <img src="https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/OpenAI-Powered-412991?style=for-the-badge&logo=openai&logoColor=white" alt="OpenAI powered" />
+  <img src="https://img.shields.io/badge/0G-Compute-111827?style=for-the-badge" alt="0G Compute" />
 </p>
 
 <p align="center">
-  <!-- AI COOKIE -->
-  <img src="https://img.shields.io/badge/AI%20COOKIE%20NFTs-F97316?style=for-the-badge&logo=sparkfun&logoColor=white" alt="AI Cookie NFTs" />
-
-  <!-- CROSSCHAIN -->
-  <img src="https://img.shields.io/badge/Crosschain%20Bridge-06B6D4?style=for-the-badge&logo=linktree&logoColor=white" alt="Crosschain Bridge" />
-
-  <!-- BLOB -->
-  <img src="https://img.shields.io/badge/BLOB%20Leaderboard-9333EA?style=for-the-badge&logo=magic&logoColor=white" alt="BLOB" />
-
-  <!-- Fortune Engine -->
-  <img src="https://img.shields.io/badge/Fortune%20Engine-14B8A6?style=for-the-badge&logo=openai&logoColor=white" alt="Fortune Engine" />
-</p>
-
-AI-generated fortune cookies, multi-chain NFTs, LayerZero ZK bridge, MGID leaderboard, Farcaster Mini-app.  
-All in one **Cookieverse**.
-
-<p align="center">
-  <img src="public/ms-logo.png" alt="Monad Fortune Cookies" width="180" />
-</p>
-
-<p align="center">
-  <b>Mint AI-powered COOKIE NFTs → Bridge them across chains → Grind quests → Climb the MGID leaderboard.</b>
+  <img src="https://img.shields.io/badge/Base%20App-Supported-0052FF?style=for-the-badge&logo=coinbase&logoColor=white" alt="Base App supported" />
+  <img src="https://img.shields.io/badge/Farcaster-Mini%20App-855DCD?style=for-the-badge" alt="Farcaster Mini App" />
+  <img src="https://img.shields.io/badge/Mobile%20%2F%20Tablet-Ready-22C55E?style=for-the-badge" alt="Mobile and tablet ready" />
+  <img src="https://img.shields.io/badge/LayerZero-Bridge-000000?style=for-the-badge" alt="LayerZero bridge" />
 </p>
 
 ---
 
-## ✨ What is this?
+Cookieverse is a Next.js dApp for AI fortune COOKIE NFTs, multi-chain bridge flows, leaderboards, Farcaster Mini App usage, and the newer Base App / Wallet Roast experience. It is built for desktop, mobile, and tablet usage, with dedicated compact shells for Farcaster and Base App contexts.
 
-**Fortune Cookies** is a Next.js dApp + Farcaster Mini-app that lets users:
+The project is built around:
 
-- 🧠 Generate short AI fortunes  - text or image
-- 🍪 Mint them on-chain as **COOKIE NFTs** (FortuneCookiesAI ERC-721)
-- 🌉 Bridge NFTs between **Monad, Base, Mantle, Linea, Mitosis** powered by **LayerZero ZK brisge**
-- 🧮 Track their multi-chain COOKIE portfolio & quest progress on a **Dashboard**
-- 🏆 Compete in **leaderboard**, mapped to **X (Twitter)** and **Farcaster** usernames
-- 📱 Use a **Farcaster Mini-App** (“Cookieverse”) with a compact interface to compete on Farcaster
+- 🧠 AI-generated fortune text and images
+- 🍪 COOKIE NFT minting through `FortuneCookiesAI`
+- 🌉 LayerZero ONFT bridge routes across supported chains
+- 🏆 Leaderboard and dashboard state stored through Vercel Blob
+- 🧑‍🚀 X OAuth and Farcaster Mini App identity surfaces
+- 🔥 Base wallet analysis, roast classification, card rendering, sharing, and minting
+- 🔵 Base App support through `/app` routes and mobile-first layout constraints
+- 🟣 Farcaster Mini App support through `/mini` routes and launch metadata
+- ⚡ OpenAI and 0G powered AI flows for fortunes and Wallet Roast generation
+- 📱 Responsive desktop, mobile, and tablet experiences
 
-The app is built to be **prod-ready**: server-side APIs, on-chain scans, Etherscan v2 integration, Vercel Blob storage, OpenAI, Pinata, WalletConnect, MetaMask smart accounts & more.
+## ✨ Feature Snapshot
 
----
-
-## 🧩 Core Features
-
-### 🍪 1. AI Fortune & COOKIE Minting
-
-- `/api/fortune` – calls OpenAI (Responses API) to generate a short fortune text
-- Main page (`/`) lets users:
-  - Connect wallet (RainbowKit + Wagmi)
-  - Generate fortune + image
-  - Mint COOKIE NFTs via `FortuneCookiesAI` ABI (`src/abi/FortuneCookiesAI.json`)
-- Multi-chain aware:
-  - Uses `cookieAddressFor(chainId)` to select correct COOKIE ERC-721 per chain
-  - Supports **Monad / Base / Mantle / Linea / Mitosis**
-
-### 🌉 2. ZK Bridge (LayerZero ONFT)
-
-- `/bridge` – ZK Bridge page implemented in `src/app/bridge/page.tsx`
-- Uses:
-  - `NEXT_PUBLIC_ADAPTER_*` for ONFT Adapters per chain
-  - `NEXT_PUBLIC_ONFT_*` / COOKIE canonical contracts
-  - LayerZero v2 `quoteSend` + `send` on ONFT adapter ABI
-- UX:
-  - Detects connected chain
-  - Loads owned COOKIE token IDs (via `/api/fc-token-ids`)
-  - Steps: **Approve → Quote fee → Send** (with flat fee params)
-  - Updates MGID stats after successful bridge
-
-### 🧮 3. Leaderboard
-
-- **snapshot** stored in Vercel Blob: `fortune-cookie/snapshot.json` via `src/server/mgidStore.ts`
-- Per-player record includes:
-  - X username, Farcaster username
-  - EOAWallet / SAWallet
-  - per-chain scores, transactions, images
-  - per-chain boost flags (BaseBoost, MonadBoost, LineaBoost, MantleBoost, MitosisBoost)
-- API routes:
-  - `/api/mgid-get` – load player row
-  - `/api/mgid-upsert` – recompute + persist MGID after actions (mint/bridge)
-  - `/api/mgid-leaderboard` – sorted list for dashboard/leaderboard
-  - `/api/mgid-boosts` – reads booster NFT ownership
-- UI:
-  - `/leaderboard` → `LeaderboardClient`
-    - Shows top COOKIES minters (top-20), enriched with X / Farcaster from MGID
-  - `/dashboard` → `DashboardClient`
-    - Shows multi-chain holdings, bridge counts, quests and ranks
-
-### 📊 4. Multi-chain COOKIE Dashboard & Quests
-
-- **Holdings**:
-  - `/api/holdings` aggregates NFT holdings per chain
-  - Uses BlockVision + RPC fallbacks, plus a local “last-good” JSON to survive API hiccups
-- **Leaderboard (on-chain view)**:
-  - `/api/leaderboard` calculates top-20 mints per chain
-  - Uses `FortuneCookiesAI` ABI with `getPublicClientByKey` for multi-chain scans
-- **Quests & ranks** (DashboardClient):
-  - Daily & weekly COOKIE mint quests
-  - Rank system (Bronze / Silver / Gold / Emerald) with custom colors
-  - Per-chain counters (mints, bridges, images) and boosts
-
-### 📱 5. Farcaster Mini-App (Cookieverse)
-
-- Mini-app entrypoint at `/mini`
-- Compact navigation in `src/components/mini/MiniNav.tsx`
-- Mini routes:
-  - `/mini` – main minting view
-  - `/mini/bridge` – mini bridge
-  - `/mini/dashboard` – mini dashboard
-  - `/mini/leaderboard` – mini leaderboard
-  - `/mini/smartaccount` – smart account tools
-- Metadata published via `public/.well-known/farcaster.json`:
-  - Name: **Cookieverse**
-  - Home URL, icons, splash, description, webhook URL, category
-- Uses `@farcaster/miniapp-sdk` for:
-  - Wallet connection with injected provider
-  - Reading FID/session details (for Farcaster username mapping)
-
-### 👤 6. Identity & Auth (X + Smart Accounts)
-
-- **X / Twitter OAuth** via NextAuth:
-  - Config in `src/lib/auth.ts`
-  - Provider: `next-auth/providers/twitter` (OAuth 2.0)
-  - Session enriched with `twitter_username` & `twitter_image`
-  - Used in MGID + UI (X avatar, username display)
-- **Farcaster** via Farcaster:
-  - get username and wallet address
+| Area | What it does |
+| --- | --- |
+| 🍪 Fortune minting | Generate AI fortunes and mint them as COOKIE NFTs. |
+| 🔥 Wallet Roast | Analyze a Base wallet, classify it, render a roast card, share it, or mint it. |
+| 🌉 Bridge | Move COOKIE NFTs with LayerZero ONFT adapter flows. |
+| 🏆 Leaderboards | Track mints, boosts, quests, ranks, and MGID stats. |
+| 🔵 Base App | Compact `/app` shell with Base App metadata and mobile/tablet UI. |
+| 🟣 Farcaster | `/mini` routes optimized for Farcaster Mini App embeds. |
+| 🤖 AI providers | OpenAI by default, optional 0G Compute provider for Wallet Roast. |
 
 ---
 
-## 🛠 Tech Stack
+## 🧭 Current App Surfaces
 
-- **Framework**: Next.js (App Router, `src/app`)
-- **Language**: TypeScript / React
-- **Wallet & Chains**:
-  - `wagmi`, `viem`, `@rainbow-me/rainbowkit`
-  - Custom chains in `src/lib/chain.ts`:
-    - Monad (testnet / mainnet style config)
-    - Base
-    - Mantle
-    - Linea
-    - Mitosis
-- **Identity & Auth**:
-  - NextAuth (Twitter provider)
-  - Farcaster Mini-app SDK
-  - Privy (for smart account / MPC login)
-- **AI & Storage**:
-  - OpenAI Responses API (`/api/fortune`)
-  - Vercel Blob (`@vercel/blob`) for MGID snapshot
-  - Pinata for NFT metadata / images
-- **Infra & Indexing**:
-  - Etherscan v2 API for adapter transfers & on-chain stats
-  - BlockVision NFT API for collection/account snapshots
-- **Styling**:
-  - CSS-in-JS via inline styles + some Tailwind-style spacing choices
-  - Custom gradient dividers, rank color palette, mini-nav chrome
+### 🖥️ Main Web App
+
+Routes:
+
+- `/` - main COOKIE minting page, Wallet Roast UI, and connected wallet flows
+- `/bridge` - LayerZero ONFT bridge page
+- `/leaderboard` - COOKIE and MGID leaderboard UI
+- `/dashboard` - multi-chain holdings, quest progress, boosts, and rank UI
+
+The main app is wrapped by `MainChrome` and requires X login before exposing the full dApp shell.
+
+### 🟣 Farcaster Mini App
+
+Routes:
+
+- `/mini`
+- `/mini/bridge`
+- `/mini/dashboard`
+- `/mini/leaderboard`
+
+Mini routes use `MiniProviders` and `MiniNav`. Metadata is generated in `src/app/layout.tsx` and `src/app/mini/head.tsx`.
+
+Farcaster support includes Mini App launch metadata, splash assets, compact navigation, and a separate `/mini` route family for wallet, bridge, dashboard, leaderboard, and smart account flows.
+
+### 🔵 Base App / Compact Web App
+
+Routes:
+
+- `/app`
+- `/app/bridge`
+- `/app/leaderboard`
+- `/app/dashboard`
+
+The Base App shell is isolated by `BaseAppOnly`, `BaseAppNav`, and `src/app/app/baseAppStyles.ts`. Mobile users landing on `/` are redirected to `/app` by `MobileBaseAppRedirect`, unless `?web=1` is used.
+
+Base App support includes the `base:app_id` metadata, a compact route family under `/app`, mobile/tablet-friendly navigation, wallet connection, X profile display, and layout overrides that make the existing dApp tools usable in constrained viewports.
+
+### 📱 Mobile and Tablet Support
+
+Cookieverse supports desktop, mobile, and tablet layouts:
+
+- Desktop users get the full main web shell.
+- Mobile and tablet users can use the compact `/app` shell.
+- Touch and coarse-pointer devices are automatically routed from `/` to `/app`.
+- Farcaster users get a separate `/mini` shell optimized for Mini App embeds.
+- `?web=1` disables the automatic mobile redirect when a user wants the full web app.
+
+---
+
+## 🚀 Core Features
+
+### 🍪 AI Fortune Minting
+
+- `/api/fortune` calls OpenAI to generate a short fortune.
+- `/api/images` creates or handles image generation assets.
+- `/api/pinata` uploads NFT metadata and images.
+- `src/app/page.tsx` handles wallet connect, generation, preview, Pinata upload, and minting.
+- `src/abi/FortuneCookiesAI.json` provides the COOKIE ERC-721 ABI.
+
+### 🔥 Wallet Roast
+
+Wallet Roast is now part of the main mint page and Base App experience.
+
+User flow:
+
+1. Paste a wallet address or use the connected wallet.
+2. POST `/api/wallet-roast/analyze` analyzes the wallet on Base.
+3. The analysis is classified into an archetype and tags.
+4. POST `/api/wallet-roast/render` renders a PNG roast card.
+5. The card can be previewed, copied, downloaded, shared to X, or minted.
+
+Important files:
+
+- `src/lib/wallet-roast/analyzeWalletRoast.ts` - full analysis pipeline
+- `src/lib/wallet-roast/fetchBaseWalletData.ts` - Base data from Etherscan V2 plus Basename lookup
+- `src/lib/wallet-roast/normalizeWalletData.ts` - raw data normalization
+- `src/lib/wallet-roast/computeMetrics.ts` - portfolio and activity metrics
+- `src/lib/wallet-roast/classifyArchetype.ts` - archetype scoring
+- `src/lib/wallet-roast/buildTags.ts` - visible tag selection
+- `src/lib/wallet-roast/buildTraits.ts` - prompt traits
+- `src/lib/wallet-roast/generateRoast.ts` - provider switch between OpenAI and 0G
+- `src/lib/wallet-roast/generateOpenAIRoast.ts` - OpenAI roast generation
+- `src/lib/wallet-roast/generateOgRoast.ts` - 0G roast generation
+- `src/lib/wallet-roast/renderCard.ts` - server-side PNG rendering with `@napi-rs/canvas`
+- `src/lib/share.ts` - native mobile image sharing and X intent fallback
+
+Assets:
+
+- `public/wallet-roast/templates/` - archetype card templates
+- `public/wallet-roast/icons/stats/` - stat icons
+- `public/wallet-roast/icons/tags/` - tag icons
+
+Supported roast archetype templates include Bridge Tourist, Dust Farmer, Silent Whale, NFT Addict, DeFi Goblin, and Onchain Civilian.
+
+### 🤖 Wallet Roast Providers
+
+`WALLET_ROAST_PROVIDER` controls text generation:
+
+- `openai` - uses `OPENAI_API_KEY_MFC_NEW` and `WALLET_ROAST_OPENAI_MODEL`
+- `og` - uses 0G Compute broker configuration
+
+Cookieverse is powered by both OpenAI and 0G:
+
+- OpenAI powers fortune text, image-related AI routes, and the default Wallet Roast provider.
+- 0G Compute can power Wallet Roast text generation when `WALLET_ROAST_PROVIDER=og`.
+- The provider abstraction lives in `src/lib/wallet-roast/generateRoast.ts`, so roast generation can switch providers without changing the UI.
+
+Diagnostic routes:
+
+- `/api/diag-wallet-roast-openai`
+- `/api/diag-wallet-roast-og`
+
+0G helper scripts:
+
+- `npm run check:og` - validates wallet, ledger, provider, and service metadata
+- `npm run setup:og` - creates/checks a 0G Compute ledger, acknowledges the provider, and transfers provider inference funds
+
+### 🌉 LayerZero Bridge
+
+- `/bridge`, `/mini/bridge`, and `/app/bridge` expose bridge flows.
+- The bridge reads owned COOKIE token IDs through `/api/fc-token-ids`.
+- It quotes and sends through configured ONFT adapter contracts.
+- It can update MGID stats after bridge actions.
+
+Important environment groups:
+
+- `NEXT_PUBLIC_ADAPTER_*`
+- `NEXT_PUBLIC_ONFT_*`
+- `NEXT_PUBLIC_CANONICAL_ERC721*`
+- `NEXT_PUBLIC_EID_*`
+- `NEXT_PUBLIC_FLAT_FEE_WEI_*`
+- `NEXT_PUBLIC_APP_FEE_BPS`
+- `NEXT_PUBLIC_FEE_RECEIVER`
+
+### 🏆 Leaderboards, Dashboard, and MGID
+
+APIs:
+
+- `/api/mgid-get`
+- `/api/mgid-upsert`
+- `/api/mgid-leaderboard`
+- `/api/mgid-boosts`
+- `/api/leaderboard`
+- `/api/holdings`
+- `/api/collection-holders`
+- `/api/adapter-sends`
+- `/api/last-minted`
+
+Storage:
+
+- `src/server/mgidStore.ts` stores MGID snapshots in Vercel Blob.
+- `HOLDINGS_DB_PATH` can point to a local last-good holdings cache.
+
+UI:
+
+- `src/app/leaderboard/ui/LeaderboardClient.tsx`
+- `src/app/mgid-leaderboard/ui/MgidLeaderboardClient.tsx`
+- `src/app/dashboard/ui/DashboardClient.tsx`
+
+### 🧑‍🚀 Identity and Auth
+
+- X OAuth uses NextAuth in `src/lib/auth.ts`.
+- Session fields are typed in `src/types/next-auth.d.ts`.
+- X profile information is shown in the main and Base App shells.
+- Farcaster Mini App routes use the Farcaster Mini App SDK providers.
+- Smart account support uses Privy and MetaMask delegation/account abstraction helpers.
+
+---
+
+## 🛠️ Tech Stack
+
+- Next.js 15 App Router
+- React 19
+- TypeScript
+- Wagmi, Viem, RainbowKit
+- NextAuth Twitter provider
+- Farcaster Mini App SDK
+- Privy
+- OpenAI SDK
+- 0G Serving Broker
+- Vercel Blob
+- Pinata
+- Etherscan V2 API
+- BlockVision
+- `@napi-rs/canvas` for server-side Wallet Roast PNG rendering
 
 ---
 
 ## 📁 Project Structure
 
-```bash
+```text
 src/
   abi/
-    FortuneCookiesAI.json       # COOKIE ERC-721 ABI
+    FortuneCookiesAI.json
   app/
-    layout.tsx                  # Main layout + NavTabs + MiniOnly
-    page.tsx                    # Main COOKIE mint page + MGID integration
-    bridge/
-      page.tsx                  # ZK Bridge UI (LayerZero ONFT)
-    leaderboard/
+    layout.tsx
+    page.tsx
+    app/
       page.tsx
-      ui/LeaderboardClient.tsx  # Top-20 COOKIES leaderboard
+      bridge/page.tsx
+      dashboard/page.tsx
+      leaderboard/page.tsx
+      baseAppStyles.ts
+    bridge/page.tsx
     dashboard/
       page.tsx
-      ui/DashboardClient.tsx    # Multi-chain stats, quests, ranks
-    SmartAccount/
-      page.tsx                  # (commented) smart account tools
-    mini/                       # Farcaster Mini app
+      ui/DashboardClient.tsx
+    leaderboard/
+      page.tsx
+      ui/LeaderboardClient.tsx
+    mgid-leaderboard/
+      page.tsx
+      ui/MgidLeaderboardClient.tsx
+    mini/
       page.tsx
       bridge/page.tsx
       dashboard/page.tsx
       leaderboard/page.tsx
       smartaccount/page.tsx
-      head.tsx                  # mini app <head> metadata
+      head.tsx
     api/
-      fortune/route.ts          # AI fortune generation via OpenAI
-      images/route.ts           # Image upload / Pinata integration
-      pinata/route.ts           # Pinata helpers
-      adapter-sends/route.ts    # Bridge tx stats via Etherscan v2
-      collection-holders/route.ts
-      holdings/route.ts         # Multi-chain COOKIE holdings
-      leaderboard/route.ts      # On-chain leaderboard
-      last-minted/route.ts      # Last minted COOKIE per chain
-      fc-token-ids/route.ts     # Owned COOKIE token IDs via explorer APIs
-      mgid-get/route.ts         # Load MGID row
-      mgid-upsert/route.ts      # Recompute + save MGID
-      mgid-leaderboard/route.ts # MGID-based leaderboard
-      mgid-boosts/route.ts      # Booster NFT tracking
-      privy-config/route.ts     # Privy app config
-      diag-openai/route.ts      # Debug for OpenAI config
+      fortune/route.ts
+      images/route.ts
+      pinata/route.ts
+      wallet-roast/analyze/route.ts
+      wallet-roast/render/route.ts
+      diag-wallet-roast-openai/route.ts
+      diag-wallet-roast-og/route.ts
+      holdings/route.ts
+      leaderboard/route.ts
+      mgid-get/route.ts
+      mgid-upsert/route.ts
+      mgid-leaderboard/route.ts
+      mgid-boosts/route.ts
+      adapter-sends/route.ts
+      fc-token-ids/route.ts
       auth/[...nextauth]/route.ts
   components/
-    MainChrome.tsx              # Global layout chrome
-    NavTabs.tsx                 # Main top navigation
-    MonadGamesIdBanner.tsx      # MGID banner
-    SaStatusCard.tsx            # Smart account status card
-    TopUpMenu.tsx               # Funding/top-up UI
-    XAuthButton.tsx             # Twitter login & avatar
+    BaseAppNav.tsx
+    MainChrome.tsx
+    MobileBaseAppRedirect.tsx
+    NavTabs.tsx
+    XAuthButton.tsx
     mini/
-      MiniNav.tsx               # Farcaster Mini nav bar
-      MiniProviders.client.tsx  # Wagmi / React Query / etc for mini
+      MiniNav.tsx
+      MiniProviders.client.tsx
+  hooks/
+    useAppMode.ts
+    useResponsiveMode.ts
   lib/
-    chain.ts                    # Custom viem chain definitions
-    wagmi.ts                    # RainbowKit + Wagmi config
-    aa/clients.ts               # Account abstraction / public clients per chain
-    auth.ts                     # NextAuth config
-    debugClient.ts              # Helpers for logging clients
+    aa/
+      clients.ts
+      smartAccount.ts
+    wallet-roast/
+      analyzeWalletRoast.ts
+      fetchBaseWalletData.ts
+      generateRoast.ts
+      renderCard.ts
+      types.ts
+    auth.ts
+    chain.ts
+    share.ts
+    wagmi.ts
   server/
-    mgidStore.ts                # MGID snapshot store via @vercel/blob
-  types/
-    next-auth.d.ts              # Session typing for twitter fields
+    mgidStore.ts
 public/
-  ms-logo.png                   # Logo
-  ms-logo-mini.png              # Mini logo
-  layerzero-logo.png            # LayerZero logo
-  .well-known/farcaster.json    # Farcaster mini metadata
+  wallet-roast/
+    templates/
+    icons/
 ```
 
-## ⚙️ Environment Configuration
+---
 
-Create .env.local in the project root and configure (names taken from code):
+## ⚙️ Environment
 
-### 1. General / App
+Create `.env.local` in the project root.
 
-NEXTAUTH_URL=...
+### 🔐 App and Auth
+
+```bash
+NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=...
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
 
-NEXT_PUBLIC_BASE_URL=https://your-domain.vercel.app
-NEXT_PUBLIC_BLOCK_EXPLORER_TX=...
-
-### 2. RPC & Chain IDs (src/lib/chain.ts)
-
-NEXT_PUBLIC_RPC_HTTP_MONAD=...
-NEXT_PUBLIC_RPC_HTTP_BASE=...
-NEXT_PUBLIC_RPC_HTTP_MANTLE=...
-NEXT_PUBLIC_RPC_HTTP_LINEA=...
-NEXT_PUBLIC_RPC_HTTP_MITOS=...
-
-NEXT_PUBLIC_MITOSIS_CHAIN_ID=777777            # or your real MITOS chain id
-NEXT_PUBLIC_MITOSIS_EXPLORER=https://...       # optional
-NEXT_PUBLIC_DEFAULT_CHAIN=monad | base | ...
+TWITTER_CLIENT_ID=...
+TWITTER_CLIENT_SECRET=...
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
+```
 
-### 3. COOKIE & ONFT Contracts
+### ⛓️ RPC and Chains
 
-#### COOKIE ERC-721 contracts
-NEXT_PUBLIC_COOKIE_ADDRESS=0x...              # Monad
+```bash
+NEXT_PUBLIC_DEFAULT_CHAIN=monad
+NEXT_PUBLIC_RPC_HTTP_MONAD=https://testnet-rpc.monad.xyz
+NEXT_PUBLIC_RPC_HTTP_BASE=https://mainnet.base.org
+NEXT_PUBLIC_RPC_HTTP_MANTLE=https://rpc.mantle.xyz
+NEXT_PUBLIC_RPC_HTTP_LINEA=https://rpc.linea.build
+NEXT_PUBLIC_RPC_HTTP_MITOS=https://rpc.mitosis.org
+NEXT_PUBLIC_MITOSIS_CHAIN_ID=777777
+NEXT_PUBLIC_MITOSIS_EXPLORER=https://explorer.mitosis.org
+```
+
+### 🍪 COOKIE and Bridge Contracts
+
+```bash
+NEXT_PUBLIC_COOKIE_ADDRESS=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_BASE=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_LINEA=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS=0x...
 
-#### LayerZero Endpoint IDs per chain (for ONFT)
-NEXT_PUBLIC_EID_BASE=30184
-NEXT_PUBLIC_EID_MANTLE=30181
-NEXT_PUBLIC_EID_LINEA=40231
-NEXT_PUBLIC_EID_MONAD=...                     # set proper EID
+NEXT_PUBLIC_CANONICAL_ERC721=0x...
+NEXT_PUBLIC_CANONICAL_ERC721_MONAD=0x...
+NEXT_PUBLIC_CANONICAL_ERC721_MANTLE=0x...
+NEXT_PUBLIC_CANONICAL_ERC721_LINEA=0x...
 
-#### LayerZero ONFT adapter addresses
 NEXT_PUBLIC_ADAPTER_BASE=0x...
 NEXT_PUBLIC_ADAPTER_MANTLE=0x...
 NEXT_PUBLIC_ADAPTER_LINEA=0x...
 NEXT_PUBLIC_ADAPTER_MONAD=0x...
 
-#### Canonical ONFT contracts (if different from cookie)
 NEXT_PUBLIC_ONFT_BASE=0x...
 NEXT_PUBLIC_ONFT_MANTLE=0x...
 NEXT_PUBLIC_ONFT_LINEA=0x...
 NEXT_PUBLIC_ONFT_MONAD=0x...
 
-### 4. Bridge & Fees
+NEXT_PUBLIC_EID_BASE=30184
+NEXT_PUBLIC_EID_MANTLE=30181
+NEXT_PUBLIC_EID_LINEA=40231
+NEXT_PUBLIC_EID_MONAD=...
 
-NEXT_PUBLIC_FEE_RECEIVER=0x...          # where app fee goes
-NEXT_PUBLIC_FLAT_FEE_WEI_ETH=...
-NEXT_PUBLIC_FLAT_FEE_WEI_MNT=...
-NEXT_PUBLIC_FLAT_FEE_WEI_MON=...
-NEXT_PUBLIC_APP_FEE_BPS=2000            # 20% app fee, adjust as needed
+NEXT_PUBLIC_FEE_RECEIVER=0x...
+NEXT_PUBLIC_APP_FEE_BPS=0
+NEXT_PUBLIC_FLAT_FEE_WEI_ETH=0
+NEXT_PUBLIC_FLAT_FEE_WEI_MON=0
+NEXT_PUBLIC_FLAT_FEE_WEI_MNT=0
+```
 
-### 5. BLOB & Indexing
+### 🤖 AI, Wallet Roast, and Media
 
-####  Vercel Blob
-BLOB_READ_WRITE_TOKEN=...
-
-####  Etherscan v2
-ETHERSCAN_API_KEY=...
-
-####  BlockVision NFT API for Monad
-BLOCKVISION_API_KEY=...
-MONAD_RPC_URL=...                        # for viem client fallback
-
-####  Optional path for local “last-good” holdings cache
-HOLDINGS_DB_PATH=.holdings_last_good.json
-
-### 6. Identity / Auth / Smart Accounts
-
-#### Twitter / X (NextAuth)
-TWITTER_CLIENT_ID=...
-TWITTER_CLIENT_SECRET=...
-
-#### Privy (smart accounts, login)
-PRIVY_APP_ID=...
-MONAD_GAMES_PROVIDER_APP_ID=...          # reused as Privy App ID
-
-#### Optional: signer private key if you re-enable register-score API
-SIGNER_PRIVATE_KEY=0x...
-
-### 7. AI & Media
-
+```bash
 OPENAI_API_KEY_MFC_NEW=sk-...
+MFC_OPENAI_KEY_NAME=OPENAI_API_KEY_MFC_NEW
+
+WALLET_ROAST_PROVIDER=openai
+WALLET_ROAST_OPENAI_MODEL=gpt-5-mini
+WALLET_ROAST_DUST_THRESHOLD_USD=1.5
+WALLET_ROAST_RESPONSE_TOKEN_LIMIT=25
+WALLET_ROAST_DEBUG=false
+
+ETHERSCAN_API_KEY=...
+BASE_RPC_URL=https://mainnet.base.org
+ETHEREUM_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/...
+ENABLE_BASENAME_ENSIP19_FALLBACK=false
 
 PINATA_JWT=...
 PINATA_GATEWAY=https://your-gateway.pinata.cloud
+```
 
-## 🚀 Getting Started
+### ⚡ 0G Wallet Roast Provider
 
-### Clone & install
+Only required when `WALLET_ROAST_PROVIDER=og`.
 
-git clone https://github.com/<you>/monad-fortune-cookies.git
-cd monad-fortune-cookies
+```bash
+OG_PRIVATE_KEY=0x...
+OG_EVM_RPC_URL=https://evmrpc-testnet.0g.ai
+OG_PROVIDER_ADDRESS=0x...
+OG_MODEL=openai/gpt-oss-20b
+OG_LEDGER_FUND_AMOUNT=3
+OG_PROVIDER_FUND_AMOUNT=2
+```
 
-#### choose your package manager
-npm install
-#### or
-yarn
-#### or
-pnpm install
+### 💾 Storage, Indexing, and Smart Accounts
 
-### Configure env
+```bash
+BLOB_READ_WRITE_TOKEN=...
+BLOCKVISION_API_KEY=...
+MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+HOLDINGS_DB_PATH=.holdings_last_good.json
 
-Create .env.local and fill the variables described above.
+PRIVY_APP_ID=...
+MONAD_GAMES_PROVIDER_APP_ID=...
+NEXT_PUBLIC_BUNDLER_RPC_URL=...
+NEXT_PUBLIC_BUNDLER_RPC_URL_BASE=...
+NEXT_PUBLIC_BUNDLER_RPC_URL_MANTLE=...
+NEXT_PUBLIC_BUNDLER_RPC_URL_LINEA=...
 
-### Run dev server
+SIGNER_PRIVATE_KEY=0x...
+```
 
+### 🧪 Optional API Tuning
+
+```bash
+ETHERSCAN_MAX_CONCURRENT=2
+ETHERSCAN_RETRIES=2
+ETHERSCAN_PAGE_SIZE=10000
+ETHERSCAN_MAX_PAGES=10
+
+HOLDINGS_TTL_MS=45000
+BV_MAX_RETRIES=5
+BV_BASE_DELAY_MS=400
+BV_PAGE_DELAY_MS=300
+BV_REQ_TIMEOUT_MS=12000
+```
+
+---
+
+## 🧰 Scripts
+
+```bash
 npm run dev
-#### or
-yarn dev
-#### or
-pnpm dev
+npm run build
+npm run start
+npm run lint
+npm run check:og
+npm run setup:og
+```
 
-### Visit:
+Notes:
 
-http://localhost:3000 → main dApp
+- `postinstall` runs `scripts/patch-ox.js`.
+- `vercel-build` runs prebuild checks, patches `ox`, then builds Next.js.
+- `next.config.js` marks `@napi-rs/canvas` as a server external package.
+- TypeScript and ESLint build errors are currently ignored in `next.config.js`.
 
-http://localhost:3000/bridge → ZK Bridge
+---
 
-http://localhost:3000/leaderboard → leaderboard
+## 🚦 Getting Started
 
-http://localhost:3000/dashboard → dashboard
+```bash
+npm install
+npm run dev
+```
 
-http://localhost:3000/mini → Farcaster mini-app shell
+Open:
+
+- `http://localhost:3000/`
+- `http://localhost:3000/app`
+- `http://localhost:3000/mini`
+- `http://localhost:3000/bridge`
+- `http://localhost:3000/leaderboard`
+- `http://localhost:3000/dashboard`
+
+---
+
+## 🧾 Metadata
+
+The app metadata is generated dynamically in `src/app/layout.tsx`.
+
+Current metadata includes:
+
+- `title`: `Cookieverse`
+- `description`: `AI blessing cookies`
+- `base:app_id`: `69413c95d19763ca26ddc346`
+- `fc:miniapp` and `fc:frame` JSON embeds pointing to `/mini`
+- launch image `/ms-logo-32.png`
+- splash image `/ms-logo-mini.png`
+
+For production deployments, set `NEXT_PUBLIC_BASE_URL`, `NEXTAUTH_URL`, and the deployed host correctly so Farcaster and Base App launch URLs resolve to the public HTTPS origin.
+
+---
+
+## 📝 Implementation Notes
+
+- Wallet Roast analysis is Base-only today and uses Etherscan V2 chain ID `8453`.
+- Etherscan Pro-only token balance endpoints are avoided; balances are reconstructed from transfer history.
+- Basename resolution first uses the Base L2 resolver and can optionally attempt ENSIP-19 fallback with an Ethereum RPC.
+- Wallet Roast rendering expects PNG templates and icons under `public/wallet-roast`.
+- The Base App route shares the main page implementation through `src/app/app/page.tsx`.
+- The compact Base App layout has separate CSS constraints to make the existing dApp UI usable on mobile.

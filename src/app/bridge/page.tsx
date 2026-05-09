@@ -12,6 +12,8 @@ import {
 import { usePathname } from 'next/navigation';
 import { sdk } from '@farcaster/miniapp-sdk';
 
+import { useAppMode } from '../../hooks/useAppMode'
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Chain & LayerZero config (matches your .env and src/lib/chain.ts)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -314,7 +316,7 @@ export default function BridgePage() {
   const [loadingTokenIds, setLoadingTokenIds] = React.useState(false);
   
   const pathname = usePathname();
-  const isMini = !!pathname && pathname.startsWith('/mini');
+  const { isFarcasterMini, isBaseAppRoute, isCompactLayout } = useAppMode();
 
   const [fcUsername, setFcUsername] = React.useState<string>('');
 
@@ -416,7 +418,7 @@ export default function BridgePage() {
   }, [src, address]);
 
   React.useEffect(() => {
-    if (!isMini) return;
+    if (!isFarcasterMini) return;
     let alive = true;
     (async () => {
       try {
@@ -430,7 +432,7 @@ export default function BridgePage() {
       }
     })();
     return () => { alive = false; };
-  }, [isMini]);
+  }, [isFarcasterMini]);
 
 
     // Periodically sync leaderboard from bridge page as well (every 60s)

@@ -1,17 +1,25 @@
-'use client'
-import { PropsWithChildren } from 'react'
-import { usePathname } from 'next/navigation'
+'use client';
 
-/** Renders its children ONLY outside /mini, using React navigation only. */
+import { PropsWithChildren } from 'react';
+import { usePathname } from 'next/navigation';
+
 export function MainChrome({ children }: PropsWithChildren) {
-  const pathname = usePathname() || '/'
-  // Pure React check: if we navigated into /mini, hide chrome
-  if (pathname.startsWith('/mini')) return null
-  return <>{children}</>
+  const pathname = usePathname() || '/';
+
+  if (pathname.startsWith('/mini')) return null;
+  if (pathname.startsWith('/app')) return null;
+
+  return <>{children}</>;
 }
 
-/** Renders its children ONLY on /mini routes (pure React navigation). */
-export function MiniOnly({ children }: PropsWithChildren) {
-  const pathname = usePathname() || '/'
-  return pathname.startsWith('/mini') ? <>{children}</> : null
+export function FarcasterMiniOnly({ children }: PropsWithChildren) {
+  const pathname = usePathname() || '/';
+
+  return pathname.startsWith('/mini') ? <>{children}</> : null;
+}
+
+export function BaseAppOnly({ children }: PropsWithChildren) {
+  const pathname = usePathname() || '/';
+
+  return pathname.startsWith('/app') ? <>{children}</> : null;
 }

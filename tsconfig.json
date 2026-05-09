@@ -17,6 +17,7 @@
     "jsx": "preserve",
 
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "ox": ["src/types/ox-shim.d.ts"],
       "ox/*": ["src/types/ox-shim.d.ts"]

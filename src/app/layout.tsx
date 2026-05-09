@@ -5,7 +5,11 @@ import { headers } from 'next/headers'
 
 //import { SmartAccountProvider } from './SmartAccountProvider';
 
-import{MainChrome, MiniOnly} from "../components/MainChrome";
+import{MainChrome, FarcasterMiniOnly, BaseAppOnly} from "../components/MainChrome";
+
+import MobileBaseAppRedirect from '../components/MobileBaseAppRedirect';
+import BaseAppNav from '../components/BaseAppNav';
+
 import MiniProviders from "../components/mini/MiniProviders.client";
 
 import MiniNav from '../components/mini/MiniNav'
@@ -103,6 +107,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial',
         }}
       >
+
+        <MobileBaseAppRedirect />
+
         {/* === NON-MINI (default app) === */}
         <MainChrome>
         {!isLoggedIn ? (
@@ -324,7 +331,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* === MINI (Farcaster Mini App) ===
             No Providers, no Header, no Tabs, no SmartAccountProvider.
             Mini pages will import and use @farcaster/miniapp-sdk themselves. */}
-        <MiniOnly>
+        <FarcasterMiniOnly>
           <MiniProviders>
 
           <div style={{ background: '#111', borderBottom: '1px solid #2a2a2e' }}>
@@ -353,7 +360,365 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
             {children}
           </MiniProviders>
-        </MiniOnly>
+        </FarcasterMiniOnly>
+
+
+        {/* === BASE APP / COMPACT WEB === */}
+        <BaseAppOnly>
+          {!isLoggedIn ? (
+            <div className="base-app-login">
+              <div className="base-app-login__card">
+                <div className="base-app-login__brand">
+                  <img
+                    src="/ms-logo-mini.png"
+                    alt="Cookieverse"
+                    className="base-app-login__logo"
+                  />
+                  <div>
+                    <div className="base-app-login__title">Cookieverse</div>
+                    <div className="base-app-login__subtitle">
+                      Connect X to save stats, leaderboards and mints.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="base-app-login__divider" />
+
+                <div className="base-app-login__text">
+                  You’ll be redirected to X to authorize Cookieverse. We only read your
+                  public profile: handle and avatar.
+                </div>
+
+                <div className="base-app-login__button">
+                  <XAuthButton />
+                </div>
+
+                <div className="base-app-login__footnote">
+                  Your X username can be used for leaderboards, raffles and on-chain
+                  achievements in Cookieverse.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Providers>
+              <div className="base-app-shell">
+                <BaseAppNav
+                  twitterUsername={twitterUsername}
+                  twitterImage={twitterImage}
+                />
+
+                <main className="base-app-content">{children}</main>
+              </div>
+            </Providers>
+          )}
+
+          <style>{`
+            .base-app-shell {
+              box-sizing: border-box;
+              width: 100%;
+              min-height: 100dvh;
+              margin: 0 auto;
+              background: #0b0b10;
+              color: #e5e7eb;
+              overflow-x: hidden;
+            }
+
+            .base-app-content {
+              width: 100%;
+              max-width: 480px;
+              margin: 0 auto;
+              padding: 8px 8px 18px;
+              box-sizing: border-box;
+            }
+
+            .base-app-nav {
+              width: 100%;
+              max-width: 480px;
+              margin: 0 auto;
+              padding: 10px 8px 8px;
+              box-sizing: border-box;
+              background: #111;
+              border-bottom: 1px solid #2a2a2e;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+              position: sticky;
+              top: 0;
+              z-index: 40;
+            }
+
+            .base-app-nav__top {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+              min-width: 0;
+            }
+
+            .base-app-nav__brand {
+              display: inline-flex;
+              align-items: center;
+              gap: 10px;
+              min-width: 0;
+              text-decoration: none;
+            }
+
+            .base-app-nav__logo {
+              width: 44px;
+              height: 44px;
+              border-radius: 10px;
+              object-fit: cover;
+              flex: 0 0 auto;
+            }
+
+            .base-app-nav__title {
+              font-size: 18px;
+              font-weight: 900;
+              letter-spacing: -0.02em;
+              color: #3c1dd9ff;
+              line-height: 1.05;
+            }
+
+            .base-app-nav__subtitle {
+              margin-top: 2px;
+              font-size: 11px;
+              font-weight: 700;
+              color: #8b8fa3;
+              line-height: 1;
+            }
+
+            .base-app-nav__x {
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              max-width: 138px;
+              min-width: 0;
+              padding: 5px 8px;
+              border-radius: 999px;
+              border: 1px solid #374151;
+              background: linear-gradient(135deg, #111827 0%, #020617 100%);
+              color: #e5e7eb;
+              text-decoration: none;
+              font-size: 11px;
+              font-weight: 700;
+              overflow: hidden;
+              white-space: nowrap;
+              text-overflow: ellipsis;
+            }
+
+            .base-app-nav__avatar {
+              width: 22px;
+              height: 22px;
+              border-radius: 999px;
+              border: 1px solid #1f2937;
+              flex: 0 0 auto;
+            }
+
+            .base-app-nav__wallet {
+              display: flex;
+              justify-content: flex-start;
+              align-items: center;
+              min-height: 34px;
+            }
+
+            .base-app-nav__tabs {
+              display: flex;
+              align-items: center;
+              gap: 7px;
+              overflow-x: auto;
+              overscroll-behavior-x: contain;
+              scrollbar-width: none;
+              padding-bottom: 2px;
+            }
+
+            .base-app-nav__tabs::-webkit-scrollbar {
+              display: none;
+            }
+
+            .base-app-nav__tab {
+              flex: 0 0 auto;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              padding: 8px 10px;
+              border-radius: 10px;
+              border: 1px solid rgba(63, 63, 70, 0.7);
+              background: rgba(24, 24, 28, 0.82);
+              color: #e5e7eb;
+              font-size: 12px;
+              font-weight: 800;
+              line-height: 1;
+              text-decoration: none;
+              white-space: nowrap;
+            }
+
+            .base-app-nav__tab--active {
+              background: #4f46e5;
+              border-color: #7c3aed;
+              color: #fff;
+              box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.18);
+            }
+
+            .base-app-content .base-app-root {
+              max-width: 100% !important;
+              padding-left: 0 !important;
+              padding-right: 0 !important;
+            }
+
+            .base-app-content .page {
+              max-width: 100%;
+              padding: 8px 0 12px;
+            }
+
+            .base-app-content .grid {
+              grid-template-columns: 1fr !important;
+              gap: 10px !important;
+            }
+
+            .base-app-content .card {
+              padding: 14px !important;
+              border-radius: 14px !important;
+            }
+
+            .base-app-content .card__title {
+              font-size: 12px !important;
+              margin-bottom: 8px !important;
+              letter-spacing: 0.08em;
+            }
+
+            .base-app-content .input,
+            .base-app-content .textarea,
+            .base-app-content select,
+            .base-app-content input,
+            .base-app-content textarea {
+              width: 100% !important;
+              max-width: 100%;
+              padding: 8px 10px !important;
+              font-size: 14px !important;
+              box-sizing: border-box;
+            }
+
+            .base-app-content .textarea,
+            .base-app-content textarea {
+              min-height: 100px !important;
+            }
+
+            .base-app-content .btn,
+            .base-app-content button {
+              padding: 9px 12px !important;
+              font-size: 13px !important;
+              border-radius: 10px !important;
+            }
+
+            .base-app-content .two-col {
+              grid-template-columns: 1fr !important;
+              gap: 10px !important;
+            }
+
+            .base-app-content .list {
+              gap: 4px !important;
+            }
+
+            .base-app-content table {
+              font-size: 12px !important;
+            }
+
+            .base-app-content th,
+            .base-app-content td {
+              padding: 7px 6px !important;
+            }
+
+            .base-app-login {
+              min-height: 100dvh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 16px;
+              box-sizing: border-box;
+              background: radial-gradient(circle at top, #111827 0, #020617 45%, #020617 100%);
+            }
+
+            .base-app-login__card {
+              width: 100%;
+              max-width: 420px;
+              border-radius: 22px;
+              padding: 22px;
+              border: 1px solid rgba(55, 65, 81, 0.9);
+              background: radial-gradient(circle at top left, #1d293b 0, #020617 55%);
+              box-shadow: 0 24px 70px rgba(15, 23, 42, 0.95);
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+              box-sizing: border-box;
+            }
+
+            .base-app-login__brand {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            }
+
+            .base-app-login__logo {
+              width: 48px;
+              height: 48px;
+              border-radius: 12px;
+              object-fit: cover;
+            }
+
+            .base-app-login__title {
+              font-size: 21px;
+              font-weight: 900;
+              letter-spacing: -0.02em;
+              color: #e5e7eb;
+            }
+
+            .base-app-login__subtitle {
+              margin-top: 2px;
+              font-size: 12px;
+              color: #9ca3af;
+              line-height: 1.35;
+            }
+
+            .base-app-login__divider {
+              height: 1px;
+              width: 100%;
+              background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.6), transparent);
+            }
+
+            .base-app-login__text {
+              font-size: 13px;
+              color: #d1d5db;
+              line-height: 1.5;
+              text-align: center;
+            }
+
+            .base-app-login__button {
+              text-align: center;
+            }
+
+            .base-app-login__footnote {
+              font-size: 11px;
+              color: #6b7280;
+              line-height: 1.4;
+              text-align: center;
+            }
+
+            @media (min-width: 769px) {
+              .base-app-nav,
+              .base-app-content {
+                max-width: 720px;
+              }
+            }
+
+            @media (min-width: 1025px) {
+              .base-app-nav,
+              .base-app-content {
+                max-width: 960px;
+              }
+            }
+          `}</style>
+        </BaseAppOnly>
+
       </body>
     </html>
   );
