@@ -407,13 +407,29 @@ export default function Page() {
 
   const lastMintQ = useQuery({
     queryKey: ['lastMinted', address, chain?.id],
-    enabled: !!address && !!COOKIE_ADDRESS,
+    enabled: !!address && !!COOKIE_ADDRESS && !!chain?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
     queryFn: async () => {
-      const r = await fetch(`/api/holdings?address=${address}&contract=${COOKIE_ADDRESS}`, { cache: 'no-store' });
+      const r = await fetch(`/api/holdings?address=${address}`, {
+        cache: 'no-store',
+        headers: {
+          'x-chain-id': String(chain?.id ?? ''),
+        },
+      });
+
       if (!r.ok) return null;
+
       const j = await r.json();
-      const ids = Array.isArray(j?.tokenIds) ? (j.tokenIds as number[]) : [];
+      const ids = Array.isArray(j?.tokenIds)
+        ? j.tokenIds
+            .map((id: unknown) => Number(id))
+            .filter((id: number) => Number.isFinite(id))
+        : [];
+
       if (!ids.length) return null;
+
       return Math.max(...ids);
     },
   });
@@ -476,6 +492,28 @@ export default function Page() {
   React.useEffect(() => {
     setHoldingIds(holdingsQ.data ?? []);
   }, [holdingsQ.data]);
+
+  React.useEffect(() => {
+    if (!connected || !address) return;
+
+    const ids = Array.isArray(holdingIds)
+      ? holdingIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id))
+      : [];
+
+    if (!ids.length) {
+      setLastMinted(null);
+      return;
+    }
+
+    const latestHeldId = Math.max(...ids);
+    setLastMinted(latestHeldId);
+
+    try {
+      localStorage.setItem(`fc:lastMinted:${address}`, String(latestHeldId));
+    } catch {}
+  }, [connected, address, holdingIds]);
 
   React.useEffect(() => {
     if (!connected) return;
