@@ -69,7 +69,7 @@ export function classifyArchetype(
     archetype = "Bridge Tourist";
   } else if (nftCount >= 100 && nftScore >= 65) {
     archetype = "NFT Addict";
-  } else if (bridgeTxCount >= 10 && bridgeScore >= 60) {
+  } else if (bridgeTxCount >= 25 && bridgeScore >= 60) {
     archetype = "Bridge Tourist";
   } else if ((dustRatio >= 35 || spamTokenCount >= 25) && portfolioUsd < 5_000) {
     archetype = "Dust Farmer";
