@@ -825,13 +825,13 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       textOffsetY: -25,
     },
     statInline: {
-      textStyle: { startSize: 0.055, minSize: 0.05, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#FFF7FF" },
+      textStyle: { startSize: 0.04, minSize: 0.035, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#FFF7FF" },
       iconSize: 0.055,
       iconGap: 0.02,
       textOffsetY: +8 //-43,
     },
     tagInline: {
-      textStyle: { startSize: 0.055, minSize: 0.05, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#FDE6FF" },
+      textStyle: { startSize: 0.04, minSize: 0.035, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#FDE6FF" },
       iconSize: 0.055,
       iconGap: 0.02,
       textOffsetY: -12,
