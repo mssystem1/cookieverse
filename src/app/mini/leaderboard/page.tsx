@@ -5,7 +5,7 @@ export default function MiniLeaderboard() {
     <>
   
       <div className="grid">
-        <div className="card">
+        <div className="card card--wallet-roast">
           <div className="card__title">Leaderboard</div>
           <LeaderboardClient mode="FarcasterMini" /> {/* implement compact sizes */}
         </div>

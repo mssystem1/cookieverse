@@ -116,6 +116,131 @@ const ONFT_ABI = parseAbi([
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+const IPFS_GATEWAY =
+  (process.env.PINATA_GATEWAY || 'https://ipfs.io/ipfs/')
+    .replace(/\/+$/, '') + '/';
+
+type NftPreviewMeta = {
+  name?: string;
+  image?: string;
+  rawImage?: string;
+};
+
+function normalizeNftAssetUri(uri?: string | null): string | undefined {
+  const value = uri?.trim();
+  if (!value) return undefined;
+
+  if (/^ipfs:\/\//i.test(value)) {
+    const path = value.replace(/^ipfs:\/\/(ipfs\/)?/i, '');
+    return `${IPFS_GATEWAY}${path}`;
+  }
+
+  if (/^ar:\/\//i.test(value)) {
+    return `https://arweave.net/${value.replace(/^ar:\/\//i, '')}`;
+  }
+
+  if (/^data:/i.test(value)) {
+    return value;
+  }
+
+  // Avoid mixed-content blocking on HTTPS pages.
+  if (/^http:\/\//i.test(value)) {
+    return value.replace(/^http:/i, 'https:');
+  }
+
+  return value;
+}
+
+function decodeBase64Utf8(b64: string): string {
+  const binary = window.atob(b64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function parseJsonDataUri(uri: string): any | null {
+  const commaIndex = uri.indexOf(',');
+  if (commaIndex === -1) return null;
+
+  const header = uri.slice(0, commaIndex).toLowerCase();
+  const payload = uri.slice(commaIndex + 1);
+
+  if (!header.startsWith('data:application/json')) return null;
+
+  const jsonText = header.includes(';base64')
+    ? decodeBase64Utf8(payload)
+    : decodeURIComponent(payload);
+
+  return JSON.parse(jsonText);
+}
+
+function isLikelyDirectImageUrl(url: string): boolean {
+  return (
+    /^data:image\//i.test(url) ||
+    /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url)
+  );
+}
+
+async function resolveNftPreviewFromTokenUri(
+  tokenUri: string,
+): Promise<NftPreviewMeta> {
+  // Case 1: onchain base64/json metadata
+  if (/^data:application\/json/i.test(tokenUri)) {
+    const meta = parseJsonDataUri(tokenUri);
+
+    return {
+      name: meta?.name,
+      image: normalizeNftAssetUri(meta?.image || meta?.image_url),
+      rawImage: meta?.image || meta?.image_url,
+    };
+  }
+
+  const normalizedTokenUri = normalizeNftAssetUri(tokenUri);
+  if (!normalizedTokenUri) return {};
+
+  // Case 2: tokenURI is already a direct image
+  if (isLikelyDirectImageUrl(normalizedTokenUri)) {
+    return {
+      image: normalizedTokenUri,
+      rawImage: tokenUri,
+    };
+  }
+
+  // Case 3: tokenURI points to metadata JSON on IPFS/HTTP
+  if (/^https?:\/\//i.test(normalizedTokenUri)) {
+    try {
+      const res = await fetch(normalizedTokenUri, { cache: 'no-store' });
+      const text = await res.text();
+
+      try {
+        const meta = JSON.parse(text);
+
+        return {
+          name: meta?.name,
+          image: normalizeNftAssetUri(meta?.image || meta?.image_url),
+          rawImage: meta?.image || meta?.image_url,
+        };
+      } catch {
+        // If it was not JSON, maybe it was a direct image without extension.
+        return {
+          image: normalizedTokenUri,
+          rawImage: tokenUri,
+        };
+      }
+    } catch {
+      // If browser fetch is blocked, still try to render it as an image.
+      return {
+        image: normalizedTokenUri,
+        rawImage: tokenUri,
+      };
+    }
+  }
+
+  return {
+    image: normalizedTokenUri,
+    rawImage: tokenUri,
+  };
+}
+
 function addrToBytes32(addr: string): `0x${string}` {
   const hex = addr.toLowerCase().replace(/^0x/, '');
   return ('0x' + hex.padStart(64, '0')) as `0x${string}`;
@@ -297,6 +422,7 @@ export default function BridgePage() {
     name?: string;
     image?: string;
     rawUri?: string;
+    rawImage?: string;
   } | null>(null);
 
   const [bridgeTxHash, setBridgeTxHash] = React.useState<
@@ -415,7 +541,7 @@ export default function BridgePage() {
       cancelled = true;
       if (intervalId != null) clearInterval(intervalId);
     };
-  }, [src, address]);
+  }, [src, address, chainId]);
 
   React.useEffect(() => {
     if (!isFarcasterMini) return;
@@ -523,35 +649,14 @@ const onChangeDst = (next: ChainKey) => {
         authorizationList: undefined as any,
       })) as string;
 
-      let name: string | undefined;
-      let image: string | undefined;
+      const meta = await resolveNftPreviewFromTokenUri(uri);
 
-      if (uri.startsWith('data:application/json;base64,')) {
-        const b64 = uri.split(',')[1] || '';
-        let jsonStr = '';
-        if (typeof window !== 'undefined' && typeof window.atob === 'function') {
-          jsonStr = window.atob(b64);
-        } else {
-          // Node polyfill fallback (build time)
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const buf = Buffer.from(b64, 'base64');
-          jsonStr = buf.toString('utf8');
-        }
-        try {
-          const meta = JSON.parse(jsonStr);
-          name = meta.name;
-          image = meta.image;
-        } catch {
-          // ignore parse errors, show raw URI
-        }
-      } else if (uri.startsWith('ipfs://')) {
-        image = uri.replace('ipfs://', 'https://ipfs.io/ipfs/');
-      } else if (uri.startsWith('http://') || uri.startsWith('https://')) {
-        image = uri;
-      }
-
-      setPreview({ name, image, rawUri: uri });
-      setStatus('Preview loaded.');
+      setPreview({
+        name: meta.name || `COOKIE #${idNum}`,
+        image: meta.image,
+        rawUri: uri,
+        rawImage: meta.rawImage,
+      });
     } catch (e: any) {
       console.error(e);
       setStatus(null);
@@ -869,6 +974,18 @@ const onChangeDst = (next: ChainKey) => {
                     src={preview.image}
                     alt={preview.name || 'Fortune Cookie'}
                     style={{ display: 'block', width: '100%' }}
+                    onError={() => {
+                      console.error('NFT preview image failed:', {
+                        normalizedImage: preview.image,
+                        rawImage: preview.rawImage,
+                        tokenURI: preview.rawUri,
+                      });
+                      setError(
+                        `NFT metadata loaded, but image failed to load. Raw image URI: ${
+                          preview.rawImage || preview.image || 'unknown'
+                        }`,
+                      );
+                    }}
                   />
                 </div>
               )}

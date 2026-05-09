@@ -9,7 +9,7 @@ export default function BaseAppLeaderboardPage() {
     <div className="base-app-root">
       <div className="page">
         <div className="grid">
-          <div className="card">
+          <div className="card card--wallet-roast">
             <div className="card__title">Leaderboard</div>
             <LeaderboardClient mode="compact" />
           </div>

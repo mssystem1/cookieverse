@@ -5,10 +5,40 @@ export const baseAppStyles = `
     background: #0b0b10;
   }
 
+  .base-app-root .card--wallet-roast {
+    order: -100;
+    border-color: rgba(139, 92, 246, 0.45);
+    background:
+      radial-gradient(circle at top left, rgba(124, 58, 237, 0.22), transparent 34%),
+      radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.16), transparent 34%),
+      rgba(255, 255, 255, 0.065);
+    box-shadow:
+      0 18px 60px rgba(88, 28, 135, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .base-app-root .card--wallet-roast .card__title {
+    color: #f5f3ff;
+  }
+
+  .base-app-root .card--wallet-roast img {
+    display: block;
+    width: 100%;
+    max-width: 440px;
+    height: auto;
+    margin: 12px auto;
+    border-radius: 18px;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.35);
+  }
+
   @media (min-width: 1025px) {
     .base-app-root {
       max-width: 1280px;
       padding: 16px;
+    }
+
+    .base-app-root .card--wallet-roast {
+      grid-column: 1 / -1;
     }
   }
 
@@ -36,6 +66,18 @@ export const baseAppStyles = `
     .base-app-root .card {
       padding: 14px !important;
       border-radius: 14px !important;
+    }
+
+    .base-app-root .card--wallet-roast {
+      padding: 16px !important;
+      border-radius: 18px !important;
+      margin-bottom: 2px;
+    }
+
+    .base-app-root .card--wallet-roast img {
+      max-width: 100%;
+      border-radius: 16px;
+      margin: 10px auto;
     }
 
     .base-app-root .card__title {

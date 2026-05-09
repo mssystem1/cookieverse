@@ -37,7 +37,7 @@ export default function MiniDashboardPage() {
       {/* Main scrollable area per mini guidelines */}
       <div className="page">
         <div className="grid">
-          <div className="card">
+          <div className="card card--wallet-roast">
             <div className="card__title">Cookieverse Dashboard</div>
             {/* Reuse your full Dashboard logic 1:1 */}
             <DashboardClient />

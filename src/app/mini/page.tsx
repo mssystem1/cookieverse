@@ -68,6 +68,35 @@ export default function MiniMirrorPage() {
           gap: 10px !important;
         }
 
+        .mini-root .card--wallet-roast {
+          order: -100;
+          padding: 14px !important;
+          border-radius: 18px !important;
+          border-color: rgba(139, 92, 246, 0.45);
+          background:
+            radial-gradient(circle at top left, rgba(124, 58, 237, 0.24), transparent 36%),
+            radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.16), transparent 36%),
+            rgba(255, 255, 255, 0.065);
+          box-shadow:
+            0 14px 42px rgba(88, 28, 135, 0.22),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .mini-root .card--wallet-roast img {
+          display: block;
+          width: 100%;
+          max-width: 100%;
+          height: auto;
+          margin: 10px auto;
+          border-radius: 16px;
+          box-shadow: 0 12px 34px rgba(0, 0, 0, 0.36);
+        }
+
+        .mini-root .card--wallet-roast .btn,
+        .mini-root .card--wallet-roast button {
+          width: 100%;
+        }
+
         /* Tighter components for mini surface */
         .mini-root .card {
           padding: 14px !important;
