@@ -25,15 +25,21 @@ function registerFonts() {
 
   const fontDir = path.join(process.cwd(), "public", "fonts");
 
-  try {
-    GlobalFonts.registerFromPath(path.join(fontDir, "Inter-Regular.ttf"), "Inter");
-    GlobalFonts.registerFromPath(
-      path.join(fontDir, "Inter-SemiBold.ttf"),
-      "Inter SemiBold"
-    );
-    GlobalFonts.registerFromPath(path.join(fontDir, "Inter-Bold.ttf"), "Inter Bold");
-  } catch {
-    // fallback to system fonts
+  const fonts = [
+    path.join(fontDir, "Inter-Regular.ttf"),
+    path.join(fontDir, "Inter-SemiBold.ttf"),
+    path.join(fontDir, "Inter-Bold.ttf"),
+  ];
+
+  for (const fontPath of fonts) {
+    try {
+      GlobalFonts.registerFromPath(fontPath, "Inter");
+    } catch (error) {
+      console.warn("wallet roast font registration failed", {
+        fontPath,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   fontsRegistered = true;
@@ -398,7 +404,7 @@ type ThemeLayout = {
   tagInline: Omit<InlineBoxStyle, "box">;
 };
 
-const DEFAULT_FONT = '"Inter Bold", "Inter SemiBold", "Inter", sans-serif';
+const DEFAULT_FONT = "Inter";
 
 // Layout boxes below use PIXELS measured from the template PNG used as the design canvas.
 // You can paste x, y, w, h directly from Paint.
@@ -1077,9 +1083,8 @@ function applyTextFont(
   style: TextStyle,
   pixelSize: number
 ) {
-  const family = style.fontFamily || DEFAULT_FONT;
   const weight = style.fontWeight || 700;
-  ctx.font = `${weight} ${pixelSize}px ${family}`;
+  ctx.font = `${weight} ${pixelSize}px Inter`;
 }
 
 function drawStyledText(
