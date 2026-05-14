@@ -321,7 +321,16 @@ const BRIDGE_ROUTES: Partial<
   },
 
   base: {
-    // Base Adapter -> Linea ONFT
+    // Base Adapter -> Mantle
+    mantle: {
+      token: CANONICAL_BASE,
+      oapp: ADAPTER_BASE,
+      sourceKind: 'adapter',
+      dstEid: LZ_EIDS.mantle,
+      flatFeeWei: FLAT_FEE_WEI_ETH,
+    },
+
+    // Base Adapter -> Linea
     linea: {
       token: CANONICAL_BASE,
       oapp: ADAPTER_BASE,
@@ -329,19 +338,10 @@ const BRIDGE_ROUTES: Partial<
       dstEid: LZ_EIDS.linea,
       flatFeeWei: FLAT_FEE_WEI_ETH,
     },
-
-    // Base ONFT -> Mantle Adapter
-    mantle: {
-      token: ONFT_BASE,
-      oapp: ONFT_BASE,
-      sourceKind: 'onft',
-      dstEid: LZ_EIDS.mantle,
-      flatFeeWei: FLAT_FEE_WEI_ETH,
-    },
   },
 
   mantle: {
-    // Mantle Adapter -> Base ONFT
+    // Mantle Adapter -> Base
     base: {
       token: CANONICAL_MANTLE,
       oapp: ADAPTER_MANTLE,
@@ -352,17 +352,18 @@ const BRIDGE_ROUTES: Partial<
   },
 
   linea: {
-    // Linea ONFT -> Base Adapter
+    // Linea Adapter -> Base
     base: {
-      token: ONFT_LINEA,
-      oapp: ONFT_LINEA,
-      sourceKind: 'onft',
+      token: CANONICAL_LINEA,
+      oapp: ADAPTER_LINEA,
+      sourceKind: 'adapter',
       dstEid: LZ_EIDS.base,
       flatFeeWei: FLAT_FEE_WEI_ETH,
     },
   },
 
   monad: {
+    // Monad Adapter -> Base
     base: {
       token: CANONICAL_MONAD,
       oapp: ADAPTER_MONAD,
@@ -980,13 +981,13 @@ const onChangeDst = (next: ChainKey) => {
 
     try {
       const route = getBridgeRoute(src, dst);
-      const { token } = route;
-      const uri = (await (publicClient as AnyPublicClient).readContract({
+      const token = route.token;
+
+      const uri = (await publicClient.readContract({
         address: token,
         abi: ERC721_ABI as any,
         functionName: 'tokenURI',
         args: [BigInt(idNum)],
-          // viem v2 typing requires this property
         authorizationList: undefined as any,
       })) as string;
 
