@@ -38,6 +38,7 @@ const CHAIN_IDS = {
   mantle: 5000,
   linea: 59144,
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
+  og: 16661,
 } as const;
 
 function cookieAddressFor(chainId?: number): `0x${string}` | undefined {
@@ -45,7 +46,8 @@ function cookieAddressFor(chainId?: number): `0x${string}` | undefined {
   if (chainId === CHAIN_IDS.mantle) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE as `0x${string}`;
   if (chainId === CHAIN_IDS.linea) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_LINEA as `0x${string}`;
   if (chainId === CHAIN_IDS.mitosis) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
-  // default → Monad
+  if (chainId === CHAIN_IDS.og) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG as `0x${string}`;
+
   return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
 }
 
@@ -55,7 +57,8 @@ function makeExplorerNftUrl(chainId: number | undefined, contract: `0x${string}`
   if (chainId === CHAIN_IDS.mantle) return `https://mantlescan.xyz/token/${contract}?a=${tokenId}`;
   if (chainId === CHAIN_IDS.linea) return `https://lineascan.build/token/${contract}?a=${tokenId}`;
   if (chainId === CHAIN_IDS.mitosis) return `https://mitoscan.io/token/${contract}?a=${tokenId}`;
-  // Monad testnet
+  if (chainId === CHAIN_IDS.og) return `https://chainscan.0g.ai/token/${contract}?a=${tokenId}`;
+
   return `https://monadvision.com/nft/${contract}/${tokenId}`;
 }
 
@@ -92,7 +95,7 @@ export default function Page() {
 
   const [fcUsername, setFcUsername] = React.useState<string>('');
 
-  type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea';
+  type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | "og";
 
   const CHAIN_BY_ID: Record<number, ChainKey> = {
     [CHAIN_IDS.monad]: 'monad',
@@ -100,6 +103,7 @@ export default function Page() {
     [CHAIN_IDS.mantle]: 'mantle',
     [CHAIN_IDS.linea]: 'linea',
     [CHAIN_IDS.mitosis]: 'mitosis',
+    [CHAIN_IDS.og]: "og",
   };
 
   function currentKey(id?: number): ChainKey {
@@ -108,15 +112,15 @@ export default function Page() {
 
   // scoreByChain & imagesByChain come from holdings (you already set these as shown earlier)
   const [scoreByChain, setScoreByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0,
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0,
   });
   const [imagesByChain, setImagesByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0,
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0,
   });
 
   // NEW: transactionsByChain (accumulated from BLOB)
   const [txByChain, setTxByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0,
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0,
   });
 
   /*

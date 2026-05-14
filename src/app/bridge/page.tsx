@@ -23,6 +23,7 @@ const CHAIN_IDS = {
   mantle: 5000,
   linea: 59144,
   monad: 143,
+  og: Number(process.env.NEXT_PUBLIC_OG_CHAIN_ID || 16661),
 } as const;
 
 const LZ_EIDS = {
@@ -30,9 +31,13 @@ const LZ_EIDS = {
   mantle: 30181,
   linea: 30183,
   monad: 30390,
+  og: Number(process.env.NEXT_PUBLIC_LZ_EID_OG || 0),
 } as const;
 
 type ChainKey = keyof typeof CHAIN_IDS;
+
+type AnyPublicClient = any;
+type AnyWalletClient = any;
 
 const chainIdToChainKey = (chainId?: number | null): ChainKey | null => {
   if (!chainId) return null;
@@ -45,8 +50,25 @@ const chainIdToChainKey = (chainId?: number | null): ChainKey | null => {
       return 'linea';
     case CHAIN_IDS.monad:
       return 'monad';
+    case CHAIN_IDS.og:
+      return 'og';
     default:
       return null;
+  }
+};
+
+const chainLabel = (chain: ChainKey): string => {
+  switch (chain) {
+    case 'base':
+      return 'Base';
+    case 'mantle':
+      return 'Mantle';
+    case 'linea':
+      return 'Linea';
+    case 'monad':
+      return 'Monad';
+    case 'og':
+      return '0G';
   }
 };
 
@@ -68,16 +90,23 @@ const CANONICAL_MANTLE =
 
 const CANONICAL_MONAD =
   (process.env.NEXT_PUBLIC_CANONICAL_ERC721_MONAD ||
-    process.env.NEXT_PUBLIC_COOKIE_ADDRESS) as Address;        
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS) as Address;
+
+const CANONICAL_OG =
+  (process.env.NEXT_PUBLIC_CANONICAL_ERC721_OG ||
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG) as Address;
 
 const ADAPTER_BASE = process.env.NEXT_PUBLIC_ADAPTER_BASE as Address;
 const ADAPTER_MANTLE = process.env.NEXT_PUBLIC_ADAPTER_MANTLE as Address;
 const ADAPTER_LINEA = process.env.NEXT_PUBLIC_ADAPTER_LINEA as Address;
 const ADAPTER_MONAD = process.env.NEXT_PUBLIC_ADAPTER_MONAD as Address;
+const ADAPTER_OG = process.env.NEXT_PUBLIC_ADAPTER_OG as Address;
 
 const ONFT_MANTLE = process.env.NEXT_PUBLIC_ONFT_MANTLE as Address;
 const ONFT_LINEA = process.env.NEXT_PUBLIC_ONFT_LINEA as Address;
 const ONFT_BASE = process.env.NEXT_PUBLIC_ONFT_BASE as Address;
+const ONFT_OG = process.env.NEXT_PUBLIC_ONFT_OG as Address;
+
 
 const FEE_RECEIVER =
   (process.env.NEXT_PUBLIC_FEE_RECEIVER as Address) || ADAPTER_BASE;
@@ -91,7 +120,11 @@ const FLAT_FEE_WEI_ETH = BigInt(
 
 const FLAT_FEE_WEI_MON = BigInt(
   process.env.NEXT_PUBLIC_FLAT_FEE_WEI_MON ?? '0',
-); // Base & Linea
+); // Monad
+
+const FLAT_FEE_WEI_OG = BigInt(
+  process.env.NEXT_PUBLIC_FLAT_FEE_WEI_OG ?? '0',
+); // 0G
 
 const FLAT_FEE_WEI_MNT = BigInt(
   process.env.NEXT_PUBLIC_FLAT_FEE_WEI_MNT ?? '0',
@@ -252,45 +285,295 @@ function makeExplorerTxUrl(chainId: number | undefined, hash: string): string {
   if (chainId === CHAIN_IDS.mantle) return `https://mantlescan.xyz/tx/${hash}`;
   if (chainId === CHAIN_IDS.linea) return `https://lineascan.build/tx/${hash}`;
   if (chainId === CHAIN_IDS.monad) return `https://monadscan.com/tx/${hash}`;
+  if (chainId === CHAIN_IDS.og) {
+    const explorer = process.env.NEXT_PUBLIC_OG_EXPLORER || 'https://chainscan-galileo.0g.ai';
+    return `${explorer.replace(/\/+$/, '')}/tx/${hash}`;
+  }
   return '#';
 }
 
 function makeExplorerTxUrlLZ(chainId: number | undefined, hash: string): string {
   if (!hash) return '#';
   return `https://layerzeroscan.com/tx/${hash}`;
-
-  return '#';
 }
 
-function getContractsFor(chain: ChainKey): {
+type SourceContractKind = 'adapter' | 'onft';
+
+type BridgeRoute = {
   token: Address;
   oapp: Address;
-} {
-  // Where the NFT currently lives (token) and which contract exposes send()/quoteSend (oapp)
-  if (chain === 'base') {
-    // Source flow: canonical ERC721 on Base + adapter as OApp
-    return { token: CANONICAL_BASE, oapp: ADAPTER_BASE };
+  sourceKind: SourceContractKind;
+  dstEid: number;
+  flatFeeWei: bigint;
+};
+
+const BRIDGE_ROUTES: Partial<
+  Record<ChainKey, Partial<Record<ChainKey, BridgeRoute>>>
+> = {
+  og: {
+    base: {
+      token: CANONICAL_OG,
+      oapp: ADAPTER_OG,
+      sourceKind: 'adapter',
+      dstEid: LZ_EIDS.base,
+      flatFeeWei: FLAT_FEE_WEI_OG,
+    },
+  },
+
+  base: {
+    // Base Adapter -> Linea ONFT
+    linea: {
+      token: CANONICAL_BASE,
+      oapp: ADAPTER_BASE,
+      sourceKind: 'adapter',
+      dstEid: LZ_EIDS.linea,
+      flatFeeWei: FLAT_FEE_WEI_ETH,
+    },
+
+    // Base ONFT -> Mantle Adapter
+    mantle: {
+      token: ONFT_BASE,
+      oapp: ONFT_BASE,
+      sourceKind: 'onft',
+      dstEid: LZ_EIDS.mantle,
+      flatFeeWei: FLAT_FEE_WEI_ETH,
+    },
+  },
+
+  mantle: {
+    // Mantle Adapter -> Base ONFT
+    base: {
+      token: CANONICAL_MANTLE,
+      oapp: ADAPTER_MANTLE,
+      sourceKind: 'adapter',
+      dstEid: LZ_EIDS.base,
+      flatFeeWei: FLAT_FEE_WEI_MNT,
+    },
+  },
+
+  linea: {
+    // Linea ONFT -> Base Adapter
+    base: {
+      token: ONFT_LINEA,
+      oapp: ONFT_LINEA,
+      sourceKind: 'onft',
+      dstEid: LZ_EIDS.base,
+      flatFeeWei: FLAT_FEE_WEI_ETH,
+    },
+  },
+
+  monad: {
+    base: {
+      token: CANONICAL_MONAD,
+      oapp: ADAPTER_MONAD,
+      sourceKind: 'adapter',
+      dstEid: LZ_EIDS.base,
+      flatFeeWei: FLAT_FEE_WEI_MON,
+    },
+  },
+};
+
+function getBridgeRoute(src: ChainKey, dst: ChainKey): BridgeRoute {
+  const route = BRIDGE_ROUTES[src]?.[dst];
+
+  if (!route) {
+    throw new Error(`Unsupported bridge route: ${chainLabel(src)} -> ${chainLabel(dst)}`);
   }
-  if (chain === 'mantle') {
-    // ONFT mirror on Mantle
-    return { token: CANONICAL_MANTLE, oapp: ADAPTER_MANTLE };
+
+  if (!route.token || !route.oapp) {
+    throw new Error(`Missing contract env for ${chainLabel(src)} -> ${chainLabel(dst)}`);
   }
-  if (chain === 'monad') {
-    // ONFT mirror on Mantle
-    return { token: CANONICAL_MONAD, oapp: ADAPTER_MONAD };
-  }  
-  // linea
-  return { token: CANONICAL_LINEA, oapp: ADAPTER_LINEA };
+
+  if (!route.dstEid || !Number.isFinite(route.dstEid)) {
+    throw new Error(`Missing LayerZero EID for ${chainLabel(dst)}`);
+  }
+
+  return route;
 }
 
-// Allowed destinations for each source
 function allowedDestsFor(src: ChainKey): ChainKey[] {
-  if (src === 'base') return ['mantle', 'linea'];
-  if (src === 'mantle') return ['base'];
-  if (src === 'linea') return ['mantle'];
-  if (src === 'monad') return ['base'];
-  return [];
+  return Object.keys(BRIDGE_ROUTES[src] || {}) as ChainKey[];
 }
+
+type StoredBridgeJob = {
+  version: 1;
+  owner: string;
+  src: ChainKey;
+  dst: ChainKey;
+  tokenId: string;
+  approvalHash?: `0x${string}`;
+  sendHash?: `0x${string}`;
+  sourceChainId: number;
+  status:
+    | 'approval-submitted'
+    | 'approval-confirmed'
+    | 'send-submitted'
+    | 'source-confirmed';
+  createdAt: number;
+  updatedAt: number;
+};
+
+const bridgeJobStorageKey = (owner?: string) =>
+  owner ? `cookieverse:bridge:${owner.toLowerCase()}` : 'cookieverse:bridge';
+
+function saveBridgeJob(job: StoredBridgeJob) {
+  window.localStorage.setItem(bridgeJobStorageKey(job.owner), JSON.stringify(job));
+}
+
+function loadBridgeJob(owner?: string): StoredBridgeJob | null {
+  if (!owner) return null;
+
+  try {
+    const raw = window.localStorage.getItem(bridgeJobStorageKey(owner));
+    return raw ? (JSON.parse(raw) as StoredBridgeJob) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearBridgeJob(owner?: string) {
+  if (!owner) return;
+  window.localStorage.removeItem(bridgeJobStorageKey(owner));
+}
+
+async function waitForReceiptWithTimeout(params: {
+  publicClient: any;
+  hash: `0x${string}`;
+  timeoutMs: number;
+}) {
+  const { publicClient, hash, timeoutMs } = params;
+
+  return Promise.race([
+    publicClient.waitForTransactionReceipt({ hash }),
+    new Promise<null>((resolve) =>
+      window.setTimeout(() => resolve(null), timeoutMs),
+    ),
+  ]);
+}
+
+
+const OG_CHAINSCAN_API =
+  (process.env.NEXT_PUBLIC_OG_CHAINSCAN_API || 'https://chainscan.0g.ai/api/v2')
+    .replace(/\/+$/, '');
+
+const APPROVAL_POLL_INTERVAL_MS = 1_500;
+const APPROVAL_POLL_TIMEOUT_MS = 60_000;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function readApprovedAddress(params: {
+  publicClient: AnyPublicClient;
+  token: Address;
+  tokenId: bigint;
+}): Promise<Address | null> {
+  const { publicClient, token, tokenId } = params;
+
+  try {
+    return (await publicClient.readContract({
+      address: token,
+      abi: ERC721_ABI as any,
+      functionName: 'getApproved',
+      args: [tokenId],
+      authorizationList: undefined as any,
+    })) as Address;
+  } catch (error) {
+    console.warn('[bridge] getApproved failed', error);
+    return null;
+  }
+}
+
+async function isApprovedForAdapter(params: {
+  publicClient: AnyPublicClient;
+  token: Address;
+  adapter: Address;
+  tokenId: bigint;
+}): Promise<boolean> {
+  const approved = await readApprovedAddress({
+    publicClient: params.publicClient,
+    token: params.token,
+    tokenId: params.tokenId,
+  });
+
+  return approved?.toLowerCase() === params.adapter.toLowerCase();
+}
+
+async function isOgTxSuccessOnChainScan(hash: `0x${string}`): Promise<boolean> {
+  try {
+    const res = await fetch(`${OG_CHAINSCAN_API}/transactions/${hash}`, {
+      cache: 'no-store',
+    });
+
+    if (!res.ok) return false;
+
+    const json: any = await res.json().catch(() => null);
+    if (!json) return false;
+
+    const status = String(
+      json.status ??
+        json.result ??
+        json.transaction?.status ??
+        json.tx_status ??
+        '',
+    ).toLowerCase();
+
+    return (
+      status === 'ok' ||
+      status === 'success' ||
+      status === '1' ||
+      status === 'true'
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function waitUntilApprovedForAdapter(params: {
+  chain: ChainKey;
+  publicClient: AnyPublicClient;
+  token: Address;
+  adapter: Address;
+  tokenId: bigint;
+  approvalHash?: `0x${string}`;
+  timeoutMs?: number;
+}): Promise<boolean> {
+  const {
+    chain,
+    publicClient,
+    token,
+    adapter,
+    tokenId,
+    approvalHash,
+    timeoutMs = APPROVAL_POLL_TIMEOUT_MS,
+  } = params;
+
+  const started = Date.now();
+
+  while (Date.now() - started < timeoutMs) {
+    const approved = await isApprovedForAdapter({
+      publicClient,
+      token,
+      adapter,
+      tokenId,
+    });
+
+    if (approved) return true;
+
+    if (chain === 'og' && approvalHash) {
+      const chainScanSuccess = await isOgTxSuccessOnChainScan(approvalHash);
+      if (chainScanSuccess) {
+        await sleep(1_500);
+        return true;
+      }
+    }
+
+    await sleep(APPROVAL_POLL_INTERVAL_MS);
+  }
+
+  return false;
+}
+
 /*
 async function upsertMgidAfterBridge(params: {
   address: `0x${string}`;
@@ -414,10 +697,6 @@ export default function BridgePage() {
   const [status, setStatus] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  const [dstEidState, setDstEidState] = React.useState<number>(
-  LZ_EIDS['mantle'], // initial matches default dst = 'mantle'
-);
-
   const [preview, setPreview] = React.useState<{
     name?: string;
     image?: string;
@@ -449,10 +728,10 @@ export default function BridgePage() {
   // keep dest always valid, and sync dstEid with chosen dest
   React.useEffect(() => {
     const allowed = allowedDestsFor(src);
+    if (allowed.length === 0) return;
     if (!allowed.includes(dst)) {
       const newDst = allowed[0];
       setDst(newDst);
-      setDstEidState(LZ_EIDS[newDst]);
     }
   }, [src, dst]);
 
@@ -481,8 +760,17 @@ export default function BridgePage() {
             return;
           }
 
+          let route: BridgeRoute;
+          try {
+            route = getBridgeRoute(src, dst);
+          } catch {
+            setTokenIdOptions([]);
+            setLoadingTokenIds(false);
+            return;
+          }
+
         const res = await fetch(
-          `/api/fc-token-ids?chain=${chainKey}&owner=${address}`,
+          `/api/fc-token-ids?chain=${chainKey}&owner=${address}&contract=${route.token}`,
           { cache: 'no-store' },
         );
 
@@ -541,7 +829,7 @@ export default function BridgePage() {
       cancelled = true;
       if (intervalId != null) clearInterval(intervalId);
     };
-  }, [src, address, chainId]);
+  }, [src, dst, address, chainId]);
 
   React.useEffect(() => {
     if (!isFarcasterMini) return;
@@ -594,16 +882,12 @@ export default function BridgePage() {
   React.useEffect(() => {
     if (!chainId) return;
 
-    if (chainId === CHAIN_IDS.base) {
-      setSrc('base');
-    } else if (chainId === CHAIN_IDS.mantle) {
-      setSrc('mantle');
-    } else if (chainId === CHAIN_IDS.linea) {
-      setSrc('linea');
-    } else if (chainId === CHAIN_IDS.monad) {
-      setSrc('monad');
+    const chainKey = chainIdToChainKey(chainId);
+    if (chainKey) {
+      setSrc(chainKey);
+      setError(null);
     } else {
-      setError('Unsupported chain. Please switch to Base, Mantle or Linea.');
+      setError('Unsupported chain. Please switch to Base, Mantle, Linea, Monad or 0G.');
     }
   }, [chainId]);
 /*
@@ -613,8 +897,64 @@ export default function BridgePage() {
 */
 const onChangeDst = (next: ChainKey) => {
   setDst(next);
-  setDstEidState(LZ_EIDS[next]);
 };
+
+  React.useEffect(() => {
+    if (!address || !publicClient) return;
+
+    const job = loadBridgeJob(address);
+    if (!job) return;
+
+    const currentChainKey = chainIdToChainKey(chainId);
+    if (currentChainKey !== job.src) return;
+
+    if (job.sendHash && job.status === 'send-submitted') {
+      setBridgeTxHash(job.sendHash);
+      setBridgeTxChainId(job.sourceChainId);
+      setStatus(
+        `Resuming bridge ${chainLabel(job.src)} -> ${chainLabel(job.dst)} for token #${job.tokenId}…`,
+      );
+
+      let cancelled = false;
+
+      (async () => {
+        const receipt = await waitForReceiptWithTimeout({
+          publicClient: publicClient as AnyPublicClient,
+          hash: job.sendHash!,
+          timeoutMs: 180_000,
+        });
+
+        if (cancelled) return;
+
+        if (receipt) {
+          saveBridgeJob({
+            ...job,
+            status: 'source-confirmed',
+            updatedAt: Date.now(),
+          });
+
+          setStatus(
+            'Source-chain bridge transaction confirmed. Cross-chain delivery will finalize through LayerZero.',
+          );
+        } else {
+          setStatus(
+            'Bridge transaction is still pending or RPC is slow. The tx hash is saved, so you can refresh safely.',
+          );
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (job.approvalHash && job.status === 'approval-submitted') {
+      setApprovalTxHash(job.approvalHash);
+      setStatus(
+        `Approval was submitted for token #${job.tokenId}. Click Bridge again to continue after approval confirms.`,
+      );
+    }
+  }, [address, chainId, publicClient]);
 
   const handlePreview = async () => {
     setError(null);
@@ -639,10 +979,11 @@ const onChangeDst = (next: ChainKey) => {
     }
 
     try {
-      const { token } = getContractsFor(src);
-      const uri = (await publicClient.readContract({
+      const route = getBridgeRoute(src, dst);
+      const { token } = route;
+      const uri = (await (publicClient as AnyPublicClient).readContract({
         address: token,
-        abi: ERC721_ABI,
+        abi: ERC721_ABI as any,
         functionName: 'tokenURI',
         args: [BigInt(idNum)],
           // viem v2 typing requires this property
@@ -681,7 +1022,7 @@ const onChangeDst = (next: ChainKey) => {
 
     const srcChainId = CHAIN_IDS[src];
     if (chainId !== srcChainId) {
-      setError(`Switch your wallet to ${src.toUpperCase()} network first.`);
+      setError(`Switch your wallet to ${chainLabel(src)} network first.`);
       return;
     }
 
@@ -694,82 +1035,110 @@ const onChangeDst = (next: ChainKey) => {
 
     setBusy(true);
     try {
-      const { token, oapp } = getContractsFor(src);
+      const route = getBridgeRoute(src, dst);
+      const { token, oapp, sourceKind } = route;
+      const createdAt = Date.now();
 
-      // adapter that will actually call send() on this chain
-      const expectedAdapter =
-        src === 'base'
-          ? ADAPTER_BASE
-          : src === 'mantle'
-          ? ADAPTER_MANTLE
-          : src === 'monad'
-          ? ADAPTER_MONAD          
-          : ADAPTER_LINEA;
+      // ── 1. Approve adapter only for adapter-source routes ─────────────────
+      if (sourceKind === 'adapter') {
+        setStatus('Checking adapter approval…');
 
-      // ── 1. Approve adapter on *current* chain ──────────────────────────────
-      setStatus('Checking approval for adapter…');
-      const currentApproved = (await publicClient.readContract({
-        address: token,
-        abi: ERC721_ABI,
-        functionName: 'getApproved',
-        args: [tokenIdBig],
-        authorizationList: undefined as any,
-      })) as Address;
-
-      if (currentApproved.toLowerCase() !== expectedAdapter.toLowerCase()) {
-        setStatus('Approving adapter to transfer your NFT…');
-        const approveHash = await walletClient.writeContract({
-          address: token,
-          abi: ERC721_ABI,
-          functionName: 'approve',
-          args: [expectedAdapter, tokenIdBig],
-          account: address as Address,
-          chain: walletClient.chain,
+        const alreadyApproved = await isApprovedForAdapter({
+          publicClient: publicClient as AnyPublicClient,
+          token,
+          adapter: oapp,
+          tokenId: tokenIdBig,
         });
-        setApprovalTxHash(approveHash);
-        await publicClient.waitForTransactionReceipt({
-          hash: approveHash,
-        });
-      }   
 
-      // ── 2. quoteSend (LayerZero fee) ──────────────────────────────────────
-      const dstEid = dstEidState;
-        const sendParam = {
-        dstEid,
+        if (!alreadyApproved) {
+          setStatus('Approving adapter to transfer your NFT…');
+
+          const approveHash = await (walletClient as AnyWalletClient).writeContract({
+            address: token,
+            abi: ERC721_ABI as any,
+            functionName: 'approve',
+            args: [oapp, tokenIdBig],
+            account: address as Address,
+            chain: walletClient.chain,
+          });
+
+          setApprovalTxHash(approveHash);
+
+          saveBridgeJob({
+            version: 1,
+            owner: address,
+            src,
+            dst,
+            tokenId,
+            approvalHash: approveHash,
+            sourceChainId: CHAIN_IDS[src],
+            status: 'approval-submitted',
+            createdAt,
+            updatedAt: Date.now(),
+          });
+
+          setStatus('Approval submitted. Detecting approval on-chain…');
+
+          const approvedNow = await waitUntilApprovedForAdapter({
+            chain: src,
+            publicClient: publicClient as AnyPublicClient,
+            token,
+            adapter: oapp,
+            tokenId: tokenIdBig,
+            approvalHash: approveHash,
+            timeoutMs: APPROVAL_POLL_TIMEOUT_MS,
+          });
+
+          if (!approvedNow) {
+            setStatus(
+              'Approval was submitted, but 0G/RPC is still syncing. Wait a few seconds and click Bridge again. Your approval tx hash is saved.',
+            );
+            return;
+          }
+
+          saveBridgeJob({
+            version: 1,
+            owner: address,
+            src,
+            dst,
+            tokenId,
+            approvalHash: approveHash,
+            sourceChainId: CHAIN_IDS[src],
+            status: 'approval-confirmed',
+            createdAt,
+            updatedAt: Date.now(),
+          });
+        }
+      }
+
+      // ── 2. quoteSend LayerZero fee ────────────────────────────────────────
+      const sendParam = {
+        dstEid: route.dstEid,
         to: addrToBytes32(address),
         tokenId: tokenIdBig,
         extraOptions: '0x' as `0x${string}`,
         composeMsg: '0x' as `0x${string}`,
         onftCmd: '0x' as `0x${string}`,
-        };
+      };
 
       setStatus('Quoting LayerZero fee…');
-      const [nativeLzFee, lzTokenFee] = (await publicClient.readContract({
+      const [nativeLzFee, lzTokenFee] = (await (publicClient as AnyPublicClient).readContract({
         address: oapp,
-        abi: ONFT_ABI,
+        abi: ONFT_ABI as any,
         functionName: 'quoteSend',
         args: [sendParam, false],
         authorizationList: undefined as any,
       })) as readonly [bigint, bigint];
 
-        // pick flat fee depending on source chain
-        const flatFeeWei =
-          src === 'monad'
-            ? FLAT_FEE_WEI_MON
-            : src === 'mantle'
-              ? FLAT_FEE_WEI_MNT
-              : FLAT_FEE_WEI_ETH;  // default for base, linea, mitosis
+      const appFee =
+        route.flatFeeWei + (nativeLzFee * APP_FEE_BPS) / 10_000n;
+      const nativeFee = nativeLzFee + appFee;
 
-
-        const appFee =
-        flatFeeWei + (nativeLzFee * APP_FEE_BPS) / 10_000n;
-        const nativeFee = nativeLzFee + appFee;
-
-      // ── 3. send (bridging tx, same as sendWithFee.ts but via wallet signer) ─
-      setStatus('Sending NFT through LayerZero bridge…');
-      const sendHash = await walletClient.writeContract({
+      // ── 3. send bridge transaction ────────────────────────────────────────
+      setStatus('Submitting LayerZero bridge transaction…');
+      const sendHash = await (walletClient as AnyWalletClient).writeContract({
         address: oapp,
-        abi: ONFT_ABI,
+        abi: ONFT_ABI as any,
         functionName: 'send',
         args: [
           sendParam,
@@ -781,30 +1150,66 @@ const onChangeDst = (next: ChainKey) => {
         chain: walletClient.chain,
       });
 
+      setBridgeTxHash(sendHash);
+      setBridgeTxChainId(chainId);
 
-        setBridgeTxHash(sendHash);
-        setBridgeTxChainId(chainId);
-        setStatus('Waiting for bridge transaction confirmation…');
+      saveBridgeJob({
+        version: 1,
+        owner: address,
+        src,
+        dst,
+        tokenId,
+        sendHash,
+        sourceChainId: CHAIN_IDS[src],
+        status: 'send-submitted',
+        createdAt,
+        updatedAt: Date.now(),
+      });
 
-        // wait for tx confirm on source chain
-        await publicClient.waitForTransactionReceipt({ hash: sendHash });
+      setStatus('Bridge transaction submitted. Waiting for source-chain confirmation…');
 
-        // ✅ write to blob after successful bridge
-        (async () => {
-          try {
-            await fetch('/api/mgid-upsert', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json', 'x-farcaster-username': fcUsername  },
-              body: JSON.stringify({ address }),
-            });
-          } catch (e) {
-            console.error('mgid-upsert failed', e);
-          }
-        })();
+      const sourceReceipt = await waitForReceiptWithTimeout({
+        publicClient: publicClient as AnyPublicClient,
+        hash: sendHash,
+        timeoutMs: 180_000,
+      });
 
+      if (!sourceReceipt) {
         setStatus(
-        'Bridge transaction confirmed on source chain. Cross-chain delivery will finalize shortly.',
+          'Bridge transaction submitted. Source-chain confirmation is taking longer than expected. You can reopen this page and it will resume.',
         );
+        return;
+      }
+
+      saveBridgeJob({
+        version: 1,
+        owner: address,
+        src,
+        dst,
+        tokenId,
+        sendHash,
+        sourceChainId: CHAIN_IDS[src],
+        status: 'source-confirmed',
+        createdAt,
+        updatedAt: Date.now(),
+      });
+
+      try {
+        await fetch('/api/mgid-upsert', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-farcaster-username': fcUsername,
+          },
+          body: JSON.stringify({ address }),
+        });
+      } catch (e) {
+        console.error('mgid-upsert failed', e);
+      }
+
+      setStatus(
+        'Source-chain transaction confirmed. LayerZero delivery may still take time. Track it on LayerZeroScan.',
+      );
     } catch (e: any) {
       console.error(e);
       setError(e?.shortMessage || e?.message || 'Bridge failed.');
@@ -832,9 +1237,9 @@ const onChangeDst = (next: ChainKey) => {
         Fortune Cookie NFT Bridge
       </h1>
       <p className="muted" style={{ marginBottom: 24, fontSize: 14 }}>
-        Bridge your Fortune Cookies between <strong>Base</strong>,{' '}
-        <strong>Mantle</strong> and <strong>Linea</strong> using LayerZero
-        ZK core. 
+        Bridge your Fortune Cookies between <strong>0G</strong>,{' '}
+        <strong>Base</strong>, <strong>Mantle</strong>, <strong>Linea</strong>{' '}
+        and <strong>Monad</strong> using LayerZero.
       </p>
 
       <div className="grid">
@@ -852,11 +1257,11 @@ const onChangeDst = (next: ChainKey) => {
               <option value="base">Base</option>
               <option value="mantle">Mantle</option>
               <option value="linea">Linea</option>
-              <option value="monad">Monad</option>              
+              <option value="monad">Monad</option>
+              <option value="og">0G</option>
             </select>
             <p className="hint">
-              Where your NFT currently lives. For&apos;vice versa&apos; flow,
-              choose Mantle / Linea as destination and Base as source.
+              Where your NFT currently lives. The app detects this from your wallet network.
             </p>
           </div>
 
@@ -869,17 +1274,12 @@ const onChangeDst = (next: ChainKey) => {
             >
               {destOptions.map((k) => (
                 <option key={k} value={k}>
-                  {k === 'base'
-                    ? 'Base'
-                    : k === 'mantle'
-                    ? 'Mantle'
-                    : 'Linea'}
+                  {chainLabel(k)}
                 </option>
               ))}
             </select>
             <p className="hint">
-              From Base you can bridge to Mantle or Linea. From Mantle / Linea
-              you can bridge back to Base.
+              Available destinations are based on the configured LayerZero route for the current source chain.
             </p>
           </div>
 
@@ -901,7 +1301,7 @@ const onChangeDst = (next: ChainKey) => {
                   ))}
                 </select>
                 <p className="hint">
-                  COOKIE NFTs detected for your wallet on {src.toUpperCase()} via
+                  COOKIE NFTs detected for your wallet on {chainLabel(src)} via
                   explorer API. Choose one to bridge.
                 </p>
               </>
@@ -940,7 +1340,7 @@ const onChangeDst = (next: ChainKey) => {
               onClick={handleBridge}
               disabled={!tokenId || busy}
             >
-              {busy ? 'Bridging…' : 'Bridge NFT with LayerZero'}
+              {busy ? 'Bridging…' : `Bridge to ${chainLabel(dst)} with LayerZero`}
             </button>
             {/*<p className="note">
               Steps: 1) Approve adapter (Base only) 2) Quote LayerZero fee 3){' '}
@@ -1022,14 +1422,8 @@ const onChangeDst = (next: ChainKey) => {
             <div className="status__row">
               <span className="muted">Current chain:</span>
               <span>
-                {chainId === CHAIN_IDS.base
-                  ? 'Base'
-                  : chainId === CHAIN_IDS.mantle
-                  ? 'Mantle'
-                  : chainId === CHAIN_IDS.linea
-                  ? 'Linea'
-                  : chainId === CHAIN_IDS.monad
-                  ? 'monad'                  
+                {chainIdToChainKey(chainId)
+                  ? chainLabel(chainIdToChainKey(chainId)!)
                   : `Unknown (${chainId || 'n/a'})`}
               </span>
             </div>
@@ -1070,7 +1464,7 @@ const onChangeDst = (next: ChainKey) => {
               </ul>
               <p className="note">
                 The bridge transaction is clickable and opens the TX on the
-                correct block explorer (BaseScan, MantleScan, LineaScan).
+                correct block explorer or LayerZeroScan.
               </p>
             </div>
 

@@ -51,4 +51,19 @@ export const mitosisMainnet = defineChain({
   blockExplorers: { default: { name: 'Mitosis Explorer', url: process.env.NEXT_PUBLIC_MITOSIS_EXPLORER || 'https://explorer.mitosis.org' } },
 });
 
-export const CHAINS = [monadTestnet, baseMainnet, mantleMainnet, lineaMainnet, mitosisMainnet];
+const RPC_OG = process.env.NEXT_PUBLIC_RPC_HTTP_OG || "https://evmrpc.0g.ai";
+
+export const ogMainnet = defineChain({
+  id: 16661,
+  name: "0G",
+  nativeCurrency: { name: "0G", symbol: "0G", decimals: 18 },
+  rpcUrls: {
+    default: { http: [RPC_OG] },
+    public: { http: [RPC_OG] },
+  },
+  blockExplorers: {
+    default: { name: "0G ChainScan", url: "https://chainscan.0g.ai" },
+  },
+});
+
+export const CHAINS = [monadTestnet, baseMainnet, mantleMainnet, lineaMainnet, mitosisMainnet, ogMainnet];

@@ -13,6 +13,7 @@ const CHAIN_IDS: Record<string, number> = {
   mantle: 5000,
   linea: 59144,  
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
+  og: 16661,
 };
 
 // Pick chain object
@@ -23,7 +24,7 @@ const chain = (() => {
 
 // Export default AA chain + key so other modules (SA provider, status card)
 // can know which RPC / symbol to use at runtime.
-export type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea';
+export type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | "og";
 
 export const defaultChainKey = DEFAULT_CHAIN_KEY as ChainKey;
 export const defaultChain = chain;
@@ -73,6 +74,7 @@ export const bundlerClient = bundlerRpc
   mantle:  (process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE || '').toLowerCase(),
   linea:  (process.env.NEXT_PUBLIC_COOKIE_ADDRESS_LINEA || '').toLowerCase(),  
   mitosis: (process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS || '').toLowerCase(),
+  og: (process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG || "").toLowerCase(),
 };
 
 
@@ -84,6 +86,7 @@ export function resolveChainKeyByContract(contract?: string): ChainKey | null {
   if (c === COOKIE_ADDRS.linea) return 'linea';  
   if (c === COOKIE_ADDRS.mitosis) return 'mitosis';
   if (c === COOKIE_ADDRS.monad) return 'monad';
+  if (c === COOKIE_ADDRS.og) return "og";
   return null;
 }
 
@@ -94,6 +97,7 @@ const ID_MAP: Record<ChainKey, number> = {
   mantle: 5000,
   linea: 59144,  
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
+  og: 16661,
 };
 
 const CLIENTS: Record<ChainKey, PublicClient> = {
@@ -102,6 +106,7 @@ const CLIENTS: Record<ChainKey, PublicClient> = {
   mantle:  undefined as any,
   linea:  undefined as any,  
   mitosis: undefined as any,
+  og: undefined as any,
 };
 
 for (const key of Object.keys(CLIENTS) as ChainKey[]) {

@@ -222,6 +222,7 @@ function keyFromChainId(id?: number): ChainKey {
   if (id === 59144) return 'linea';
   const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777);
   if (id === mitosisId) return 'mitosis';
+  if (id === 16661) return "og";
   return 'monad'; // default
 }
 
@@ -230,6 +231,8 @@ function cookieAddressForKey(key: ChainKey): `0x${string}` {
   if (key === 'mantle')  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE as `0x${string}`;
   if (key === 'linea')  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_LINEA as `0x${string}`;
   if (key === 'mitosis') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
+  if (key === "og") return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG as `0x${string}`;
+  
   return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
 }
 

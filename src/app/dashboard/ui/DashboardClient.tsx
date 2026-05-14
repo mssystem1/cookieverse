@@ -7,7 +7,7 @@ import { useAccount } from "wagmi";
 // Types
 // ─────────────────────────────────────────────────────────────
 
-type ChainKey = "monad" | "base" | "mantle" | "linea" | "mitosis";
+type ChainKey = "monad" | "base" | "mantle" | "linea" | "mitosis" | "og";
 
 type HoldingsResponse = {
   ok: boolean;
@@ -28,12 +28,17 @@ type MgidRowClient = {
   totalScore_mantle?: number;
   totalScore_linea?: number;
   totalScore_mitosis?: number;
+  totalScore_0g?: number;
+
+  totalTransactions_0g?: number;
+  totalImages_0g?: number;
 
   totalBridges_monad?: number;
   totalBridges_base?: number;
   totalBridges_mantle?: number;
   totalBridges_linea?: number;
   totalBridges_mitosis?: number;
+  totalBridges_0g?: number;
 
   // quests
   dailyKey?: string;
@@ -56,6 +61,7 @@ type ChainStats = {
   cookies: number;
   images: number;
   bridges: number;
+  bridgeSupported: boolean;
   score: number;
 };
 
@@ -78,6 +84,7 @@ const CHAINS_META: { key: ChainKey; label: string; accent: string }[] = [
   { key: "mantle", label: "Mantle", accent: "#facc15" },
   { key: "linea", label: "Linea", accent: "#38bdf8" },
   { key: "mitosis", label: "Mitosis", accent: "#a855f7" },
+  { key: "og", label: "0G", accent: "#c084fc" },
 ];
 
 const CHAIN_IDS: Record<ChainKey, number> = {
@@ -86,7 +93,27 @@ const CHAIN_IDS: Record<ChainKey, number> = {
   mantle: 5000,
   linea: 59144,
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
+  og: 16661,
 };
+
+const BRIDGE_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "linea"]);
+
+function isBridgeSupported(key: ChainKey): boolean {
+  return BRIDGE_ENABLED_CHAINS.has(key);
+}
+
+function getBridgeCountForChain(
+  mgid: MgidRowClient | null,
+  key: ChainKey
+): number {
+  if (!mgid || !isBridgeSupported(key)) return 0;
+
+  if (key === "base") return Number(mgid.totalBridges_base ?? 0);
+  if (key === "mantle") return Number(mgid.totalBridges_mantle ?? 0);
+  if (key === "linea") return Number(mgid.totalBridges_linea ?? 0);
+
+  return 0;
+}
 
 // same helpers as in mgid-upsert
 function getUtcDayKey(now: Date): string {
@@ -218,16 +245,16 @@ export default function DashboardClient() {
           setChainsStats(stats);
 
           const cookiesSum = stats.reduce((acc, s) => acc + s.cookies, 0);
-          const bridgesSum =
-            (mgidRow?.totalBridges_monad ?? 0) +
-            (mgidRow?.totalBridges_base ?? 0) +
-            (mgidRow?.totalBridges_mantle ?? 0) +
-            (mgidRow?.totalBridges_linea ?? 0) +
-            (mgidRow?.totalBridges_mitosis ?? 0);
+          // Only Base, Mantle and Linea bridges are active in the dashboard.
+          // Monad, Mitosis and 0G bridge counts are intentionally excluded.
+          const bridgesSum = stats.reduce(
+            (acc, s) => acc + (s.bridgeSupported ? s.bridges : 0),
+            0
+          );
 
-          const scoreTotal =
-            mgidRow?.totalScore ??
-            stats.reduce((acc, s) => acc + s.score, 0);
+          // Use the visible per-chain score total so disabled bridge routes cannot
+          // keep inflating the dashboard through old stored totals.
+          const scoreTotal = stats.reduce((acc, s) => acc + s.score, 0);
 
           setTotalCookies(cookiesSum);
           setTotalBridges(bridgesSum);
@@ -274,7 +301,7 @@ export default function DashboardClient() {
 
   const tasks = deriveTasksFromMgid(mgid, totalCookies, totalBridges);
   const chainsEngaged = chainsStats.filter(
-    (s) => s.cookies > 0 || s.bridges > 0
+    (s) => s.cookies > 0 || s.images > 0 || (s.bridgeSupported && s.bridges > 0)
   ).length;
 
   return (
@@ -309,28 +336,42 @@ function computeChainStats(
 ): ChainStats[] {
   return CHAINS_META.map(({ key, label, accent }) => {
     const h = holdings[key];
-    const cookies = h?.tokenIds?.length ?? 0;
-    const images = h?.imageIds?.length ?? 0;
 
-    let bridges = 0;
+    const cookies = Number(h?.tokenIds?.length ?? 0);
+    const images = Number(h?.imageIds?.length ?? 0);
+
+    const bridgeSupported = isBridgeSupported(key);
+    const bridges = getBridgeCountForChain(mgid, key);
+
+    let storedScore = 0;
     if (mgid) {
-      if (key === "monad") bridges = mgid.totalBridges_monad ?? 0;
-      if (key === "base") bridges = mgid.totalBridges_base ?? 0;
-      if (key === "mantle") bridges = mgid.totalBridges_mantle ?? 0;
-      if (key === "linea") bridges = mgid.totalBridges_linea ?? 0;
-      if (key === "mitosis") bridges = mgid.totalBridges_mitosis ?? 0;
+      if (key === "monad") storedScore = Number(mgid.totalScore_monad ?? 0);
+      if (key === "base") storedScore = Number(mgid.totalScore_base ?? 0);
+      if (key === "mantle") storedScore = Number(mgid.totalScore_mantle ?? 0);
+      if (key === "linea") storedScore = Number(mgid.totalScore_linea ?? 0);
+      if (key === "mitosis") storedScore = Number(mgid.totalScore_mitosis ?? 0);
+      if (key === "og") storedScore = Number(mgid.totalScore_0g ?? 0);
     }
 
-    let score = 0;
-    if (mgid) {
-      if (key === "monad") score = mgid.totalScore_monad ?? 0;
-      if (key === "base") score = mgid.totalScore_base ?? 0;
-      if (key === "mantle") score = mgid.totalScore_mantle ?? 0;
-      if (key === "linea") score = mgid.totalScore_linea ?? 0;
-      if (key === "mitosis") score = mgid.totalScore_mitosis ?? 0;
-    }
+    /**
+     * Score logic:
+     * - Cookies and images count on every chain.
+     * - Bridge points count only on Base, Mantle and Linea.
+     * - Monad, Mitosis and 0G bridges are intentionally excluded.
+     */
+    const liveScore = cookies + images + (bridgeSupported ? bridges : 0);
+    const score = bridgeSupported ? Math.max(storedScore, liveScore) : liveScore;
 
-    return { key, label, accent, cookies, images, bridges, score };
+    return {
+      key,
+      label,
+      accent,
+      cookies,
+      images,
+      bridges,
+      bridgeSupported,
+      score,
+    };
   });
 }
 
@@ -622,30 +663,41 @@ function ChainGrid(props: {
             </span>
           </div>
 
-          <div
-            style={{
-              fontSize: 12,
-              color: "#9ca3af",
-              marginBottom: 10,
-            }}
-          >
-            {c.cookies > 0 || c.bridges > 0
-              ? "You’ve unlocked this chain. Keep farming!"
-              : "No cookies here yet. Mint or bridge to awaken it ⚡️"}
-          </div>
+          {(() => {
+            const showBridges =
+              c.key === "base" || c.key === "mantle" || c.key === "linea";
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3,1fr)",
-              gap: 6,
-              fontSize: 12,
-            }}
-          >
-            <StatMini label="Cookies" value={c.cookies} />
-            <StatMini label="Bridges" value={c.bridges} />
-            <StatMini label="Images" value={c.images} />
-          </div>
+            return (
+              <>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#9ca3af",
+                    marginBottom: 10,
+                  }}
+                >
+                  {c.cookies > 0 || c.images > 0 || (showBridges && c.bridges > 0)
+                    ? "You’ve unlocked this chain. Keep farming!"
+                    : showBridges
+                      ? "No cookies here yet. Mint or bridge to awaken it ⚡️"
+                      : "No cookies here yet. Mint to awaken it ⚡️"}
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: showBridges ? "repeat(3,1fr)" : "repeat(2,1fr)",
+                    gap: 6,
+                    fontSize: 12,
+                  }}
+                >
+                  <StatMini label="Cookies" value={c.cookies} />
+                  {showBridges && <StatMini label="Bridges" value={c.bridges} />}
+                  <StatMini label="Images" value={c.images} />
+                </div>
+              </>
+            );
+          })()}
 
           <div style={{ marginTop: 10 }}>
             <ProgressBar
@@ -703,7 +755,7 @@ function TasksSection(props: {
     {
       key: "dailyBridge" as const,
       title: "Daily Bridge",
-      desc: "Bridge 2 COOKIEs between any chains.",
+      desc: "Bridge 2 COOKIEs on Base, Mantle or Linea.",
       done: tasks.dailyBridgeDone,
       progress: Math.min(tasks.dailyBridgeProgress, 2),
       target: 2,
@@ -722,7 +774,7 @@ function TasksSection(props: {
     {
       key: "weeklyBridge" as const,
       title: "Weekly Bridge",
-      desc: "Bridge 8+ COOKIEs this week.",
+      desc: "Bridge 8+ COOKIEs this week on Base, Mantle or Linea.",
       done: tasks.weeklyBridgeDone,
       progress: Math.min(tasks.weeklyBridgeProgress, 8),
       target: 8,
@@ -962,7 +1014,7 @@ function Pill(props: { label: string; value: string }) {
   );
 }
 
-function StatMini(props: { label: string; value: number }) {
+function StatMini(props: { label: string; value: number | string }) {
   return (
     <div
       style={{

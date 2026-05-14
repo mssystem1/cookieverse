@@ -3,77 +3,110 @@ import { getPlayersMany, upsertPlayer } from '../../../server/mgidStore';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function n(value: unknown): number {
+  const x = Number(value);
+  return Number.isFinite(x) ? x : 0;
+}
+
 export async function POST(req: Request) {
   try {
     const payload = await req.json();
 
-    // 🔹 Mode A: read-many for leaderboard
+    // Mode A: read-many for leaderboard/dashboard enrichment
     if (payload && payload.op === 'readMany') {
       const addresses = Array.isArray(payload.addresses) ? payload.addresses : [];
       if (!addresses.length) {
         return Response.json({ rows: [] });
       }
+
       const rows = await getPlayersMany(addresses);
       return Response.json({ rows });
     }
 
-    // 🔹 Mode B: upsert single player (existing behavior)
+    // Mode B: manual upsert single player.
+    // Keep all old fields and add 0G fields so Blob read/write is symmetric.
     const row = {
       usernameX: payload.usernameX ?? '',
       usernamefarcaster: payload.usernamefarcaster ?? '',
+
       EOAWallet: payload.EOAWallet,
       SAWallet: payload.SAWallet,
-      LineaBoost: Number(payload.LineaBoost || 0),
-      BaseBoost: Number(payload.BaseBoost || 0),
-      MonadBoost: Number(payload.MonadBoost || 0),
-      MantleBoost: Number(payload.MantleBoost || 0),
-      MitosisBoost: Number(payload.MitosisBoost || 0),
-      totalScore_monad: Number(payload.totalScore_monad || 0),
-      totalTransactions_monad: Number(payload.totalTransactions_monad || 0),
-      totalImages_monad: Number(payload.totalImages_monad || 0),
-      totalScore_base: Number(payload.totalScore_base || 0),
-      totalTransactions_base: Number(payload.totalTransactions_base || 0),
-      totalImages_base: Number(payload.totalImages_base || 0),
-      totalScore_mantle: Number(payload.totalScore_mantle || 0),
-      totalTransactions_mantle: Number(payload.totalTransactions_mantle || 0),
-      totalImages_mantle: Number(payload.totalImages_mantle || 0),
-      totalScore_linea: Number(payload.totalScore_linea || 0),
-      totalTransactions_linea: Number(payload.totalTransactions_linea || 0),
-      totalImages_linea: Number(payload.totalImages_linea || 0),
-      totalScore_mitosis: Number(payload.totalScore_mitosis || 0),
-      totalTransactions_mitosis: Number(payload.totalTransactions_mitosis || 0),
-      totalImages_mitosis: Number(payload.totalImages_mitosis || 0),
-      totalScore: Number(payload.totalScore || 0),
-      totalTransactions: Number(payload.totalTransactions || 0),
-      totalImages: Number(payload.totalImages || 0),
+
+      LineaBoost: n(payload.LineaBoost),
+      BaseBoost: n(payload.BaseBoost),
+      MonadBoost: n(payload.MonadBoost),
+      MantleBoost: n(payload.MantleBoost),
+      MitosisBoost: n(payload.MitosisBoost),
+
+      totalScore_monad: n(payload.totalScore_monad),
+      totalTransactions_monad: n(payload.totalTransactions_monad),
+      totalImages_monad: n(payload.totalImages_monad),
+
+      totalScore_base: n(payload.totalScore_base),
+      totalTransactions_base: n(payload.totalTransactions_base),
+      totalImages_base: n(payload.totalImages_base),
+
+      totalScore_mantle: n(payload.totalScore_mantle),
+      totalTransactions_mantle: n(payload.totalTransactions_mantle),
+      totalImages_mantle: n(payload.totalImages_mantle),
+
+      totalScore_linea: n(payload.totalScore_linea),
+      totalTransactions_linea: n(payload.totalTransactions_linea),
+      totalImages_linea: n(payload.totalImages_linea),
+
+      totalScore_mitosis: n(payload.totalScore_mitosis),
+      totalTransactions_mitosis: n(payload.totalTransactions_mitosis),
+      totalImages_mitosis: n(payload.totalImages_mitosis),
+
+      totalScore_0g: n(payload.totalScore_0g),
+      totalTransactions_0g: n(payload.totalTransactions_0g),
+      totalImages_0g: n(payload.totalImages_0g),
+
+      totalScore: n(payload.totalScore),
+      totalTransactions: n(payload.totalTransactions),
+      totalImages: n(payload.totalImages),
       updatedAt: Date.now(),
 
-      // 🔹 NEW: allow writing bridge totals manually (optional)
-      totalBridges_monad: Number(payload.totalBridges_monad || 0),
-      totalBridges_base: Number(payload.totalBridges_base || 0),
-      totalBridges_mantle: Number(payload.totalBridges_mantle || 0),
-      totalBridges_linea: Number(payload.totalBridges_linea || 0),
-      totalBridges_mitosis: Number(payload.totalBridges_mitosis || 0),
+      totalBridges_monad: n(payload.totalBridges_monad),
+      totalBridges_base: n(payload.totalBridges_base),
+      totalBridges_mantle: n(payload.totalBridges_mantle),
+      totalBridges_linea: n(payload.totalBridges_linea),
+      totalBridges_mitosis: n(payload.totalBridges_mitosis),
+      totalBridges_0g: n(payload.totalBridges_0g),
 
-      // 🔹 Daily tasks (UTC-based)
-      dailyKey: payload.dailyKey,               // 'YYYY-MM-DD' (UTC)
-      dailyBaselineCookies: Number(payload.dailyBaselineCookies || 0),    // total cookies at start of that day
-      dailyBaselineBridges: Number(payload.dailyBaselineBridges || 0),   // total bridges at start of that day
-      dailyMintDone: payload.dailyMintDone,          // "Mint at least 2 COOKIEs" – logic in mgid-upsert
-      dailyBridgeDone: payload.dailyBridgeDone,        // "Bridge 2 COOKIEs"
+      dailyKey: payload.dailyKey,
+      dailyBaselineCookies: n(payload.dailyBaselineCookies),
+      dailyBaselineBridges: n(payload.dailyBaselineBridges),
+      dailyMintDone: payload.dailyMintDone,
+      dailyBridgeDone: payload.dailyBridgeDone,
 
-      // 🔹 Weekly tasks (UTC-based ISO week)
-      weeklyKey: payload.weeklyKey,          // 'YYYY-Www' (UTC ISO week)
-      weeklyBaselineCookies: Number(payload.weeklyBaselineCookies || 0),  // total cookies at start of week
-      weeklyBaselineBridges: Number(payload.weeklyBaselineBridges || 0),   // total bridges at start of week
-      weeklyMintDone: payload.weeklyMintDone,          // "Mint 8+ cookies this week"
-      weeklyBridgeDone: payload.weeklyBridgeDone,        // "Bridge 8+ times this week"
+      weeklyKey: payload.weeklyKey,
+      weeklyBaselineCookies: n(payload.weeklyBaselineCookies),
+      weeklyBaselineBridges: n(payload.weeklyBaselineBridges),
+      weeklyMintDone: payload.weeklyMintDone,
+      weeklyBridgeDone: payload.weeklyBridgeDone,
     };
 
+    // If caller did not send global totals, derive them from per-chain fields.
+    row.totalScore = row.totalScore || (
+      row.totalScore_monad + row.totalScore_base + row.totalScore_mantle +
+      row.totalScore_linea + row.totalScore_mitosis + row.totalScore_0g
+    );
+
+    row.totalTransactions = row.totalTransactions || (
+      row.totalTransactions_monad + row.totalTransactions_base + row.totalTransactions_mantle +
+      row.totalTransactions_linea + row.totalTransactions_mitosis + row.totalTransactions_0g
+    );
+
+    row.totalImages = row.totalImages || (
+      row.totalImages_monad + row.totalImages_base + row.totalImages_mantle +
+      row.totalImages_linea + row.totalImages_mitosis + row.totalImages_0g
+    );
+
     await upsertPlayer(row as any);
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, row });
   } catch (err) {
-    console.error('mgid-upsert error', err);
+    console.error('mgid-downsert error', err);
     return Response.json({ error: 'Internal error' }, { status: 500 });
   }
 }

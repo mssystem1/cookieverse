@@ -1,17 +1,34 @@
 // src/app/api/adapter-sends/route.ts
 import { NextResponse } from 'next/server';
+import {
+  getAddress,
+  isAddress,
+  type Address,
+} from 'viem';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type ChainKey = 'base' | 'mantle' | 'linea' | 'monad';
+type ChainKey = 'base' | 'mantle' | 'linea' | 'monad' | 'og';
 
 type ChainAdapterResult = {
   count: number;
-  ok: boolean;      // true = data is reliable, false = we had to fallback
+  ok: boolean;
+  source:
+    | 'etherscan'
+    | 'alchemy'
+    | 'chainscan-v2'
+    | 'chainscan-old'
+    | 'disabled'
+    | 'none';
 };
 
-// COOKIE / CANONICAL ONFT contracts
+const ZERO_RESULT: ChainAdapterResult = {
+  count: 0,
+  ok: false,
+  source: 'none',
+};
+
 const CANONICAL_ADDRESSES: Record<ChainKey, string> = {
   base:
     process.env.NEXT_PUBLIC_CANONICAL_ERC721 ??
@@ -28,162 +45,476 @@ const CANONICAL_ADDRESSES: Record<ChainKey, string> = {
   monad:
     process.env.NEXT_PUBLIC_CANONICAL_ERC721_MONAD ??
     process.env.NEXT_PUBLIC_COOKIE_ADDRESS ??
-    '',    
+    '',
+  og:
+    process.env.NEXT_PUBLIC_CANONICAL_ERC721_OG ??
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG ??
+    '',
 };
 
-// LayerZero adapters
 const ADAPTERS: Record<ChainKey, string | undefined> = {
   base: process.env.NEXT_PUBLIC_ADAPTER_BASE,
   mantle: process.env.NEXT_PUBLIC_ADAPTER_MANTLE,
   linea: process.env.NEXT_PUBLIC_ADAPTER_LINEA,
-  monad: process.env.NEXT_PUBLIC_ADAPTER_MONAD,  
+  monad: process.env.NEXT_PUBLIC_ADAPTER_MONAD,
+  og: process.env.NEXT_PUBLIC_ADAPTER_OG,
 };
 
-// Etherscan V2 chain IDs
-const ETHERSCAN_CHAINIDS: Record<ChainKey, string> = {
+const ETHERSCAN_CHAINIDS: Partial<Record<ChainKey, string>> = {
   base: '8453',
   mantle: '5000',
   linea: '59144',
   monad: '143',
 };
 
-// Your key name (you used ETHERSCAN_API_KEY_ENV earlier)
+const RPCS: Partial<Record<ChainKey, string>> = {
+  base: process.env.NEXT_PUBLIC_RPC_HTTP_BASE,
+  mantle: process.env.NEXT_PUBLIC_RPC_HTTP_MANTLE,
+  linea: process.env.NEXT_PUBLIC_RPC_HTTP_LINEA,
+  monad: process.env.NEXT_PUBLIC_RPC_HTTP_MONAD,
+  og: process.env.NEXT_PUBLIC_RPC_HTTP_OG ?? process.env.OG_EVM_RPC_URL,
+};
+
 const ETHERSCAN_API_KEY =
   process.env.ETHERSCAN_API_KEY_ENV ||
   process.env.ETHERSCAN_API_KEY ||
   process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY ||
   '';
 
-function isHexAddress(v: string | null): v is `0x${string}` {
-  return !!v && /^0x[0-9a-fA-F]{40}$/.test(v);
+const OG_CHAINSCAN_BASES = (
+  process.env.OG_CHAINSCAN_BASES ||
+  process.env.NEXT_PUBLIC_OG_CHAINSCAN_BASES ||
+  process.env.OG_CHAINSCAN_BASE ||
+  process.env.NEXT_PUBLIC_OG_CHAINSCAN_BASE ||
+  'https://chainscan.0g.ai'
+)
+  .split(',')
+  .map((x) => x.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const FETCH_TIMEOUT_MS = Number(process.env.CHAINSCAN_FETCH_TIMEOUT_MS || '4500');
+const CHAINSCAN_MAX_PAGES = Number(process.env.CHAINSCAN_MAX_PAGES || '15');
+
+function isHexAddress(value: string | null): value is `0x${string}` {
+  return !!value && /^0x[0-9a-fA-F]{40}$/.test(value);
 }
 
-// Small sleep helper for retry loop
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchEtherscanNFTTx(
-  url: string,
-): Promise<{ ok: boolean; json: any | null }> {
+function normalizeAddressLike(value: unknown): string {
+  if (!value) return '';
+
+  if (typeof value === 'string') {
+    return value.toLowerCase();
+  }
+
+  if (typeof value === 'object') {
+    const obj = value as Record<string, any>;
+    const maybe =
+      obj.hash ??
+      obj.address ??
+      obj.address_hash ??
+      obj.addressHash ??
+      obj.value;
+
+    if (typeof maybe === 'string') {
+      return maybe.toLowerCase();
+    }
+  }
+
+  return '';
+}
+
+function normalizeFrom(item: any): string {
+  return normalizeAddressLike(
+    item?.from ??
+      item?.from_address ??
+      item?.from_address_hash ??
+      item?.fromAddress,
+  );
+}
+
+function normalizeTo(item: any): string {
+  return normalizeAddressLike(
+    item?.to ??
+      item?.to_address ??
+      item?.to_address_hash ??
+      item?.toAddress,
+  );
+}
+
+function normalizeTokenAddress(item: any): string {
+  return normalizeAddressLike(
+    item?.token?.address ??
+      item?.token?.hash ??
+      item?.token?.address_hash ??
+      item?.token?.addressHash ??
+      item?.token_address ??
+      item?.token_address_hash ??
+      item?.contractAddress ??
+      item?.contract_address,
+  );
+}
+
+function normalizeTxHash(item: any): string {
+  const raw =
+    item?.transaction_hash ??
+    item?.tx_hash ??
+    item?.hash ??
+    item?.transactionHash;
+
+  return typeof raw === 'string' ? raw.toLowerCase() : '';
+}
+
+function normalizeTokenId(item: any): string {
+  const raw =
+    item?.token_id ??
+    item?.tokenID ??
+    item?.tokenId ??
+    item?.erc721TokenId ??
+    item?.token_instance?.id ??
+    item?.token_instance?.token_id ??
+    item?.total?.token_id;
+
+  if (typeof raw === 'bigint') return raw.toString();
+  if (typeof raw === 'number') return String(raw);
+  if (typeof raw === 'string') return raw;
+
+  return '';
+}
+
+function toHexBlock(value: bigint | number | string): `0x${string}` {
+  if (typeof value === 'string') {
+    if (value.startsWith('0x')) return value as `0x${string}`;
+    return `0x${BigInt(value).toString(16)}`;
+  }
+
+  return `0x${BigInt(value).toString(16)}`;
+}
+
+async function fetchJsonWithTimeout(url: string, init?: RequestInit, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      ...init,
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+
+    const text = await res.text().catch(() => '');
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
+    }
+
+    return text ? JSON.parse(text) : null;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function postJsonWithTimeout(url: string, body: any, timeoutMs = FETCH_TIMEOUT_MS) {
+  return fetchJsonWithTimeout(
+    url,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    timeoutMs,
+  );
+}
+
+function chainScanNextPageParams(json: any): Record<string, string> | null {
+  const params = json?.next_page_params;
+  if (!params || typeof params !== 'object') return null;
+
+  const out: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || typeof value === 'undefined') continue;
+    out[key] = String(value);
+  }
+
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function parseOldExplorerTransfers(json: any): any[] {
+  if (!json) return [];
+  if (Array.isArray(json.result)) return json.result;
+  if (Array.isArray(json.items)) return json.items;
+  if (Array.isArray(json)) return json;
+  return [];
+}
+
+function countUserToAdapterFromTransferItems(params: {
+  chain: ChainKey;
+  items: any[];
+  user: Address;
+  adapter: Address;
+  contract: Address;
+  source: ChainAdapterResult['source'];
+}): ChainAdapterResult {
+  const { chain, items, user, adapter, contract, source } = params;
+
+  const lowerUser = user.toLowerCase();
+  const lowerAdapter = adapter.toLowerCase();
+  const lowerContract = contract.toLowerCase();
+
+  const hashes = new Set<string>();
+
+  for (const item of items) {
+    const tokenAddress = normalizeTokenAddress(item);
+
+    if (tokenAddress && tokenAddress !== lowerContract) {
+      continue;
+    }
+
+    const from = normalizeFrom(item);
+    const to = normalizeTo(item);
+
+    if (from === lowerUser && to === lowerAdapter) {
+      const hash = normalizeTxHash(item);
+      const tokenId = normalizeTokenId(item);
+      hashes.add(hash || `${item?.block_number ?? item?.blockNumber ?? ''}:${tokenId}`);
+    }
+  }
+
+  console.log(
+    '[adapter-sends]',
+    chain,
+    source,
+    'items:',
+    items.length,
+    'user->adapter txs:',
+    hashes.size,
+  );
+
+  return {
+    count: hashes.size,
+    ok: true,
+    source,
+  };
+}
+
+async function fetchOgAddressTokenTransfersV2(params: {
+  user: Address;
+  contract: Address;
+}): Promise<any[]> {
+  const { user, contract } = params;
+
+  let lastError: any = null;
+
+  for (const base of OG_CHAINSCAN_BASES) {
+    let nextPageParams: Record<string, string> | null = null;
+    const items: any[] = [];
+
+    try {
+      for (let page = 0; page < CHAINSCAN_MAX_PAGES; page += 1) {
+        const url = new URL(`${base}/api/v2/addresses/${user}/token-transfers`);
+        url.searchParams.set('type', 'ERC-721');
+        url.searchParams.set('token', contract);
+
+        if (nextPageParams) {
+          for (const [key, value] of Object.entries(nextPageParams)) {
+            url.searchParams.set(key, value);
+          }
+        }
+
+        const json = await fetchJsonWithTimeout(url.toString());
+        const pageItems = Array.isArray(json?.items)
+          ? json.items
+          : Array.isArray(json?.result)
+            ? json.result
+            : Array.isArray(json)
+              ? json
+              : [];
+
+        items.push(...pageItems);
+
+        nextPageParams = chainScanNextPageParams(json);
+        if (!nextPageParams) break;
+      }
+
+      return items;
+    } catch (error) {
+      lastError = error;
+      console.warn('[adapter-sends] 0G ChainScan v2 failed for base', base, error);
+    }
+  }
+
+  throw lastError ?? new Error('0G ChainScan v2 failed');
+}
+
+async function fetchOgAddressTokenTransfersOldApi(params: {
+  user: Address;
+  contract: Address;
+}): Promise<any[]> {
+  const { user, contract } = params;
+  let lastError: any = null;
+
+  for (const base of OG_CHAINSCAN_BASES) {
+    try {
+      const url = new URL(`${base}/api`);
+      url.searchParams.set('module', 'account');
+      url.searchParams.set('action', 'tokennfttx');
+      url.searchParams.set('contractaddress', contract);
+      url.searchParams.set('address', user);
+      url.searchParams.set('page', '1');
+      url.searchParams.set('offset', '10000');
+      url.searchParams.set('sort', 'asc');
+
+      const json = await fetchJsonWithTimeout(url.toString());
+      const items = parseOldExplorerTransfers(json);
+
+      return items;
+    } catch (error) {
+      lastError = error;
+      console.warn('[adapter-sends] 0G ChainScan old API failed for base', base, error);
+    }
+  }
+
+  throw lastError ?? new Error('0G ChainScan old API failed');
+}
+
+async function fetchOgAdapterSends(user: Address): Promise<ChainAdapterResult> {
+  const contractRaw = CANONICAL_ADDRESSES.og;
+  const adapterRaw = ADAPTERS.og;
+
+  if (!contractRaw || !adapterRaw || !isAddress(contractRaw) || !isAddress(adapterRaw)) {
+    console.warn('[adapter-sends] og missing/invalid config', {
+      contract: contractRaw,
+      adapter: adapterRaw,
+    });
+
+    return ZERO_RESULT;
+  }
+
+  const contract = getAddress(contractRaw);
+  const adapter = getAddress(adapterRaw);
+
+  try {
+    const items = await fetchOgAddressTokenTransfersV2({ user, contract });
+
+    return countUserToAdapterFromTransferItems({
+      chain: 'og',
+      items,
+      user,
+      adapter,
+      contract,
+      source: 'chainscan-v2',
+    });
+  } catch {
+    // Continue to old API fallback.
+  }
+
+  try {
+    const items = await fetchOgAddressTokenTransfersOldApi({ user, contract });
+
+    return countUserToAdapterFromTransferItems({
+      chain: 'og',
+      items,
+      user,
+      adapter,
+      contract,
+      source: 'chainscan-old',
+    });
+  } catch (error) {
+    console.error('[adapter-sends] og all ChainScan strategies failed', error);
+    return ZERO_RESULT;
+  }
+}
+
+async function fetchEtherscanNFTTx(url: string): Promise<{ ok: boolean; json: any | null }> {
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+
     if (!res.ok) {
       console.warn('[adapter-sends] HTTP error', res.status, res.statusText);
       return { ok: false, json: null };
     }
+
     const json: any = await res.json().catch(() => null);
     if (!json) return { ok: false, json: null };
+
     return { ok: true, json };
-  } catch (e) {
-    console.error('[adapter-sends] fetch error', e);
+  } catch (error) {
+    console.error('[adapter-sends] fetch error', error);
     return { ok: false, json: null };
   }
 }
 
-/**
- * Base: special retry logic (up to 10 seconds, every 500 ms).
- * If we never get a valid "status:1" response, return ok:false so mgid-upsert
- * can keep previous score via Math.max().
- */
-async function fetchBaseAdapterSends(
-  user: `0x${string}`,
-): Promise<ChainAdapterResult> {
-  const apiKey = ETHERSCAN_API_KEY;
-  const contract = CANONICAL_ADDRESSES.base;
-  const adapter = ADAPTERS.base;
-  const chainid = ETHERSCAN_CHAINIDS.base;
+function extractUserToAdapterCountFromEtherscanJson(
+  chain: ChainKey,
+  json: any,
+  user: Address,
+  adapter: Address,
+): ChainAdapterResult {
+  const transfers = Array.isArray(json.result) ? (json.result as any[]) : [];
+  const lowerUser = user.toLowerCase();
+  const lowerAdapter = adapter.toLowerCase();
 
-  if (!apiKey || !contract || !adapter || !chainid) {
-    console.warn('[adapter-sends] base missing config', {
-      hasApiKey: !!apiKey,
-      contract,
-      adapter,
-      chainid,
-    });
-    return { count: 0, ok: false };
+  const hashes = new Set<string>();
+
+  for (const tx of transfers) {
+    const from = (tx.from || '').toString().toLowerCase();
+    const to = (tx.to || '').toString().toLowerCase();
+    const isError = (tx.isError ?? tx.txreceipt_status ?? '0').toString();
+
+    if (from === lowerUser && to === lowerAdapter && isError !== '1') {
+      const hash = tx.hash || tx.transactionHash;
+      const tokenId = tx.tokenID ?? tx.tokenId ?? '';
+      hashes.add(typeof hash === 'string' && hash ? hash.toLowerCase() : `${tx.blockNumber ?? ''}:${tokenId}`);
+    }
   }
 
-  const url =
-    `https://api.etherscan.io/v2/api` +
-    `?chainid=${chainid}` +
-    `&module=account` +
-    `&action=tokennfttx` +
-    `&contractaddress=${contract}` +
-    `&address=${user}` +
-    `&page=1&offset=10000&sort=asc` +
-    `&apikey=${apiKey}`;
-
-  const start = Date.now();
-  const maxDurationMs = 5_000;
-  const intervalMs = 500;
-
-  let lastJson: any | null = null;
-
-  while (Date.now() - start < maxDurationMs) {
-    const { ok, json } = await fetchEtherscanNFTTx(url);
-    lastJson = json;
-
-    if (!ok || !json) {
-      await sleep(intervalMs);
-      continue;
-    }
-
-    // Check Etherscan status
-    if (json.status === '1' && Array.isArray(json.result)) {
-      // success
-      return extractUserToAdapterCount('base', json, user, adapter);
-    }
-
-    // Base-specific free-tier message: no point retrying forever
-    const resultStr = typeof json.result === 'string' ? json.result : '';
-    if (
-      resultStr.includes('Free API access is not supported for this chain') ||
-      resultStr.includes('No transactions found')
-    ) {
-      console.warn(
-        '[adapter-sends] base non-success status',
-        json.status,
-        json.message,
-        json.result,
-      );
-      // we consider this definitive: ok=false so mgid-upsert keeps old score
-      return { count: 0, ok: false };
-    }
-
-    // other NOTOK → try again after delay
-    await sleep(intervalMs);
-  }
-
-  console.warn(
-    '[adapter-sends] base timeout after retries, lastJson=',
-    lastJson,
+  console.log(
+    '[adapter-sends]',
+    chain,
+    'etherscan transfers:',
+    transfers.length,
+    'user->adapter txs:',
+    hashes.size,
   );
-  // Did not get valid data in time → mark as unreliable
-  return { count: 0, ok: false };
+
+  return { count: hashes.size, ok: true, source: 'etherscan' };
 }
 
-/**
- * Mantle / Linea: single call (they are stable on free tier).
- */
-async function fetchOtherChainAdapterSends(
-  chain: 'mantle' | 'linea' | 'monad',
-  user: `0x${string}`,
+async function fetchAdapterSendsViaEtherscan(
+  chain: Exclude<ChainKey, 'og'>,
+  user: Address,
 ): Promise<ChainAdapterResult> {
   const apiKey = ETHERSCAN_API_KEY;
-  const contract = CANONICAL_ADDRESSES[chain];
-  const adapter = ADAPTERS[chain];
+  const contractRaw = CANONICAL_ADDRESSES[chain];
+  const adapterRaw = ADAPTERS[chain];
   const chainid = ETHERSCAN_CHAINIDS[chain];
 
-  if (!apiKey || !contract || !adapter || !chainid) {
-    console.warn('[adapter-sends]', chain, 'missing config', {
+  if (!apiKey || !contractRaw || !adapterRaw || !chainid) {
+    console.warn('[adapter-sends]', chain, 'missing etherscan config', {
       hasApiKey: !!apiKey,
-      contract,
-      adapter,
+      contract: contractRaw,
+      adapter: adapterRaw,
       chainid,
     });
-    return { count: 0, ok: false };
+
+    return ZERO_RESULT;
   }
+
+  if (!isAddress(contractRaw) || !isAddress(adapterRaw)) {
+    console.warn('[adapter-sends]', chain, 'invalid contract/adapter address', {
+      contract: contractRaw,
+      adapter: adapterRaw,
+    });
+
+    return ZERO_RESULT;
+  }
+
+  const contract = getAddress(contractRaw);
+  const adapter = getAddress(adapterRaw);
 
   const url =
     `https://api.etherscan.io/v2/api` +
@@ -196,63 +527,166 @@ async function fetchOtherChainAdapterSends(
     `&apikey=${apiKey}`;
 
   const { ok, json } = await fetchEtherscanNFTTx(url);
-  if (!ok || !json) {
-    return { count: 0, ok: false };
-  }
+
+  if (!ok || !json) return ZERO_RESULT;
 
   if (json.status !== '1' || !Array.isArray(json.result)) {
     const resultStr = typeof json.result === 'string' ? json.result : '';
+
     console.warn(
       '[adapter-sends]',
       chain,
-      'non-success status from etherscan:',
+      'non-success etherscan status:',
       json.status,
       json.message,
       resultStr,
     );
 
     if (resultStr.includes('No transactions found')) {
-      // legit zero, ok=true
-      return { count: 0, ok: true };
+      return { count: 0, ok: true, source: 'etherscan' };
     }
 
-    return { count: 0, ok: false };
+    return ZERO_RESULT;
   }
 
-  return extractUserToAdapterCount(chain, json, user, adapter);
+  return extractUserToAdapterCountFromEtherscanJson(chain, json, user, adapter);
 }
 
-function extractUserToAdapterCount(
+async function fetchBaseAdapterSendsWithRetry(user: Address): Promise<ChainAdapterResult> {
+  const start = Date.now();
+  const maxDurationMs = 5_000;
+  const intervalMs = 500;
+
+  while (Date.now() - start < maxDurationMs) {
+    const result = await fetchAdapterSendsViaEtherscan('base', user);
+    if (result.ok) return result;
+    await sleep(intervalMs);
+  }
+
+  console.warn('[adapter-sends] base etherscan timeout after retries');
+  return ZERO_RESULT;
+}
+
+function getAlchemyFromBlock(chain: ChainKey): `0x${string}` {
+  const key = chain.toUpperCase();
+
+  const raw =
+    process.env[`ADAPTER_SENDS_FROM_BLOCK_${key}`] ??
+    process.env[`NFT_SCAN_FROM_BLOCK_${key}`] ??
+    process.env[`NEXT_PUBLIC_COOKIE_START_BLOCK_${key}`] ??
+    process.env.NEXT_PUBLIC_COOKIE_START_BLOCK ??
+    '0';
+
+  return toHexBlock(raw);
+}
+
+async function fetchAdapterSendsViaAlchemy(
+  chain: Exclude<ChainKey, 'og'>,
+  user: Address,
+): Promise<ChainAdapterResult> {
+  const rpc = RPCS[chain];
+  const contractRaw = CANONICAL_ADDRESSES[chain];
+  const adapterRaw = ADAPTERS[chain];
+
+  if (!rpc || !contractRaw || !adapterRaw || !isAddress(contractRaw) || !isAddress(adapterRaw)) {
+    return ZERO_RESULT;
+  }
+
+  const contract = getAddress(contractRaw);
+  const adapter = getAddress(adapterRaw);
+
+  const hashes = new Set<string>();
+  let pageKey: string | undefined;
+
+  try {
+    for (let page = 0; page < 20; page += 1) {
+      const transferParams: any = {
+        fromBlock: getAlchemyFromBlock(chain),
+        toBlock: 'latest',
+        fromAddress: user,
+        toAddress: adapter,
+        contractAddresses: [contract],
+        category: ['erc721'],
+        withMetadata: false,
+        excludeZeroValue: false,
+        maxCount: '0x3e8',
+      };
+
+      if (pageKey) transferParams.pageKey = pageKey;
+
+      const json = await postJsonWithTimeout(rpc, {
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'alchemy_getAssetTransfers',
+        params: [transferParams],
+      }, 10_000);
+
+      if (json?.error) {
+        throw new Error(JSON.stringify(json.error));
+      }
+
+      const transfers = Array.isArray(json?.result?.transfers)
+        ? json.result.transfers
+        : [];
+
+      for (const tx of transfers) {
+        const hash = tx.hash || tx.transactionHash;
+        if (typeof hash === 'string' && hash) {
+          hashes.add(hash.toLowerCase());
+        }
+      }
+
+      pageKey = json?.result?.pageKey;
+      if (!pageKey) break;
+    }
+
+    console.log('[adapter-sends]', chain, 'alchemy user->adapter txs:', hashes.size);
+
+    return {
+      count: hashes.size,
+      ok: true,
+      source: 'alchemy',
+    };
+  } catch (error) {
+    console.warn('[adapter-sends]', chain, 'alchemy_getAssetTransfers failed', error);
+    return ZERO_RESULT;
+  }
+}
+
+async function fetchChainAdapterSends(
   chain: ChainKey,
-  json: any,
-  user: `0x${string}`,
-  adapter: string,
-): ChainAdapterResult {
-  const transfers = json.result as any[];
-  const lowerUser = user.toLowerCase();
-  const lowerAdapter = adapter.toLowerCase();
+  user: Address,
+): Promise<ChainAdapterResult> {
+  if (chain === 'og') {
+    return fetchOgAdapterSends(user);
+  }
 
-  const filtered = transfers.filter((tx) => {
-    const from = (tx.from || '').toString().toLowerCase();
-    const to = (tx.to || '').toString().toLowerCase();
-    const isError = (tx.isError || tx.txreceipt_status || '0').toString();
-    return from === lowerUser && to === lowerAdapter && isError === '0';
-  });
+  // Monad: never use eth_getLogs on free Alchemy plan.
+  // Use Alchemy enhanced method first, then Etherscan as fallback.
+  if (chain === 'monad') {
+    const alchemy = await fetchAdapterSendsViaAlchemy(chain, user);
+    if (alchemy.ok) return alchemy;
 
-  const hashes = filtered
-    .map((tx) => tx.hash || tx.transactionHash)
-    .filter((h: any) => typeof h === 'string') as string[];
+    return fetchAdapterSendsViaEtherscan(chain, user);
+  }
 
-  console.log(
-    '[adapter-sends]',
-    chain,
-    'ERC721 transfers:',
-    transfers.length,
-    'user->adapter bridges:',
-    filtered.length,
-  );
+  if (chain === 'base') {
+    const base = await fetchBaseAdapterSendsWithRetry(user);
+    if (base.ok) return base;
 
-  return { count: filtered.length, ok: true };
+    const alchemy = await fetchAdapterSendsViaAlchemy(chain, user);
+    if (alchemy.ok) return alchemy;
+
+    return ZERO_RESULT;
+  }
+
+  const etherscan = await fetchAdapterSendsViaEtherscan(chain, user);
+  if (etherscan.ok) return etherscan;
+
+  const alchemy = await fetchAdapterSendsViaAlchemy(chain, user);
+  if (alchemy.ok) return alchemy;
+
+  return ZERO_RESULT;
 }
 
 export async function GET(req: Request) {
@@ -260,20 +694,30 @@ export async function GET(req: Request) {
   const address = searchParams.get('address');
 
   if (!isHexAddress(address)) {
-    return NextResponse.json({ error: 'Invalid or missing address' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Invalid or missing address' },
+      { status: 400 },
+    );
   }
 
-  const user = address.toLowerCase() as `0x${string}`;
+  const user = getAddress(address);
 
-  const [base, mantle, linea, monad] = await Promise.all([
-    fetchBaseAdapterSends(user),
-    fetchOtherChainAdapterSends('mantle', user),
-    fetchOtherChainAdapterSends('linea', user),
-    fetchOtherChainAdapterSends('monad', user),    
+  const [base, mantle, linea, monad, og] = await Promise.all([
+    fetchChainAdapterSends('base', user),
+    fetchChainAdapterSends('mantle', user),
+    fetchChainAdapterSends('linea', user),
+    fetchChainAdapterSends('monad', user),
+    fetchChainAdapterSends('og', user),
   ]);
 
   return NextResponse.json({
-    address: user,
-    byChain: { base, mantle, linea, monad },
+    address: user.toLowerCase(),
+    byChain: {
+      base,
+      mantle,
+      linea,
+      monad,
+      og,
+    },
   });
 }

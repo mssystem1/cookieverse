@@ -401,6 +401,7 @@ function Table({
     if (chainId === 8453) return 'base';
     if (chainId === 5000) return 'mantle';
     if (chainId === 59144) return 'linea';    
+    if (chainId === 16661) return '0G'; 
     if (mitosisId && chainId === mitosisId) return 'mitosis';
     return 'monad';
   }, [chainId]);

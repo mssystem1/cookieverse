@@ -207,7 +207,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   read your public profile (handle & avatar).
                 </div>
                 <div style={{ marginTop: 4, textAlign: 'center', }}>
-                  <XAuthButton />
+                  <XAuthButton callbackUrl="/" />
                 </div>
               </div>
 
@@ -390,7 +390,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </div>
 
                 <div className="base-app-login__button">
-                  <XAuthButton />
+                  <XAuthButton callbackUrl="/app" compact />
                 </div>
 
                 <div className="base-app-login__footnote">
