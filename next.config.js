@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
+console.log(">> next.config.js loaded");
+
 const nextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
+  
   // ✅ Make sure Next writes to a folder, not a file
   distDir: ".next",
 
@@ -19,7 +23,7 @@ const nextConfig = {
   },
 
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+ // eslint: { ignoreDuringBuilds: true },
 };
 
 console.log(">> next.config.js loaded");

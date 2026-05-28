@@ -5,11 +5,11 @@
 </p>
 
 <p align="center">
-  <b>Cookieverse turns wallets into AI-powered social identities: fortune NFTs, Wallet Roast cards, cross-chain COOKIEs, dashboards, and leaderboards.</b>
+  <b>Cookieverse turns wallets into AI-powered social identities: fortune NFTs, paid x402 Wallet Roast products, cross-chain COOKIEs, dashboards, Galxe tasks, and leaderboards.</b>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=nextdotjs" alt="Next.js 15" />
+  <img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs" alt="Next.js 16" />
   <img src="https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white" alt="React 19" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Wagmi-Viem-646CFF?style=for-the-badge" alt="Wagmi and Viem" />
@@ -20,6 +20,8 @@
   <img src="https://img.shields.io/badge/Farcaster-Mini%20App-855DCD?style=for-the-badge" alt="Farcaster Mini App" />
   <img src="https://img.shields.io/badge/LayerZero-Bridge-000000?style=for-the-badge" alt="LayerZero Bridge" />
   <img src="https://img.shields.io/badge/0G-Compute%20%2B%20Chain-111827?style=for-the-badge" alt="0G Compute and Chain" />
+  <img src="https://img.shields.io/badge/x402-Coinbase%20%2B%20Bankr-0052FF?style=for-the-badge" alt="x402 Coinbase and Bankr" />
+  <img src="https://img.shields.io/badge/Galxe-REST%20Tasks-111827?style=for-the-badge" alt="Galxe REST Tasks" />
 </p>
 
 ---
@@ -28,7 +30,7 @@
 
 Cookieverse is a consumer crypto app that makes onchain activity fun, visual, and shareable.
 
-Users can generate AI fortunes, mint COOKIE NFTs, roast wallets, render beautiful share cards, bridge COOKIE NFTs across supported chains, track activity in a dashboard, and compete on leaderboards.
+Users can generate AI fortunes, mint COOKIE NFTs, roast wallets, render beautiful share cards, unlock paid Wallet Roast products through x402, bridge COOKIE NFTs across supported chains, complete Galxe-verifiable tasks, track activity in a dashboard, and compete on leaderboards.
 
 Cookieverse is built as a multi-surface product:
 
@@ -61,6 +63,10 @@ The product goal is simple:
 | 🏆 Leaderboard | Ranks users by Cookieverse activity. |
 | 📊 Dashboard | Tracks holdings, image mints, quests, boosts, and activity. |
 | 🐦 X Sharing | Lets users share generated cards, mints, and roast content on X. |
+| 💳 x402 Paid Roasts | Supports paid Wallet Roast products through Coinbase x402 and Bankr x402. |
+| 🏦 Coinbase x402 | Cookieverse acts as the x402 seller for paid roast endpoints protected by `src/proxy.ts`. |
+| 🤖 Bankr x402 | Bankr Cloud acts as the x402 seller and calls Cookieverse paid backend after payment. |
+| ✅ Galxe REST Tasks | Verifies x402 usage, COOKIE minting, and bridge activity for Galxe campaigns. |
 
 ---
 
@@ -143,6 +149,9 @@ flowchart TD
     OPENAI --> ROAST_JSON[Roast Text JSON]
     OGVERIFY --> ROAST_JSON
 
+    ROAST_JSON --> X402PAID[x402 Paid Products<br/>roast-json / identity-roast]
+    X402PAID --> X402USAGE[x402 Usage Store<br/>Vercel Blob]
+    X402USAGE --> GALXE[Galxe REST Verification<br/>x402 / mint / bridge]
     ROAST_JSON --> CARD[Wallet Roast Card Renderer<br/>PNG with @napi-rs/canvas]
     CARD --> PINATA2[Pinata / IPFS]
     PINATA2 --> ROAST_MINT[Mint Wallet Roast NFT<br/>mintWithImage fortune + imageURI]
@@ -235,6 +244,82 @@ DeFi Goblin
 Onchain Civilian
 ```
 
+
+### 2.1 Paid Wallet Roast with x402
+
+Cookieverse supports two paid Wallet Roast products through x402:
+
+```txt
+roast-json
+identity-roast
+```
+
+| Product | Purpose | Output |
+| --- | --- | --- |
+| `roast-json` | Fast paid Wallet Roast API | Archetype, scores, tags, traits, headline, light roast, savage roast, verdict |
+| `identity-roast` | Full paid onchain identity roast | Roast JSON, rendered PNG card, IPFS image, NFT-ready metadata |
+
+Cookieverse supports two x402 providers:
+
+| Provider | Seller | Flow |
+| --- | --- | --- |
+| Coinbase x402 | Cookieverse | Frontend calls Cookieverse protected x402 routes. `src/proxy.ts` verifies payment with Coinbase/CDP facilitator before route logic runs. |
+| Bankr x402 | Bankr Cloud | Frontend or agents call Bankr x402 endpoints. Bankr verifies payment, then calls Cookieverse `/api/wallet-roast/pro` with `COOKIEVERSE_SERVICE_KEY`. |
+
+Coinbase x402 route flow:
+
+```txt
+User
+→ Cookieverse frontend
+→ /api/x402/coinbase/wallet-roast/json
+→ src/proxy.ts with @x402/next
+→ Coinbase/CDP facilitator
+→ buildPaidWalletRoastResponse()
+→ x402 usage recorded in Vercel Blob
+```
+
+Bankr x402 route flow:
+
+```txt
+User / agent
+→ https://x402.bankr.bot/.../cookieverse-roast-json
+→ Bankr x402 payment verification
+→ Bankr service calls /api/wallet-roast/pro
+→ requireCookieverseServiceKey()
+→ buildPaidWalletRoastResponse()
+→ x402 usage recorded in Vercel Blob
+```
+
+Important implementation areas:
+
+```txt
+src/proxy.ts
+src/lib/x402/config.ts
+src/lib/x402/client.ts
+src/app/api/x402/coinbase/wallet-roast/json/route.ts
+src/app/api/x402/coinbase/wallet-roast/identity/route.ts
+src/app/api/wallet-roast/pro/route.ts
+src/lib/wallet-roast/buildPaidWalletRoastResponse.ts
+src/server/x402UsageStore.ts
+x402/cookieverse-roast-json/index.ts
+x402/cookieverse-identity-roast/index.ts
+```
+
+Security model:
+
+```txt
+Coinbase x402:
+  Payment is verified by Cookieverse x402 proxy.
+
+Bankr x402:
+  Payment is verified by Bankr.
+  Cookieverse only accepts Bankr backend calls to /api/wallet-roast/pro
+  when X-Cookieverse-Service-Key matches COOKIEVERSE_SERVICE_KEY.
+
+Galxe:
+  REST verification endpoints require access-token or accepted secret header.
+```
+
 ### 3. Wallet Roast Card Rendering
 
 Cookieverse renders Wallet Roast cards server-side using `@napi-rs/canvas`.
@@ -296,6 +381,90 @@ src/app/api/mgid-upsert/route.ts
 src/app/api/mgid-leaderboard/route.ts
 src/app/api/mgid-boosts/route.ts
 ```
+
+---
+
+## Galxe Campaign Verification
+
+Cookieverse includes REST endpoints for Galxe task verification. These endpoints let Galxe verify whether a wallet has completed Cookieverse actions.
+
+Supported Galxe tasks:
+
+| Endpoint | Campaign use case | Data source |
+| --- | --- | --- |
+| `/api/galxe/x402` | Verify paid x402 Wallet Roast usage | `src/server/x402UsageStore.ts` / Vercel Blob |
+| `/api/galxe/mint` | Verify COOKIE NFT mint activity | Holdings / mint data |
+| `/api/galxe/bridge` | Verify COOKIE bridge activity | MGID / bridge activity storage |
+
+Galxe endpoint files:
+
+```txt
+src/app/api/galxe/x402/route.ts
+src/app/api/galxe/mint/route.ts
+src/app/api/galxe/bridge/route.ts
+src/lib/galxe/response.ts
+```
+
+Authentication:
+
+```txt
+Galxe REST endpoints are not public.
+Requests must include a valid token header.
+Unauthenticated requests return 401 Unauthorized.
+```
+
+Supported auth headers:
+
+```txt
+access-token: <GALXE_ACCESS_TOKEN>
+Authorization: Bearer <GALXE_ACCESS_TOKEN>
+X-Galxe-Secret: <GALXE_REST_SECRET>
+X-Cookieverse-Galxe-Secret: <COOKIEVERSE_GALXE_SECRET>
+```
+
+Recommended production setup:
+
+```txt
+Vercel env:
+  GALXE_ACCESS_TOKEN=<Galxe Server API token or dedicated verification token>
+  GALXE_REST_SECRET=<same token or migration fallback>
+  COOKIEVERSE_GALXE_SECRET=<optional dedicated Cookieverse verification secret>
+
+Galxe REST credential:
+  URL: https://www.cookieverse.tech/api/galxe/x402?address={{address}}&min=4
+  Header: access-token: <GALXE_ACCESS_TOKEN>
+```
+
+Example local tests:
+
+```bash
+curl -i "http://127.0.0.1:3000/api/galxe/x402?address=0x0000000000000000000000000000000000000000&min=4" \
+  -H "access-token: $GALXE_ACCESS_TOKEN"
+
+curl -i "http://127.0.0.1:3000/api/galxe/mint?address=0x0000000000000000000000000000000000000000&min=1" \
+  -H "access-token: $GALXE_ACCESS_TOKEN"
+
+curl -i "http://127.0.0.1:3000/api/galxe/bridge?address=0x0000000000000000000000000000000000000000&min=1" \
+  -H "access-token: $GALXE_ACCESS_TOKEN"
+```
+
+Response shape:
+
+```json
+{
+  "ok": true,
+  "eligible": true,
+  "address": "0x0000000000000000000000000000000000000000",
+  "min": 4
+}
+```
+
+Notes:
+
+- `GALXE_ACCESS_TOKEN` in Vercel is the expected server-side token.
+- The caller must still send the same token in the request header.
+- A bare request without auth header should return `401 Unauthorized`.
+- x402 usage records should include `provider` so Galxe can distinguish `coinbase` and `bankr` paid roasts.
 
 ---
 
@@ -531,7 +700,7 @@ Wallet Roast metadata attributes
 
 | Layer | Tools |
 | --- | --- |
-| Frontend | Next.js 15, React 19, TypeScript |
+| Frontend | Next.js 16, React 19, TypeScript |
 | Wallets | Wagmi, Viem, RainbowKit |
 | Auth | NextAuth with X OAuth |
 | Base App | Base App metadata and compact `/app` routes |
@@ -594,6 +763,18 @@ src/
       wallet-roast/
         analyze/route.ts
         render/route.ts
+        pro/route.ts
+
+      x402/
+        coinbase/
+          wallet-roast/
+            json/route.ts
+            identity/route.ts
+
+      galxe/
+        x402/route.ts
+        mint/route.ts
+        bridge/route.ts
 
       diag-wallet-roast-openai/route.ts
       diag-wallet-roast-og/route.ts
@@ -627,6 +808,13 @@ src/
       clients.ts
       smartAccount.ts
 
+    x402/
+      client.ts
+      config.ts
+
+    galxe/
+      response.ts
+
     wallet-roast/
       analyzeWalletRoast.ts
       buildRoastPrompt.ts
@@ -653,6 +841,7 @@ src/
 
   server/
     mgidStore.ts
+    x402UsageStore.ts
 
 public/
   wallet-roast/
@@ -764,6 +953,99 @@ ETHERSCAN_API_KEY=...
 BASE_RPC_URL=https://mainnet.base.org
 ETHEREUM_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/...
 ENABLE_BASENAME_ENSIP19_FALLBACK=false
+```
+
+### x402 Paid Wallet Roast
+
+Cookieverse supports `coinbase`, `bankr`, or `disabled` x402 modes.
+
+```bash
+NEXT_PUBLIC_X402_PROVIDER=coinbase
+# allowed values: coinbase, bankr, disabled
+
+# Keep the old/global server switch disabled unless explicitly used by older code.
+X402_PROVIDER=disabled
+```
+
+#### Coinbase x402
+
+Cookieverse acts as the seller. `src/proxy.ts` protects only Coinbase x402 routes.
+
+```bash
+X402_SERVER_PROVIDER=coinbase
+X402_NETWORK=eip155:8453
+X402_PAY_TO=0xYourTreasuryReceiverWallet
+
+CDP_API_KEY_ID=...
+CDP_API_KEY_SECRET=...
+```
+
+Local development note:
+
+```bash
+# App can run on 127.0.0.1 for XAuth.
+NEXTAUTH_URL=http://127.0.0.1:3000
+NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000
+
+# Coinbase x402 local calls may use localhost if @x402/next generates localhost resource URLs.
+NEXT_PUBLIC_X402_COINBASE_ORIGIN=http://localhost:3000
+```
+
+Coinbase protected routes:
+
+```txt
+/api/x402/coinbase/wallet-roast/json
+/api/x402/coinbase/wallet-roast/identity
+```
+
+#### Bankr x402
+
+Bankr acts as the seller. Bankr cloud services call Cookieverse after payment.
+
+```bash
+NEXT_PUBLIC_X402_PROVIDER=bankr
+
+NEXT_PUBLIC_BANKR_X402_ROAST_JSON_URL=https://x402.bankr.bot/<bankr-wallet>/cookieverse-roast-json
+NEXT_PUBLIC_BANKR_X402_IDENTITY_ROAST_URL=https://x402.bankr.bot/<bankr-wallet>/cookieverse-identity-roast
+
+COOKIEVERSE_API_URL=https://www.cookieverse.tech
+COOKIEVERSE_SERVICE_KEY=...
+```
+
+Cookieverse paid backend:
+
+```txt
+/api/wallet-roast/pro
+```
+
+Bankr service calls must include:
+
+```txt
+X-Cookieverse-Service-Key: <COOKIEVERSE_SERVICE_KEY>
+X-Cookieverse-X402-Provider: bankr
+X-Cookieverse-X402-Product: roast-json | identity-roast
+```
+
+#### Galxe REST Verification
+
+```bash
+GALXE_ACCESS_TOKEN=...
+GALXE_REST_SECRET=...
+COOKIEVERSE_GALXE_SECRET=...
+```
+
+Galxe endpoints:
+
+```txt
+/api/galxe/x402
+/api/galxe/mint
+/api/galxe/bridge
+```
+
+Required request header:
+
+```txt
+access-token: <GALXE_ACCESS_TOKEN>
 ```
 
 ### 0G Compute
@@ -977,6 +1259,10 @@ Example body:
 - `mintWithImage()` is the preferred mint path for Wallet Roast cards.
 - `getAllMints()` is recommended for all deployed COOKIE contracts used by Cookieverse holdings APIs.
 - 0G proof should be shown as both a runtime app flow and a ChainScan mint transaction.
+- Coinbase x402 and Bankr x402 are separate paid Wallet Roast provider paths.
+- `/api/wallet-roast/pro` is the canonical paid backend for Bankr x402 services.
+- `buildPaidWalletRoastResponse()` is the shared paid Wallet Roast response builder for Coinbase and Bankr flows.
+- Galxe REST endpoints verify x402 usage, minting, and bridge activity and require a valid `access-token` header.
 
 ---
 

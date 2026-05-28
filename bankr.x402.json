@@ -1,0 +1,133 @@
+{
+  "network": "base",
+  "currency": "USDC",
+  "services": {
+    "weather": {
+      "description": "Real-time weather data for any city",
+      "price": "0.001",
+      "paymentScheme": "exact",
+      "methods": ["GET"],
+      "category": "data",
+      "tags": ["weather", "forecast"],
+      "schema": {
+        "input": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string",
+              "description": "City name"
+            }
+          },
+          "required": ["city"]
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string"
+            },
+            "temperature": {
+              "type": "number"
+            },
+            "conditions": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "ping": {
+    "description": "Cookieverse x402 deploy test endpoint",
+    "price": "0.001",
+    "paymentScheme": "exact",
+    "methods": ["GET", "POST"],
+    "category": "test",
+    "tags": ["test"],
+    "schema": {
+        "input": {
+        "type": "object",
+        "properties": {}
+        },
+        "output": {
+        "type": "object",
+        "properties": {
+            "ok": { "type": "boolean" },
+            "service": { "type": "string" },
+            "method": { "type": "string" },
+            "timestamp": { "type": "string" }
+        }
+        }
+    }
+    },
+    "cookieverse-roast-json": {
+      "description": "Fast Cookieverse Wallet Roast API. Send a Base wallet and receive roast JSON.",
+      "price": "0.02",
+      "paymentScheme": "exact",
+      "methods": ["POST"],
+      "category": "ai-onchain-identity",
+      "tags": ["cookieverse", "wallet-roast", "base", "x402"],
+      "schema": {
+        "input": {
+          "type": "object",
+          "properties": {
+            "wallet": {
+              "type": "string",
+              "description": "EVM wallet address"
+            }
+          },
+          "required": ["wallet"]
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "ok": { "type": "boolean" },
+            "product": { "type": "string" },
+            "wallet": { "type": "string" },
+            "chain": { "type": "string" },
+            "archetype": { "type": "string" },
+            "headline": { "type": "string" },
+            "lightRoast": { "type": "string" },
+            "savageRoast": { "type": "string" },
+            "verdict": { "type": "string" }
+          }
+        }
+      }
+    },
+    "cookieverse-identity-roast": {
+      "description": "Full Cookieverse identity roast with image and NFT metadata.",
+      "price": "0.05",
+      "paymentScheme": "exact",
+      "methods": ["POST"],
+      "category": "ai-onchain-identity",
+      "tags": ["cookieverse", "wallet-roast", "base", "x402", "nft"],
+      "schema": {
+        "input": {
+          "type": "object",
+          "properties": {
+            "wallet": {
+              "type": "string",
+              "description": "EVM wallet address"
+            }
+          },
+          "required": ["wallet"]
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "ok": { "type": "boolean" },
+            "product": { "type": "string" },
+            "wallet": { "type": "string" },
+            "chain": { "type": "string" },
+            "archetype": { "type": "string" },
+            "headline": { "type": "string" },
+            "image": { "type": "object" },
+            "metadata": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}

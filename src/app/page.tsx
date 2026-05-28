@@ -11,6 +11,7 @@ import {
   useWriteContract,
   useBalance,
   useReadContract,
+  useWalletClient,
 } from 'wagmi';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -24,6 +25,12 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { useAppMode } from '../hooks/useAppMode'
 
 import { shareToX } from '../lib/share';
+
+import {
+  callCookieverseX402Roast,
+  type CookieverseX402Product,
+} from "../lib/x402/client";
+import { x402Enabled, x402Provider } from "../lib/x402/config";
 
 // [FIXED] Privy + banner
 //import { PrivyProvider } from '@privy-io/react-auth';
@@ -81,7 +88,9 @@ function shortAddress(address?: string | null) {
 export default function Page() {
   const qc = useQueryClient();
   const { address, chain, isConnected } = useAccount();
+  const { data: walletClient } = useWalletClient();
   const connected = isConnected && !!address;
+
   const COOKIE_ADDRESS = React.useMemo(
     () => cookieAddressFor(chain?.id),
     [chain?.id]
@@ -89,6 +98,9 @@ export default function Page() {
   if (connected && !COOKIE_ADDRESS) {
     return <main className="page"><div className="muted">Unsupported network.</div></main>;
   }
+
+  const isBaseChain = connected && chain?.id === CHAIN_IDS.base;
+  const shouldUseX402Roast = Boolean(x402Enabled && isBaseChain);
 
   const pathname = usePathname();
   const { isFarcasterMini, isBaseAppRoute, isCompactLayout } = useAppMode();
@@ -312,6 +324,9 @@ export default function Page() {
   React.useEffect(() => {
     if (address) prevAddrRef.current = address;
   }, [address]);
+
+  const [x402RoastBusy, setX402RoastBusy] =
+  React.useState<CookieverseX402Product | null>(null);
 
   // ---------- Clear everything on disconnect ----------
   const clearWalletUI = React.useCallback(() => {
@@ -946,6 +961,67 @@ const generateWalletRoast = async () => {
   }
 };
 
+const generateWalletRoastViaX402 = async (product: CookieverseX402Product) => {
+  setUiError(null);
+
+  if (!address) {
+    setUiError("Connect wallet first.");
+    return;
+  }
+
+  if (!walletClient) {
+    setUiError("Wallet client is not ready.");
+    return;
+  }
+
+  if (chain?.id !== 8453) {
+    setUiError("Switch to Base to pay with x402 USDC.");
+    return;
+  }
+
+  setX402RoastBusy(product);
+
+  try {
+    const data = await callCookieverseX402Roast({
+      walletClient,
+      wallet: address,
+      product,
+    });
+
+    if (roastImageUrl) {
+      URL.revokeObjectURL(roastImageUrl);
+    }
+
+    setRoastWallet(address);
+    setRoastData(data.raw || data);
+    setRoastImageUrl(null);
+    setRoastImageBlob(null);
+    setRoastImageB64(null);
+    setPinCid(null);
+    setWalletRoastMintStage("idle");
+
+    if (data.image?.gatewayUrl) {
+      const imgRes = await fetch(data.image.gatewayUrl, { cache: "no-store" });
+
+      if (!imgRes.ok) {
+        throw new Error(`Failed to fetch x402 roast image: HTTP ${imgRes.status}`);
+      }
+
+      const blob = await imgRes.blob();
+      const url = URL.createObjectURL(blob);
+      const b64 = await blobToBase64(blob);
+
+      setRoastImageBlob(blob);
+      setRoastImageUrl(url);
+      setRoastImageB64(b64);
+    }
+  } catch (e: any) {
+    setUiError(String(e?.message || e));
+  } finally {
+    setX402RoastBusy(null);
+  }
+};
+
   const onMintWalletRoast = async () => {
     setUiError(null);
 
@@ -1293,7 +1369,19 @@ const onShareCookieToX = React.useCallback(
     qc.invalidateQueries({ queryKey: ['lastMinted', address, chain?.id] });
     qc.invalidateQueries({ queryKey: ['holdings', address, chain?.id] });
   }, [isConfirmed, receipt, address, qc, chain?.id, txHash, pendingMintType, lastProcessedTx]);
-
+  
+/*
+                  <button
+                    className="btn btn--primary"
+                    onClick={() => generateWalletRoastViaX402("roast-json")}
+                    disabled={roastBusy || roastRenderBusy || !!x402RoastBusy || !connected}
+                    title={`Pay with x402 via ${x402Provider}`}
+                  >
+                    {x402RoastBusy === "roast-json"
+                      ? "Paying x402…"
+                      : "x402 Fast Roast"}
+                  </button>
+*/
 
   const content = (
     <main className="page">
@@ -1394,15 +1482,28 @@ const onShareCookieToX = React.useCallback(
                 placeholder={address || '0x...'}
               />
 
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                <button
-                  className="btn btn--primary"
-                  onClick={generateWalletRoast}
-                  disabled={roastBusy || roastRenderBusy}
-                >
-                  {roastBusy || roastRenderBusy ? 'Generating Roast…' : 'Generate Wallet Roast'}
-                </button>
-              </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                {shouldUseX402Roast ? (
+                  <button
+                    className="btn btn--accent"
+                    onClick={() => generateWalletRoastViaX402("identity-roast")}
+                    disabled={roastBusy || roastRenderBusy || !!x402RoastBusy || !connected}
+                    title={`Pay with x402 via ${x402Provider}`}
+                  >
+                    {x402RoastBusy === "identity-roast"
+                      ? "Paying x402…"
+                      : "x402 Wallet Roast"}
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn--primary"
+                    onClick={generateWalletRoast}
+                    disabled={roastBusy || roastRenderBusy || !!x402RoastBusy}
+                  >
+                    {roastBusy || roastRenderBusy ? "Generating Roast…" : "Wallet Roast"}
+                  </button>
+                )}
+            </div>
 
               {roastData ? (
                 <>
