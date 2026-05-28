@@ -57,7 +57,7 @@ The product goal is simple:
 | 🧠 Wallet Archetypes | Classify wallets as Bridge Tourist, Dust Farmer, Silent Whale, NFT Addict, DeFi Goblin, or Onchain Civilian. |
 | 🤖 AI Providers | Uses 0G Compute by default and can route Wallet Roast generation through OpenAI. |
 | ⛓️ 0G Mainnet | Supports Wallet Roast NFT minting on 0G Mainnet for product expansion and hackathon proof. |
-| 🌉 LayerZero Bridge | Bridges COOKIE NFTs across supported networks. |
+| 🌉 LayerZero Bridge | Bridges COOKIE NFTs across supported networks: 0G Mainnet, Base, Monad and Mantle. |
 | 🔵 Base App | Mobile-first compact Cookieverse shell for Base App users. |
 | 🟣 Farcaster Mini App | Dedicated `/mini` routes for Farcaster Mini App contexts. |
 | 🏆 Leaderboard | Ranks users by Cookieverse activity. |
