@@ -55,7 +55,7 @@ The product goal is simple:
 | 🖼️ AI Image Mints | Generate or upload image-based COOKIE NFTs with IPFS metadata. |
 | 🔥 Wallet Roast | Analyze a Base wallet and turn it into a funny AI roast card. |
 | 🧠 Wallet Archetypes | Classify wallets as Bridge Tourist, Dust Farmer, Silent Whale, NFT Addict, DeFi Goblin, or Onchain Civilian. |
-| 🤖 AI Providers | Uses OpenAI by default and can route Wallet Roast generation through 0G Compute. |
+| 🤖 AI Providers | Uses 0G Compute by default and can route Wallet Roast generation through OpenAI. |
 | ⛓️ 0G Mainnet | Supports Wallet Roast NFT minting on 0G Mainnet for product expansion and hackathon proof. |
 | 🌉 LayerZero Bridge | Bridges COOKIE NFTs across supported networks. |
 | 🔵 Base App | Mobile-first compact Cookieverse shell for Base App users. |
