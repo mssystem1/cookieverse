@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>Cookieverse turns wallets into AI-powered social identities: fortune NFTs, paid x402 Wallet Roast products, cross-chain COOKIEs, dashboards, Galxe tasks, and leaderboards.</b>
+  <b>Cookieverse turns wallets into AI-powered social identities: fortune NFTs, paid x402 Wallet Roast products, World Cup prophecy NFTs on X Layer, cross-chain COOKIEs, dashboards, Galxe tasks, and leaderboards.</b>
 </p>
 
 <p align="center">
@@ -17,8 +17,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Base%20App-Supported-0052FF?style=for-the-badge&logo=coinbase&logoColor=white" alt="Base App supported" />
-  <img src="https://img.shields.io/badge/Farcaster-Mini%20App-855DCD?style=for-the-badge" alt="Farcaster Mini App" />
-  <img src="https://img.shields.io/badge/LayerZero-Bridge-000000?style=for-the-badge" alt="LayerZero Bridge" />
+  <img src="https://img.shields.io/badge/X%20Layer-World%20Cup%20NFTs-7C3AED?style=for-the-badge" alt="X Layer World Cup NFTs" />
+  <img src="https://img.shields.io/badge/LayerZero-X%20Layer%20%E2%86%92%20Base-000000?style=for-the-badge" alt="LayerZero X Layer to Base" />
   <img src="https://img.shields.io/badge/0G-Compute%20%2B%20Chain-111827?style=for-the-badge" alt="0G Compute and Chain" />
   <img src="https://img.shields.io/badge/x402-Coinbase%20%2B%20Bankr-0052FF?style=for-the-badge" alt="x402 Coinbase and Bankr" />
   <img src="https://img.shields.io/badge/Galxe-REST%20Tasks-111827?style=for-the-badge" alt="Galxe REST Tasks" />
@@ -28,9 +28,9 @@
 
 ## Overview
 
-Cookieverse is a consumer crypto app that makes onchain activity fun, visual, and shareable.
+Cookieverse is a consumer crypto app that makes onchain activity fun, visual, collectible, and shareable.
 
-Users can generate AI fortunes, mint COOKIE NFTs, roast wallets, render beautiful share cards, unlock paid Wallet Roast products through x402, bridge COOKIE NFTs across supported chains, complete Galxe-verifiable tasks, track activity in a dashboard, and compete on leaderboards.
+Users can generate AI fortunes, mint COOKIE NFTs, roast wallets, render beautiful share cards, unlock paid Wallet Roast products through x402, create World Cup match prophecy NFTs on X Layer, bridge COOKIE NFTs across supported chains, complete Galxe-verifiable tasks, track activity in a dashboard, and compete on leaderboards.
 
 Cookieverse is built as a multi-surface product:
 
@@ -39,11 +39,12 @@ Cookieverse is built as a multi-surface product:
 - Farcaster Mini App routes
 - Cross-chain NFT bridge
 - Wallet Roast identity layer
+- World Cup Match Prophecy layer
 - NFT minting and social sharing flows
 
 The product goal is simple:
 
-> Make wallet activity feel like a social identity, not just a block explorer history.
+> Make wallet activity and cultural moments feel like social identity, not just block explorer history.
 
 ---
 
@@ -53,11 +54,15 @@ The product goal is simple:
 | --- | --- |
 | 🍪 AI Fortunes | Generate short AI fortune text and mint it as a COOKIE NFT. |
 | 🖼️ AI Image Mints | Generate or upload image-based COOKIE NFTs with IPFS metadata. |
+| ⚽ World Cup Prophecy | AI researches historical match context, creates a World Cup-style prophecy, renders a collectible PNG card, and mints it as a COOKIE NFT. |
+| 🖼️ Prophecy Card Renderer | Uses `@napi-rs/canvas` and World Cup templates to render premium match prophecy cards server-side. |
+| 🟣 X Layer Mainnet | Supports X Layer wallet connection, World Cup prophecy minting, NFT holdings, dashboard, leaderboard and bridge activity. |
+| 🌉 X Layer → Base Bridge | Bridges COOKIE NFTs from X Layer to Base through LayerZero adapter / ONFT contracts. |
 | 🔥 Wallet Roast | Analyze a Base wallet and turn it into a funny AI roast card. |
 | 🧠 Wallet Archetypes | Classify wallets as Bridge Tourist, Dust Farmer, Silent Whale, NFT Addict, DeFi Goblin, or Onchain Civilian. |
 | 🤖 AI Providers | Uses 0G Compute by default and can route Wallet Roast generation through OpenAI. |
 | ⛓️ 0G Mainnet | Supports Wallet Roast NFT minting on 0G Mainnet for product expansion and hackathon proof. |
-| 🌉 LayerZero Bridge | Bridges COOKIE NFTs across supported networks: 0G Mainnet, Base, Monad and Mantle. |
+| 🌉 LayerZero Bridge | Bridges COOKIE NFTs across supported networks, including the focused X Layer → Base route. |
 | 🔵 Base App | Mobile-first compact Cookieverse shell for Base App users. |
 | 🟣 Farcaster Mini App | Dedicated `/mini` routes for Farcaster Mini App contexts. |
 | 🏆 Leaderboard | Ranks users by Cookieverse activity. |
@@ -84,7 +89,7 @@ Routes:
  /mgid-leaderboard
 ```
 
-The main web app includes AI fortune minting, Wallet Roast, NFT minting, bridge flows, dashboards, and leaderboards.
+The main web app includes AI fortune minting, World Cup Match Prophecy, Wallet Roast, NFT minting, bridge flows, dashboards, and leaderboards.
 
 ### Base App
 
@@ -97,7 +102,7 @@ Routes:
 /app/leaderboard
 ```
 
-The Base App surface is a compact mobile/tablet experience. It uses a dedicated shell and layout constraints to make Cookieverse usable inside Base App-style environments.
+The Base App surface is a compact mobile/tablet experience. It uses a dedicated shell and layout constraints to make Cookieverse usable inside Base App-style environments. It also includes a compact World Cup header/banner and the same World Cup Prophecy flow.
 
 ### Farcaster Mini App
 
@@ -122,6 +127,7 @@ flowchart TD
     U[User] --> SURFACES[Cookieverse App Surfaces<br/>Web App / Base App / Farcaster Mini App]
 
     SURFACES --> FORTUNE[AI Fortune Minting]
+    SURFACES --> XCUP[World Cup Match Prophecy]
     SURFACES --> ROAST[Wallet Roast]
     SURFACES --> BRIDGE[LayerZero Bridge]
     SURFACES --> DASH[Dashboard]
@@ -131,6 +137,11 @@ flowchart TD
     FORTUNE_AI --> FORTUNE_IMG[Image / Metadata Handling]
     FORTUNE_IMG --> PINATA1[Pinata / IPFS]
     PINATA1 --> COOKIE_NFT[FortuneCookiesAI NFT Contracts]
+
+    XCUP --> XCUP_AI[OpenAI Match Research + Prophecy JSON]
+    XCUP_AI --> XCUP_CARD[World Cup PNG Renderer<br/>@napi-rs/canvas]
+    XCUP_CARD --> XCUP_IPFS[Pinata / IPFS]
+    XCUP_IPFS --> XLAYER_MINT[X Layer mintWithImage<br/>World Cup Prophecy COOKIE NFT]
 
     ROAST --> WALLET_DATA[Base Wallet Data<br/>Etherscan V2 + Basename]
     WALLET_DATA --> METRICS[Wallet Metrics Engine<br/>Portfolio, DeFi, NFTs,<br/>Bridge Activity, Dust, Tx Count]
@@ -156,20 +167,25 @@ flowchart TD
     CARD --> PINATA2[Pinata / IPFS]
     PINATA2 --> ROAST_MINT[Mint Wallet Roast NFT<br/>mintWithImage fortune + imageURI]
 
-    COOKIE_NFT --> CHAINS[Supported NFT Networks<br/>Monad / Base / Mantle / Linea / Mitosis]
+    COOKIE_NFT --> CHAINS[Supported NFT Networks<br/>Monad / Base / Mantle / Linea / Mitosis / X Layer]
+    XLAYER_MINT --> XLAYER[X Layer Mainnet<br/>World Cup Prophecy NFTs]
     ROAST_MINT --> OGCHAIN[0G Mainnet<br/>CookieverseWalletRoastOG ERC-721]
 
     BRIDGE --> LZ[LayerZero ONFT Bridge]
     LZ --> CHAINS
+    LZ --> XLAYER_BASE[X Layer → Base Bridge<br/>Adapter on X Layer / ONFT on Base]
 
     DASH --> HOLDINGS[Holdings API]
     HOLDINGS --> CHAINS
+    HOLDINGS --> XLAYER
     HOLDINGS --> OGCHAIN
 
     BOARD --> MGID[MGID / Ranking Storage<br/>Vercel Blob]
 
     CARD --> SHARE[Share to X<br/>Copy / Download / Native Share]
+    XCUP_CARD --> SHARE
 
+    XLAYER --> OKXAPI[OKX / X Layer Onchain Data API<br/>Token IDs + adapter sends]
     OGCHAIN --> OGEXPLORER[0G ChainScan<br/>Contract + Mint Transaction Proof]
 ```
 
@@ -198,7 +214,183 @@ src/app/api/pinata/route.ts
 src/abi/FortuneCookiesAI.json
 ```
 
-### 2. Wallet Roast
+---
+
+### 2. World Cup Match Prophecy on X Layer
+
+World Cup Match Prophecy is the main X Layer Build X Hackathon-facing feature.
+
+It turns a simple match input into a collectible AI-powered NFT card.
+
+User flow:
+
+```txt
+Open Cookieverse
+→ Connect wallet
+→ Switch to X Layer Mainnet
+→ Enter Team 1
+→ Enter Team 2
+→ Select match date
+→ Click Create Match Prophecy
+→ AI generates match prophecy JSON
+→ Server renders World Cup prophecy card PNG
+→ User can download, copy, share on X, or mint
+→ Mint Prophecy uploads image to IPFS and calls mintWithImage()
+```
+
+The user does not manually write match context or choose criteria. The AI agent creates the context and criteria itself.
+
+Generated prophecy cards include:
+
+```txt
+Team 1
+Team 2
+Match date
+Pick
+Score
+Confidence
+Prophecy text
+Short reasoning line
+Criteria scores
+```
+
+Prophecy criteria:
+
+```txt
+Form
+Attack
+Defense
+Momentum
+Fans
+Confidence
+```
+
+Important implementation areas:
+
+```txt
+src/app/page.tsx
+src/app/api/xcup/prophecy/route.ts
+src/app/api/xcup/render/route.ts
+src/lib/xcup/types.ts
+src/lib/xcup/renderProphecyCard.ts
+
+public/xcup/world-cup-prophecy-template.png
+public/xcup/world-cup-header-desktop.png
+public/xcup/world-cup-header-mobile.png
+```
+
+The rendered card uses `@napi-rs/canvas`, local template assets, local fonts, and tunable layout boxes, following the same server-side image-rendering architecture as Wallet Roast.
+
+#### World Cup Prophecy AI Flow
+
+Cookieverse uses OpenAI for World Cup prophecy generation.
+
+Endpoint:
+
+```txt
+POST /api/xcup/prophecy
+```
+
+Input:
+
+```json
+{
+  "homeTeam": "Argentina",
+  "awayTeam": "Spain",
+  "matchDate": "2026-07-20"
+}
+```
+
+Output shape:
+
+```json
+{
+  "title": "World Cup Match Prophecy",
+  "homeTeam": "Argentina",
+  "awayTeam": "Spain",
+  "matchDate": "2026-07-20",
+  "location": "",
+  "pick": "Argentina",
+  "scoreline": "2-1",
+  "confidence": 78,
+  "prophecy": "Argentina edges a tense final with sharper control in key moments...",
+  "reasoning": [
+    "Form edge and transition balance shape the call.",
+    "Momentum and big-match mentality decide the edge."
+  ],
+  "research": {
+    "matchDate": "2026-07-20",
+    "competition": "World Cup",
+    "recentForm": "",
+    "keyPlayers": "",
+    "injuriesOrSuspensions": "",
+    "fanSentiment": "",
+    "tacticalContext": "",
+    "sources": []
+  },
+  "criteria": {
+    "form": 72,
+    "attack": 75,
+    "defense": 66,
+    "momentum": 78,
+    "fans": 58,
+    "confidenceSignal": 78
+  }
+}
+```
+
+The endpoint uses the existing Cookieverse OpenAI key pattern:
+
+```bash
+MFC_OPENAI_KEY_NAME=OPENAI_API_KEY_MFC_NEW
+OPENAI_API_KEY_MFC_NEW=sk-...
+XCUP_OPENAI_MODEL=gpt-5.5
+```
+
+#### World Cup Card Rendering
+
+Endpoint:
+
+```txt
+POST /api/xcup/render
+```
+
+Rendering flow:
+
+```txt
+WorldCupProphecyResult JSON
+→ renderWorldCupProphecyCard()
+→ load public/xcup/world-cup-prophecy-template.png
+→ draw teams, date, summary, prophecy, reasoning and criteria
+→ add decorative divider lines
+→ return image/png
+```
+
+The current card design includes:
+
+- World Cup stadium theme
+- Gold trophy visual language
+- Cookieverse footer
+- Team names aligned with the VS ribbon
+- Summary / prophecy / reasoning layered with decorative gold dividers
+- Criteria boxes aligned under template icons
+- IPFS-ready PNG output
+
+Debug layout boxes can be enabled locally:
+
+```bash
+XCUP_RENDER_DEBUG_BOXES=1
+```
+
+Disable for production:
+
+```bash
+XCUP_RENDER_DEBUG_BOXES=0
+```
+
+---
+
+### 3. Wallet Roast
 
 Wallet Roast turns a wallet into a shareable AI identity card.
 
@@ -244,8 +436,9 @@ DeFi Goblin
 Onchain Civilian
 ```
 
+---
 
-### 2.1 Paid Wallet Roast with x402
+### 3.1 Paid Wallet Roast with x402
 
 Cookieverse supports two paid Wallet Roast products through x402:
 
@@ -320,7 +513,9 @@ Galxe:
   REST verification endpoints require access-token or accepted secret header.
 ```
 
-### 3. Wallet Roast Card Rendering
+---
+
+### 4. Wallet Roast Card Rendering
 
 Cookieverse renders Wallet Roast cards server-side using `@napi-rs/canvas`.
 
@@ -340,7 +535,9 @@ Shareable image
 IPFS image for NFT minting
 ```
 
-### 4. Cross-chain COOKIE Bridge
+---
+
+### 5. Cross-chain COOKIE Bridge
 
 Cookieverse supports bridging COOKIE NFTs across supported networks using LayerZero ONFT-style bridge flows.
 
@@ -364,9 +561,152 @@ NEXT_PUBLIC_APP_FEE_BPS
 NEXT_PUBLIC_FEE_RECEIVER
 ```
 
-### 5. Dashboard and Leaderboard
+#### LayerZero Bridge: X Layer to Base
 
-Cookieverse tracks user activity across mints, image mints, holdings, quests, boosts, and ranking data.
+For the hackathon version, Cookieverse supports a focused bridge route:
+
+```txt
+X Layer → Base
+```
+
+Contract model:
+
+```txt
+X Layer:
+  FortuneCookiesONFTAdapter
+
+Base:
+  FortuneCookiesONFT
+```
+
+Bridge flow:
+
+```txt
+COOKIE NFT minted on X Layer
+→ user opens /bridge or /app/bridge
+→ source chain is X Layer
+→ destination chain is Base
+→ user previews token ID
+→ user approves adapter if needed
+→ user bridges through LayerZero
+→ bridge transaction is counted in adapter-sends
+```
+
+Important app areas:
+
+```txt
+src/app/bridge/page.tsx
+src/app/app/bridge/page.tsx
+src/app/api/fc-token-ids/route.ts
+src/app/api/adapter-sends/route.ts
+```
+
+Important configuration groups:
+
+```bash
+NEXT_PUBLIC_CANONICAL_ERC721_XLAYER=0x...
+NEXT_PUBLIC_ADAPTER_XLAYER=0x...
+NEXT_PUBLIC_ONFT_BASE=0x...
+
+NEXT_PUBLIC_EID_XLAYER=30274
+NEXT_PUBLIC_EID_BASE=30184
+
+NEXT_PUBLIC_FLAT_FEE_WEI_OKB=0
+NEXT_PUBLIC_FLAT_FEE_WEI_ETH=0
+NEXT_PUBLIC_APP_FEE_BPS=0
+NEXT_PUBLIC_FEE_RECEIVER=0x...
+```
+
+LayerZero proof placeholders:
+
+```txt
+X Layer adapter contract: 0xdC4538763F8Ec6cB628684d8421B470735d8319a
+Base ONFT contract: 0x7e579E8D744bA7a3D62b9ABC43eD165bFE3f2688
+X Layer → Base bridge tx: 0xd4520802ff5283022ebf7c2006133ae32ac086c0bf324d70b64dc6a3aff71c5a
+LayerZero Scan link: https://layerzeroscan.com/tx/0xd4520802ff5283022ebf7c2006133ae32ac086c0bf324d70b64dc6a3aff71c5a
+```
+
+---
+
+### 6. X Layer NFT Token ID Indexing
+
+For X Layer, Cookieverse should not rely on slow block scanning.
+
+Instead, X Layer token IDs are fetched through the OKX / X Layer Onchain Data API.
+
+Endpoint used by Cookieverse:
+
+```txt
+GET /api/v5/xlayer/address/token-balance
+```
+
+Purpose:
+
+```txt
+Fetch ERC-721 token IDs held by connected user on X Layer
+```
+
+Cookieverse route:
+
+```txt
+GET /api/fc-token-ids?chain=xlayer&owner=0x...
+```
+
+Expected behavior:
+
+```txt
+Connected wallet
+→ /api/fc-token-ids
+→ OKX X Layer token-balance API
+→ filter by NEXT_PUBLIC_CANONICAL_ERC721_XLAYER
+→ return tokenIds[]
+```
+
+This is used for holdings, NFT preview, dashboard and bridge UX.
+
+---
+
+### 7. X Layer Adapter Send Counting
+
+Bridge activity from X Layer is counted through X Layer transaction data instead of block scanning.
+
+Endpoint used by Cookieverse:
+
+```txt
+GET /api/v5/xlayer/address/token-transaction-list
+```
+
+Purpose:
+
+```txt
+Count ERC-721 transfers from user wallet to NEXT_PUBLIC_ADAPTER_XLAYER
+```
+
+Cookieverse route:
+
+```txt
+GET /api/adapter-sends?address=0x...
+```
+
+Expected behavior:
+
+```txt
+User wallet
+→ /api/adapter-sends
+→ OKX X Layer token-transaction-list API
+→ filter tokenContractAddress = NEXT_PUBLIC_CANONICAL_ERC721_XLAYER
+→ filter from = user
+→ filter to = NEXT_PUBLIC_ADAPTER_XLAYER
+→ count bridge send transactions
+```
+
+This provides bridge activity proof without expensive `eth_getLogs` scans.
+
+---
+
+### 8. Dashboard and Leaderboard
+
+Cookieverse tracks user activity across mints, image mints, holdings, quests, boosts, X Layer World Cup Prophecy NFTs, and ranking data.
 
 Important app areas:
 
@@ -378,8 +718,141 @@ src/server/mgidStore.ts
 src/app/api/holdings/route.ts
 src/app/api/mgid-get/route.ts
 src/app/api/mgid-upsert/route.ts
+src/app/api/mgid-downsert/route.ts
 src/app/api/mgid-leaderboard/route.ts
 src/app/api/mgid-boosts/route.ts
+src/app/api/leaderboard/route.ts
+```
+
+---
+
+## Hackathon Proof: X Layer Integration
+
+Fill this section after deployment.
+
+```txt
+Hackathon: X Layer Build X / X Cup
+Project: Cookieverse World Cup Match Prophecy
+Live app: https://www.cookieverse.tech/
+GitHub: https://github.com/mssystem1/cookieverse
+
+X Layer component:
+- X Layer Mainnet wallet connection
+- X Layer COOKIE NFT minting
+- World Cup prophecy NFT card minting
+- X Layer holdings / token ID indexing
+- X Layer leaderboard and dashboard support
+- X Layer → Base LayerZero bridge route
+
+X Layer Chain ID:
+196
+
+X Layer RPC:
+https://rpc.xlayer.tech
+
+World Cup Prophecy Contract:
+0x114252793390F60ab3302d3ff6b229382Ac3AA32
+
+World Cup Prophecy mint transaction:
+0x986f921d556e31f543265a4002c6b4256b5e0f6351f9a06fba591548fad89bda
+
+X Layer explorer link:
+https://web3.okx.com/explorer/x-layer/evm/tx/0x986f921d556e31f543265a4002c6b4256b5e0f6351f9a06fba591548fad89bda
+
+Minted token ID:
+5
+
+Minted IPFS image:
+IPFS: ipfs://QmSUdJHKFbfoYStDebb7hnq4fx3CPwADVhq8HEFB5FQJqJ
+
+LayerZero X Layer → Base Bridge:
+X Layer adapter: 0xdC4538763F8Ec6cB628684d8421B470735d8319a
+Base ONFT: 0x7e579E8D744bA7a3D62b9ABC43eD165bFE3f2688
+Bridge tx: 0x5fdcb500b9b05073a54a850183d3468df93a28b142c5b147a4ecf0c569a4a08b
+LayerZero Scan: https://layerzeroscan.com/tx/0x5fdcb500b9b05073a54a850183d3468df93a28b142c5b147a4ecf0c569a4a08b
+```
+
+Why this proves X Layer integration:
+
+1. User connects to X Layer Mainnet inside Cookieverse.
+2. User generates a World Cup Match Prophecy card.
+3. Cookieverse renders the prophecy as a PNG card.
+4. Cookieverse uploads the card to IPFS.
+5. User mints the card through `mintWithImage()` on X Layer.
+6. Cookieverse reads X Layer NFT IDs through X Layer/OKX onchain data.
+7. Cookieverse can bridge COOKIE NFTs from X Layer to Base through LayerZero.
+8. Dashboard and leaderboard use the same Cookieverse activity layer to display the X Layer activity.
+
+---
+
+## Reviewer Test Flow
+
+A reviewer can test the hackathon feature as follows:
+
+```txt
+1. Open Cookieverse.
+2. Connect wallet.
+3. Switch to X Layer Mainnet.
+4. Enter a match, for example Argentina vs Spain.
+5. Select match date.
+6. Click Create Match Prophecy.
+7. Confirm the generated World Cup prophecy card preview.
+8. Click Mint Prophecy.
+9. Confirm wallet transaction.
+10. Open X Layer explorer transaction.
+11. Check minted token in Cookieverse dashboard / holdings.
+12. Optionally bridge the NFT from X Layer to Base.
+```
+
+Local API tests:
+
+```bash
+curl -X POST "http://127.0.0.1:3000/api/xcup/prophecy" \
+  -H "content-type: application/json" \
+  -d '{
+    "homeTeam": "Argentina",
+    "awayTeam": "Spain",
+    "matchDate": "2026-07-20"
+  }'
+
+curl -X POST "http://127.0.0.1:3000/api/xcup/render" \
+  -H "content-type: application/json" \
+  -d '{
+    "title": "World Cup Match Prophecy",
+    "homeTeam": "Argentina",
+    "awayTeam": "Spain",
+    "matchDate": "2026-07-20",
+    "pick": "Argentina",
+    "scoreline": "2-1",
+    "confidence": 78,
+    "prophecy": "Argentina edges a tense final with sharper control in key moments.",
+    "reasoning": [
+      "Form edge and transition balance shape the call.",
+      "Momentum and big-match mentality decide the edge."
+    ],
+    "research": {
+      "matchDate": "2026-07-20",
+      "competition": "World Cup",
+      "sources": []
+    },
+    "criteria": {
+      "form": 72,
+      "attack": 75,
+      "defense": 66,
+      "momentum": 78,
+      "fans": 58,
+      "confidenceSignal": 78
+    },
+    "mintedBy": "0x0000000000000000000000000000000000000000"
+  }' \
+  --output world-cup-prophecy.png
+```
+
+Expected render response:
+
+```txt
+Content-Type: image/png
+Output: World Cup prophecy PNG card
 ```
 
 ---
@@ -421,50 +894,6 @@ Authorization: Bearer <GALXE_ACCESS_TOKEN>
 X-Galxe-Secret: <GALXE_REST_SECRET>
 X-Cookieverse-Galxe-Secret: <COOKIEVERSE_GALXE_SECRET>
 ```
-
-Recommended production setup:
-
-```txt
-Vercel env:
-  GALXE_ACCESS_TOKEN=<Galxe Server API token or dedicated verification token>
-  GALXE_REST_SECRET=<same token or migration fallback>
-  COOKIEVERSE_GALXE_SECRET=<optional dedicated Cookieverse verification secret>
-
-Galxe REST credential:
-  URL: https://www.cookieverse.tech/api/galxe/x402?address={{address}}&min=4
-  Header: access-token: <GALXE_ACCESS_TOKEN>
-```
-
-Example local tests:
-
-```bash
-curl -i "http://127.0.0.1:3000/api/galxe/x402?address=0x0000000000000000000000000000000000000000&min=4" \
-  -H "access-token: $GALXE_ACCESS_TOKEN"
-
-curl -i "http://127.0.0.1:3000/api/galxe/mint?address=0x0000000000000000000000000000000000000000&min=1" \
-  -H "access-token: $GALXE_ACCESS_TOKEN"
-
-curl -i "http://127.0.0.1:3000/api/galxe/bridge?address=0x0000000000000000000000000000000000000000&min=1" \
-  -H "access-token: $GALXE_ACCESS_TOKEN"
-```
-
-Response shape:
-
-```json
-{
-  "ok": true,
-  "eligible": true,
-  "address": "0x0000000000000000000000000000000000000000",
-  "min": 4
-}
-```
-
-Notes:
-
-- `GALXE_ACCESS_TOKEN` in Vercel is the expected server-side token.
-- The caller must still send the same token in the request header.
-- A bare request without auth header should return `401 Unauthorized`.
-- x402 usage records should include `provider` so Galxe can distinguish `coinbase` and `bankr` paid roasts.
 
 ---
 
@@ -523,8 +952,6 @@ Wallet Roast card PNG
 
 ### 0G Proof for Reviewers
 
-Fill these values after deployment:
-
 ```txt
 0G Component: 0G Compute
 0G Chain Component: 0G Mainnet NFT minting
@@ -535,13 +962,10 @@ Fill these values after deployment:
 Contract: FortuneCookiesAI_OG
 Contract address: 0x951AC8cB1524A7856B2940966AB9751c2259aF63
 Contract explorer link: https://chainscan.0g.ai/address/0x951AC8cB1524A7856B2940966AB9751c2259aF63
-Example Wallet Roast mint transaction: https://chainscan.0g.ai/token/0x951ac8cb1524a7856b2940966ab9751c2259af63, 
-https://chainscan.0g.ai/token/0x951ac8cb1524a7856b2940966ab9751c2259af63
+Example Wallet Roast mint transaction: https://chainscan.0g.ai/token/0x951ac8cb1524a7856b2940966ab9751c2259af63
 ```
 
-### Why This Proves 0G Integration
-
-Cookieverse proves 0G integration through the actual user-facing Wallet Roast product flow:
+Why this proves 0G integration:
 
 1. Runtime proof: Wallet Roast text can be generated through 0G Compute.
 2. Product proof: The generated roast card is rendered and used inside the app.
@@ -620,11 +1044,12 @@ Cookieverse currently supports or is designed around these networks:
 
 | Network | Purpose |
 | --- | --- |
-| Monad | COOKIE NFT minting and bridge route.  |
-| Base | Wallet Roast analysis, Base App surface, COOKIE minting. |
+| X Layer | World Cup Prophecy minting, COOKIE NFT support, holdings, leaderboard and X Layer → Base bridge source. |
+| Base | Base App surface, Wallet Roast analysis, COOKIE minting and X Layer bridge destination. |
+| Monad | COOKIE NFT minting and bridge route. |
 | Mantle | COOKIE NFT support and bridge route. |
 | Linea | COOKIE NFT support and bridge route. |
-| Mitosis | COOKIE NFT support |
+| Mitosis | COOKIE NFT support. |
 | 0G Mainnet | Wallet Roast NFT minting and bridge route. |
 
 ---
@@ -659,6 +1084,47 @@ Important note:
 Cookieverse holdings API expects getAllMints().
 If a deployed contract does not include getAllMints(), minting may still work,
 but holdings/dashboard reads can fail.
+```
+
+### Recommended X Layer Contract
+
+For X Layer World Cup Prophecy, use a `FortuneCookiesAI`-compatible ERC-721 contract.
+
+Required functions for app compatibility:
+
+```solidity
+mintWithImage(string calldata fortune, string calldata imageURI)
+mintWithFortune(string calldata fortune)
+getAllMints()
+mintPrice()
+tokenURI(uint256 tokenId)
+getFortune(uint256 tokenId)
+getImageURI(uint256 tokenId)
+```
+
+Recommended usage:
+
+```txt
+Mint World Cup prophecy cards through mintWithImage().
+Store the rendered card image as ipfs://CID.
+Use the fortune string as compact match metadata:
+"Argentina vs Spain | Pick: Argentina | Score: 2-1 | Confidence: 78%"
+```
+
+### Recommended X Layer → Base Bridge Contracts
+
+```txt
+X Layer:
+  FortuneCookiesONFTAdapter
+
+Base:
+  FortuneCookiesONFT
+```
+
+Purpose:
+
+```txt
+Bridge COOKIE NFTs from X Layer to Base for X Layer Build X hackathon proof.
 ```
 
 ### Recommended 0G Contract
@@ -710,7 +1176,7 @@ Wallet Roast metadata attributes
 | Storage | Vercel Blob, Pinata / IPFS |
 | Smart contracts | Solidity, ERC-721, ERC-2981, OpenZeppelin |
 | Bridge | LayerZero ONFT-style routes |
-| Data | Etherscan V2, Basename lookup, app APIs |
+| Data | Etherscan V2, Basename lookup, OKX / X Layer Onchain Data API, app APIs |
 
 ---
 
@@ -760,6 +1226,10 @@ src/
       images/route.ts
       pinata/route.ts
 
+      xcup/
+        prophecy/route.ts
+        render/route.ts
+
       wallet-roast/
         analyze/route.ts
         render/route.ts
@@ -783,6 +1253,7 @@ src/
       leaderboard/route.ts
       mgid-get/route.ts
       mgid-upsert/route.ts
+      mgid-downsert/route.ts
       mgid-leaderboard/route.ts
       mgid-boosts/route.ts
       adapter-sends/route.ts
@@ -804,6 +1275,10 @@ src/
     useResponsiveMode.ts
 
   lib/
+    xcup/
+      types.ts
+      renderProphecyCard.ts
+
     aa/
       clients.ts
       smartAccount.ts
@@ -844,6 +1319,11 @@ src/
     x402UsageStore.ts
 
 public/
+  xcup/
+    world-cup-prophecy-template.png
+    world-cup-header-desktop.png
+    world-cup-header-mobile.png
+
   wallet-roast/
     templates/
     icons/
@@ -883,8 +1363,9 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
 ### RPC and Chains
 
 ```bash
-NEXT_PUBLIC_DEFAULT_CHAIN=monad
+NEXT_PUBLIC_DEFAULT_CHAIN=xlayer
 
+NEXT_PUBLIC_RPC_HTTP_XLAYER=https://rpc.xlayer.tech
 NEXT_PUBLIC_RPC_HTTP_MONAD=https://testnet-rpc.monad.xyz
 NEXT_PUBLIC_RPC_HTTP_BASE=https://mainnet.base.org
 NEXT_PUBLIC_RPC_HTTP_MANTLE=https://rpc.mantle.xyz
@@ -900,6 +1381,7 @@ NEXT_PUBLIC_MITOSIS_EXPLORER=https://explorer.mitosis.org
 
 ```bash
 NEXT_PUBLIC_COOKIE_ADDRESS=0x...
+NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_BASE=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_LINEA=0x...
@@ -911,10 +1393,12 @@ NEXT_PUBLIC_COOKIE_ADDRESS_OG=0x...
 
 ```bash
 NEXT_PUBLIC_CANONICAL_ERC721=0x...
+NEXT_PUBLIC_CANONICAL_ERC721_XLAYER=0x...
 NEXT_PUBLIC_CANONICAL_ERC721_MONAD=0x...
 NEXT_PUBLIC_CANONICAL_ERC721_MANTLE=0x...
 NEXT_PUBLIC_CANONICAL_ERC721_LINEA=0x...
 
+NEXT_PUBLIC_ADAPTER_XLAYER=0x...
 NEXT_PUBLIC_ADAPTER_BASE=0x...
 NEXT_PUBLIC_ADAPTER_MANTLE=0x...
 NEXT_PUBLIC_ADAPTER_LINEA=0x...
@@ -925,6 +1409,7 @@ NEXT_PUBLIC_ONFT_MANTLE=0x...
 NEXT_PUBLIC_ONFT_LINEA=0x...
 NEXT_PUBLIC_ONFT_MONAD=0x...
 
+NEXT_PUBLIC_EID_XLAYER=30274
 NEXT_PUBLIC_EID_BASE=30184
 NEXT_PUBLIC_EID_MANTLE=30181
 NEXT_PUBLIC_EID_LINEA=40231
@@ -932,16 +1417,29 @@ NEXT_PUBLIC_EID_MONAD=...
 
 NEXT_PUBLIC_FEE_RECEIVER=0x...
 NEXT_PUBLIC_APP_FEE_BPS=0
+NEXT_PUBLIC_FLAT_FEE_WEI_OKB=0
 NEXT_PUBLIC_FLAT_FEE_WEI_ETH=0
 NEXT_PUBLIC_FLAT_FEE_WEI_MON=0
 NEXT_PUBLIC_FLAT_FEE_WEI_MNT=0
 ```
 
-### AI and Wallet Roast
+### X Layer / OKX Onchain Data
+
+```bash
+OKX_XLAYER_API_BASE_URL=https://www.okx.com
+OKX_XLAYER_API_KEY=...
+OKX_XLAYER_API_SECRET=...
+OKX_XLAYER_API_PASSPHRASE=...
+```
+
+### AI, Wallet Roast, and World Cup Prophecy
 
 ```bash
 OPENAI_API_KEY_MFC_NEW=sk-...
 MFC_OPENAI_KEY_NAME=OPENAI_API_KEY_MFC_NEW
+
+XCUP_OPENAI_MODEL=gpt-5.5
+XCUP_RENDER_DEBUG_BOXES=0
 
 WALLET_ROAST_PROVIDER=0G
 WALLET_ROAST_OPENAI_MODEL=gpt-5-mini
@@ -983,11 +1481,9 @@ CDP_API_KEY_SECRET=...
 Local development note:
 
 ```bash
-# App can run on 127.0.0.1 for XAuth.
 NEXTAUTH_URL=http://127.0.0.1:3000
 NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000
 
-# Coinbase x402 local calls may use localhost if @x402/next generates localhost resource URLs.
 NEXT_PUBLIC_X402_COINBASE_ORIGIN=http://localhost:3000
 ```
 
@@ -1163,6 +1659,49 @@ http://localhost:3000/leaderboard
 
 ---
 
+## Running World Cup Prophecy on X Layer
+
+Set:
+
+```bash
+NEXT_PUBLIC_DEFAULT_CHAIN=xlayer
+NEXT_PUBLIC_RPC_HTTP_XLAYER=https://rpc.xlayer.tech
+NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER=0x...
+
+MFC_OPENAI_KEY_NAME=OPENAI_API_KEY_MFC_NEW
+OPENAI_API_KEY_MFC_NEW=sk-...
+XCUP_OPENAI_MODEL=gpt-5.5
+
+PINATA_JWT=...
+PINATA_GATEWAY=https://your-gateway.pinata.cloud
+```
+
+Run:
+
+```bash
+npm run dev
+```
+
+Open:
+
+```txt
+http://localhost:3000/
+http://localhost:3000/app
+```
+
+Use World Cup Prophecy:
+
+```txt
+Switch wallet to X Layer
+→ Enter Team 1 and Team 2
+→ Select match date
+→ Create Match Prophecy
+→ Preview rendered card
+→ Mint Prophecy
+```
+
+---
+
 ## Running Wallet Roast with OpenAI
 
 Set:
@@ -1249,16 +1788,23 @@ Example body:
 }
 ```
 
+---
+
 ## Implementation Notes
 
 - Wallet Roast analysis currently focuses on Base wallet data.
+- World Cup Match Prophecy is built as the X Layer hackathon feature.
+- World Cup Prophecy cards are generated by OpenAI, rendered server-side, uploaded to IPFS, and minted through `mintWithImage()` on X Layer.
+- X Layer NFT token IDs should be fetched through OKX / X Layer Onchain Data API instead of slow block scanning.
+- X Layer adapter sends should be counted through OKX / X Layer transaction data.
 - Wallet Roast minting can happen on the connected supported chain, including 0G after chain support is added.
 - OpenAI is the default Wallet Roast provider.
 - 0G Compute can be enabled with `WALLET_ROAST_PROVIDER=og`.
 - The Wallet Roast card is rendered as PNG before upload and mint.
-- `mintWithImage()` is the preferred mint path for Wallet Roast cards.
+- `mintWithImage()` is the preferred mint path for Wallet Roast and World Cup Prophecy cards.
 - `getAllMints()` is recommended for all deployed COOKIE contracts used by Cookieverse holdings APIs.
 - 0G proof should be shown as both a runtime app flow and a ChainScan mint transaction.
+- X Layer proof should be shown through wallet connection, prophecy mint transaction, explorer link, holdings read, and LayerZero bridge proof.
 - Coinbase x402 and Bankr x402 are separate paid Wallet Roast provider paths.
 - `/api/wallet-roast/pro` is the canonical paid backend for Bankr x402 services.
 - `buildPaidWalletRoastResponse()` is the shared paid Wallet Roast response builder for Coinbase and Bankr flows.
@@ -1269,4 +1815,3 @@ Example body:
 ## License
 
 ISC
-
