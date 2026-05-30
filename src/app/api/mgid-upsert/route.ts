@@ -419,7 +419,7 @@ const headerFcUsername =
   const freshTx_linea   = mints_linea   + bridges_linea;
   const freshTx_mitosis = mints_mitosis + bridges_mitosis;
   const freshTx_og      = mints_og + bridges_og;
-  const freshTx_xlayer  = mints_og + bridges_xlayer;  
+  const freshTx_xlayer  = mints_xlayer + bridges_xlayer;  
 
   const existingTx_monad   = existing?.totalTransactions_monad   ?? 0;
   const existingTx_base    = existing?.totalTransactions_base    ?? 0;
@@ -500,7 +500,7 @@ const headerFcUsername =
     mints_monad + mints_base + mints_mantle + mints_linea + mints_mitosis + mints_og + mints_xlayer;
 
   const totalBridgesCurrent =
-    bridges_monad + bridges_base + bridges_mantle + bridges_linea + bridges_mitosis + bridges_og + bridges_og;
+    bridges_monad + bridges_base + bridges_mantle + bridges_linea + bridges_mitosis + bridges_og + bridges_og + bridges_xlayer;
 
   const now = new Date();
   const dayKey = getUtcDayKey(now);
