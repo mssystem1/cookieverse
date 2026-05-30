@@ -32,6 +32,8 @@ import {
 } from "../lib/x402/client";
 import { x402Enabled, x402Provider } from "../lib/x402/config";
 
+import type { WorldCupProphecyResult } from '../lib/xcup/types';
+
 // [FIXED] Privy + banner
 //import { PrivyProvider } from '@privy-io/react-auth';
 //import MonadGamesIdBanner from '../components/MonadGamesIdBanner';
@@ -46,6 +48,7 @@ const CHAIN_IDS = {
   linea: 59144,
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
   og: 16661,
+  xlayer: 196,
 } as const;
 
 function cookieAddressFor(chainId?: number): `0x${string}` | undefined {
@@ -54,17 +57,20 @@ function cookieAddressFor(chainId?: number): `0x${string}` | undefined {
   if (chainId === CHAIN_IDS.linea) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_LINEA as `0x${string}`;
   if (chainId === CHAIN_IDS.mitosis) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
   if (chainId === CHAIN_IDS.og) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG as `0x${string}`;
+  if (chainId === CHAIN_IDS.xlayer) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER as `0x${string}`;
 
   return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
 }
 
 function makeExplorerNftUrl(chainId: number | undefined, contract: `0x${string}`, tokenId: number): string {
-  // Known explorers
   if (chainId === CHAIN_IDS.base) return `https://basescan.org/token/${contract}?a=${tokenId}`;
   if (chainId === CHAIN_IDS.mantle) return `https://mantlescan.xyz/token/${contract}?a=${tokenId}`;
   if (chainId === CHAIN_IDS.linea) return `https://lineascan.build/token/${contract}?a=${tokenId}`;
   if (chainId === CHAIN_IDS.mitosis) return `https://mitoscan.io/token/${contract}?a=${tokenId}`;
   if (chainId === CHAIN_IDS.og) return `https://chainscan.0g.ai/token/${contract}?a=${tokenId}`;
+  if (chainId === CHAIN_IDS.xlayer) {
+    return `https://www.okx.com/web3/explorer/xlayer/token/${contract}?a=${tokenId}`;
+  }
 
   return `https://monadvision.com/nft/${contract}/${tokenId}`;
 }
@@ -107,7 +113,7 @@ export default function Page() {
 
   const [fcUsername, setFcUsername] = React.useState<string>('');
 
-  type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | "og";
+  type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | 'og' | 'xlayer';
 
   const CHAIN_BY_ID: Record<number, ChainKey> = {
     [CHAIN_IDS.monad]: 'monad',
@@ -115,7 +121,8 @@ export default function Page() {
     [CHAIN_IDS.mantle]: 'mantle',
     [CHAIN_IDS.linea]: 'linea',
     [CHAIN_IDS.mitosis]: 'mitosis',
-    [CHAIN_IDS.og]: "og",
+    [CHAIN_IDS.og]: 'og',
+    [CHAIN_IDS.xlayer]: 'xlayer',
   };
 
   function currentKey(id?: number): ChainKey {
@@ -124,154 +131,16 @@ export default function Page() {
 
   // scoreByChain & imagesByChain come from holdings (you already set these as shown earlier)
   const [scoreByChain, setScoreByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0,
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0
   });
   const [imagesByChain, setImagesByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0,
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0
   });
 
   // NEW: transactionsByChain (accumulated from BLOB)
   const [txByChain, setTxByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0,
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0
   });
-
-  /*
-  async function upsertMgid({
-    address,
-    incrementImages,
-    SAWallet,
-    usernamefarcaster,
-  }: {
-    address: `0x${string}`;
-    incrementImages: boolean;
-    SAWallet?: `0x${string}`;
-    usernamefarcaster?: string;
-  }) {
-    const sessionResp = await fetch('/api/auth/session', { cache: 'no-store' });
-    const session = sessionResp.ok ? await sessionResp.json() : null;
-    const twitter_username = session?.twitter_username || '';
-
-    const k = currentKey(chain?.id);
-
-    const readResp = await fetch(`/api/mgid-get?address=${address}`, { cache: 'no-store' });
-    const existing = readResp.ok ? await readResp.json() : null;
-
-    const row = {
-      usernameX: twitter_username,
-      usernamefarcaster: usernamefarcaster || existing?.usernamefarcaster || '',
-      EOAWallet: address,
-      SAWallet: SAWallet || existing?.SAWallet || '',
-
-      LineaBoost: Number(existing?.LineaBoost),
-      BaseBoost: Number(existing?.BaseBoost),
-      MonadBoost: Number(existing?.MonadBoost),
-      MantleBoost: Number(existing?.MantleBoost),
-      MitosisBoost: Number(existing?.MitosisBoost),
-
-      totalScore_monad:  Number(existing?.totalScore_monad  ?? scoreByChain.monad),
-      totalTransactions_monad: Number(existing?.totalTransactions_monad ?? txByChain.monad),
-      totalImages_monad: Number(existing?.totalImages_monad ?? imagesByChain.monad),
-
-      totalScore_base:   Number(existing?.totalScore_base   ?? scoreByChain.base),
-      totalTransactions_base: Number(existing?.totalTransactions_base ?? txByChain.base),
-      totalImages_base:  Number(existing?.totalImages_base  ?? imagesByChain.base),
-
-      totalScore_mantle: Number(existing?.totalScore_mantle ?? scoreByChain.mantle),
-      totalTransactions_mantle: Number(existing?.totalTransactions_mantle ?? txByChain.mantle),
-      totalImages_mantle: Number(existing?.totalImages_mantle ?? imagesByChain.mantle),
-
-      totalScore_linea: Number(existing?.totalScore_linea ?? scoreByChain.linea),
-      totalTransactions_linea: Number(existing?.totalTransactions_linea ?? txByChain.linea),
-      totalImages_linea: Number(existing?.totalImages_linea ?? imagesByChain.linea),
-
-      totalScore_mitosis: Number(existing?.totalScore_mitosis ?? scoreByChain.mitosis),
-      totalTransactions_mitosis: Number(existing?.totalTransactions_mitosis ?? txByChain.mitosis),
-      totalImages_mitosis: Number(existing?.totalImages_mitosis ?? imagesByChain.mitosis),
-
-      totalScore: 0,
-      totalTransactions: 0,
-      totalImages: 0,
-
-      updatedAt: Date.now(),
-    };
-
-    switch (k) {
-      case 'base':
-        row.totalScore_base += 1;
-        row.totalTransactions_base += 1;
-        if (incrementImages) row.totalImages_base += 1;
-        break;
-      case 'mantle':
-        row.totalScore_mantle += 1;
-        row.totalTransactions_mantle += 1;
-        if (incrementImages) row.totalImages_mantle += 1;
-        break;
-      case 'linea':
-        row.totalScore_linea += 1;
-        row.totalTransactions_linea += 1;
-        if (incrementImages) row.totalImages_linea += 1;
-        break;
-      case 'mitosis':
-        row.totalScore_mitosis += 1;
-        row.totalTransactions_mitosis += 1;
-        if (incrementImages) row.totalImages_mitosis += 1;
-        break;
-      default:
-        row.totalScore_monad += 1;
-        row.totalTransactions_monad += 1;
-        if (incrementImages) row.totalImages_monad += 1;
-        break;
-    }
-
-    row.totalScore =
-      row.totalScore_monad + row.totalScore_base + row.totalScore_mantle + row.totalScore_linea + row.totalScore_mitosis;
-
-    row.totalTransactions =
-      row.totalTransactions_monad + row.totalTransactions_base + row.totalTransactions_mantle + row.totalTransactions_linea + row.totalTransactions_mitosis;
-
-    row.totalImages =
-      row.totalImages_monad + row.totalImages_base + row.totalImages_mantle + row.totalImages_linea + row.totalImages_mitosis;
-
-    await fetch('/api/mgid-upsert', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(row),
-    });
-
-    setTxByChain(prev => ({ ...prev, [k]: (prev[k] ?? 0) + 1 }));
-    if (incrementImages) setImagesByChain(prev => ({ ...prev, [k]: (prev[k] ?? 0) + 1 }));
-    setScoreByChain(prev => ({ ...prev, [k]: (prev[k] ?? 0) + 1 }));
-  }
-  */
-
-  /*
-  const [privyCfg, setPrivyCfg] = React.useState<{ appId: string; providerAppId: string } | null>(null);
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const r = await fetch('/api/privy-config', { cache: 'no-store' });
-        if (!r.ok) throw new Error(String(r.status));
-        const j = (await r.json()) as { appId: string; providerAppId: string };
-        if (alive) setPrivyCfg(j);
-      } catch {
-        if (alive) setPrivyCfg(null);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-  */
-
-  // Wallet balance (shown in top bar)
-  /*
-  const { data: balance } = useBalance({
-    address,
-    chainId: monadTestnet.id,
-    query: { enabled: !!address },
-  });
-  */
 
   const [imageIds, setImageIds] = React.useState<number[]>([]);
   const [pendingMintType, setPendingMintType] = React.useState<null | 'text' | 'image'>(null);
@@ -301,6 +170,21 @@ export default function Page() {
   const [zoom, setZoom] = React.useState(false);
   const [lightboxImageUrl, setLightboxImageUrl] = React.useState<string | null>(null);
   const [lightboxAlt, setLightboxAlt] = React.useState('Preview');
+
+  // world cup prophecy
+  const [wcHomeTeam, setWcHomeTeam] = React.useState('Argentina');
+  const [wcAwayTeam, setWcAwayTeam] = React.useState('Spain');
+  const [wcMatchDate, setWcMatchDate] = React.useState('');
+  const [wcProphecy, setWcProphecy] =
+    React.useState<WorldCupProphecyResult | null>(null);
+
+  const [wcImageUrl, setWcImageUrl] = React.useState<string | null>(null);
+  const [wcImageBlob, setWcImageBlob] = React.useState<Blob | null>(null);
+  const [wcImageB64, setWcImageB64] = React.useState<string | null>(null);
+  const [wcPinCid, setWcPinCid] = React.useState<string | null>(null);
+
+  const [wcBusy, setWcBusy] = React.useState(false);
+  const [wcMintBusy, setWcMintBusy] = React.useState(false);
 
   // wallet roast state
   const [roastWallet, setRoastWallet] = React.useState('');
@@ -588,65 +472,7 @@ export default function Page() {
     return showAll ? desc : desc.slice(0, 10);
   }, [holdingIds, showAll]);
 
-  /*
-  const ALL_CHAIN_IDS: number[] = React.useMemo(
-    () => [CHAIN_IDS.monad, CHAIN_IDS.base, CHAIN_IDS.mantle, CHAIN_IDS.mitosis],
-    []
-  );
-
-  React.useEffect(() => {
-    if (!connected || !address) return;
-
-    let alive = true;
-    (async () => {
-      const getResp = await fetch(`/api/mgid-get?address=${address}`, { cache: 'no-store' });
-      const existing = getResp.ok ? await getResp.json() : null;
-
-      const txInit: Record<ChainKey, number> = {
-        monad: Number(existing?.totalTransactions_monad ?? 0),
-        base: Number(existing?.totalTransactions_base ?? 0),
-        mantle: Number(existing?.totalTransactions_mantle ?? 0),
-        mitosis: Number(existing?.totalTransactions_mitosis ?? 0),
-      };
-
-      if (alive) setTxByChain(txInit);
-    })();
-
-    return () => { alive = false; };
-  }, [connected, address]);
-
-  const key = currentKey(chain?.id);
-
-  const totalScore_current = scoreByChain[key];
-  const totalImages_current = imagesByChain[key];
-  const totalTransactions_current = txByChain[key];
-
-  const totalScore_monad  = scoreByChain.monad;
-  const totalScore_base   = scoreByChain.base;
-  const totalScore_mantle = scoreByChain.mantle;
-  const totalScore_mitosis= scoreByChain.mitosis;
-
-  const totalTransactions_monad  = totalScore_monad;
-  const totalTransactions_base   = totalScore_base;
-  const totalTransactions_mantle = totalScore_mantle;
-  const totalTransactions_mitosis= totalScore_mitosis;
-
-  const totalImages_monad  = imagesByChain.monad;
-  const totalImages_base   = imagesByChain.base;
-  const totalImages_mantle = imagesByChain.mantle;
-  const totalImages_mitosis= imagesByChain.mitosis;
-
-  const totalScore =
-    scoreByChain.monad + scoreByChain.base + scoreByChain.mantle + scoreByChain.mitosis;
-
-  const totalTransactions =
-    txByChain.monad + txByChain.base + txByChain.mantle + txByChain.mitosis;
-
-  const totalImages =
-    imagesByChain.monad + imagesByChain.base + imagesByChain.mantle + imagesByChain.mitosis;
-  */
-
-  // ---------- Generate with AI ----------
+    // ---------- Generate with AI ----------
   const onGenerate = async () => {
     setUiError(null);
     setGenBusy(true);
@@ -753,37 +579,7 @@ export default function Page() {
     }
   };
 
-  /*
-  const onMint = async () => {
-    setUiError(null);
-    if (!connected || !address) {
-      setUiError('Connect your wallet first.');
-      return;
-    }
-    if (!fortune?.trim()) {
-      setUiError('Enter or generate a fortune first.');
-      return;
-    }
-    setMintBusy(true);
-    try {
-      const hash = await writeContractAsync({
-        address: COOKIE_ADDRESS,
-        abi: FortuneABI as Abi,
-        functionName: 'mintWithFortune',
-        args: [fortune.trim()],
-        account: address as `0x${string}`,
-        chain: monadTestnet,
-        value: 1000000000000000000
-      });
-      setTxHash(hash);
-    } catch (e: any) {
-      setUiError(e?.shortMessage || e?.message || 'Mint failed');
-    } finally {
-      setMintBusy(false);
-    }
-  };
-  */
-  const onMint = async () => {
+   const onMint = async () => {
     setUiError(null);
     if (!connected || !address) {
       setUiError('Connect your wallet first.');
@@ -1053,46 +849,6 @@ const generateWalletRoastViaX402 = async (product: CookieverseX402Product) => {
     }
   };
 
-  /*
-  const onShareWalletRoast = async () => {
-    try {
-      if (!roastData) throw new Error('Analyze wallet first.');
-
-     // const walletUsed = (roastWallet || address || '').trim();
-      const light_roast = roastData?.roast_text?.light_roast || 'Wallet Roast';
-      const archetype = roastData?.classification?.archetype || 'Onchain Civilian';
-      const verdict = roastData?.roast_text?.verdict || 'Wallet Roast';
-
-      const text =
-        `Wallet Roast: ${light_roast}\n` +
-        `Archetype: ${archetype}\n` +
-        `Verdict: ${verdict}\n` +
-        //`${walletUsed ? `Wallet: ${walletUsed}\n` : ''}` +
-        `Made with Cookieverse 🍪 on @base 🟦`;
-
-      const appUrl =
-        typeof window !== 'undefined'
-          ? window.location.origin + (pathname || '')
-          : undefined;
-
-      if (isFarcasterMini) {
-        await (sdk as any).actions.composeCast({
-          text,
-          embeds: appUrl ? [appUrl] : undefined,
-        });
-        return;
-      }
-
-      const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}${appUrl ? `&url=${encodeURIComponent(appUrl)}` : ''
-        }`;
-
-      window.open(xUrl, '_blank', 'noopener,noreferrer');
-    } catch (e: any) {
-      setUiError(String(e?.message || e));
-    }
-  };
-*/
-
 const onShareWalletRoast = async () => {
   try {
     setUiError(null);
@@ -1281,6 +1037,241 @@ const onShareCookieToX = React.useCallback(
   [chain?.name, isFarcasterMini],
 );
 
+async function generateWorldCupProphecy() {
+  setUiError(null);
+  setWcBusy(true);
+
+  try {
+    const prophecyRes = await fetch('/api/xcup/prophecy', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        homeTeam: wcHomeTeam,
+        awayTeam: wcAwayTeam,
+        matchDate: wcMatchDate,
+      }),
+    });
+
+    const prophecyData = await prophecyRes.json();
+
+    if (!prophecyRes.ok) {
+      throw new Error(prophecyData?.error || 'Failed to generate World Cup prophecy');
+    }
+
+    if (wcImageUrl) URL.revokeObjectURL(wcImageUrl);
+
+    setWcProphecy(prophecyData);
+    setWcImageUrl(null);
+    setWcImageBlob(null);
+    setWcImageB64(null);
+    setWcPinCid(null);
+
+    const renderRes = await fetch('/api/xcup/render', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...prophecyData,
+        mintedBy: address,
+      }),
+    });
+
+    if (!renderRes.ok) {
+      const err = await renderRes.json().catch(() => null);
+      throw new Error(err?.error || 'Failed to render World Cup prophecy card');
+    }
+
+    const blob = await renderRes.blob();
+    const url = URL.createObjectURL(blob);
+    const b64 = await blobToBase64(blob);
+
+    setWcImageBlob(blob);
+    setWcImageUrl(url);
+    setWcImageB64(b64);
+  } catch (e: any) {
+    setUiError(String(e?.message || e));
+  } finally {
+    setWcBusy(false);
+  }
+}
+
+async function uploadWorldCupProphecyToPinata(): Promise<string> {
+  if (!wcImageB64) {
+    throw new Error('Generate World Cup prophecy card first.');
+  }
+
+  const filename = `world-cup-prophecy-${wcHomeTeam}-vs-${wcAwayTeam}.png`
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, '-');
+
+  const res = await fetch('/api/pinata', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      b64: wcImageB64,
+      filename,
+    }),
+  });
+
+  const j = await res.json();
+
+  if (!res.ok) {
+    throw new Error(j?.error || 'Failed to save prophecy card to IPFS');
+  }
+
+  if (!j?.cid) {
+    throw new Error('Pinata did not return CID.');
+  }
+
+  setWcPinCid(j.cid);
+  return j.cid;
+}
+
+async function mintWorldCupProphecy() {
+  setUiError(null);
+
+  if (!connected || !address) {
+    setUiError('Connect your wallet first.');
+    return;
+  }
+
+  if (chain?.id !== CHAIN_IDS.xlayer) {
+    setUiError('Switch to X Layer to mint World Cup prophecy.');
+    return;
+  }
+
+  if (!COOKIE_ADDRESS) {
+    setUiError('Missing X Layer COOKIE contract address.');
+    return;
+  }
+
+  if (!wcProphecy) {
+    setUiError('Generate prophecy first.');
+    return;
+  }
+
+  if (!wcImageB64) {
+    setUiError('Generate prophecy card first.');
+    return;
+  }
+
+  setWcMintBusy(true);
+
+  try {
+    const cid = wcPinCid || (await uploadWorldCupProphecyToPinata());
+
+    const fortuneText = [
+      `${wcProphecy.homeTeam} vs ${wcProphecy.awayTeam}`,
+      `Pick: ${wcProphecy.pick}`,
+      `Score: ${wcProphecy.scoreline}`,
+      `Confidence: ${wcProphecy.confidence}%`,
+    ]
+      .join(' | ')
+      .slice(0, 220);
+
+    const call: any = {
+      address: COOKIE_ADDRESS,
+      abi: FortuneABI as Abi,
+      functionName: 'mintWithImage',
+      args: [fortuneText, `ipfs://${cid}`],
+    };
+
+    if (typeof onchainMintPrice === 'bigint' && onchainMintPrice > 0n) {
+      call.value = onchainMintPrice;
+    }
+
+    const hash = await writeContractAsync(call);
+
+    setPendingMintType('image');
+    setTxHash(hash);
+  } catch (e: any) {
+    setUiError(String(e?.shortMessage || e?.message || e));
+  } finally {
+    setWcMintBusy(false);
+  }
+}
+
+async function downloadWorldCupProphecy() {
+  try {
+    if (!wcImageBlob) throw new Error('Generate prophecy card first.');
+    downloadBlob(wcImageBlob, 'cookieverse-world-cup-prophecy.png');
+  } catch (e: any) {
+    setUiError(String(e?.message || e));
+  }
+}
+
+async function copyWorldCupProphecy() {
+  try {
+    if (!wcImageBlob) throw new Error('Generate prophecy card first.');
+    await copyImageToClipboard(wcImageBlob);
+  } catch (e: any) {
+    setUiError(String(e?.message || e));
+  }
+}
+
+async function shareWorldCupProphecy() {
+  try {
+    setUiError(null);
+
+    if (!wcProphecy) throw new Error('Generate prophecy first.');
+    if (!wcImageBlob) throw new Error('Render prophecy image first.');
+
+    const appUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}${isBaseAppRoute ? '/app' : '/'}`
+        : 'https://www.cookieverse.tech/';
+
+    const text =
+      `World Cup prophecy just dropped ⚽🍪\n\n` +
+      `${wcProphecy.homeTeam} vs ${wcProphecy.awayTeam}\n` +
+      `Pick: ${wcProphecy.pick}\n` +
+      `Score: ${wcProphecy.scoreline}\n` +
+      `Confidence: ${wcProphecy.confidence}%\n\n` +
+      `Minted in Cookieverse.`;
+
+    if (isFarcasterMini) {
+      await (sdk as any).actions.composeCast({
+        text,
+        embeds: [appUrl],
+      });
+      return;
+    }
+
+    const result = await shareToX({
+      text,
+      url: appUrl,
+      imageBlob: wcImageBlob,
+      filename: 'cookieverse-world-cup-prophecy.png',
+    });
+
+    if (result.ok) {
+      if (result.method === 'native-image-share') return;
+
+      if (result.method === 'clipboard-plus-x-intent') {
+        setUiError('Text copied. X composer opened. Attach image manually if needed.');
+        return;
+      }
+
+      if (result.method === 'x-intent') {
+        setUiError('X composer opened. X Web Intent does not attach images automatically.');
+        return;
+      }
+    }
+
+    if ('error' in result && result.error !== 'Share cancelled.') {
+      throw new Error(result.error);
+    }
+  } catch (e: any) {
+    setUiError(String(e?.message || e));
+  }
+}
+
+React.useEffect(() => {
+  return () => {
+    if (wcImageUrl) URL.revokeObjectURL(wcImageUrl);
+  };
+}, [wcImageUrl]);
+
+
 
   // Parse receipt logs safely with parseEventLogs
   React.useEffect(() => {
@@ -1395,73 +1386,231 @@ const onShareCookieToX = React.useCallback(
       ) : null}
 
       <div className="grid">
-        {/* LEFT: Mint Card */}
-        <section className="card card--fortune">
-          <h2 className="card__title">Generate Fortune</h2>
+        {/* LEFT: World Cup Prophecy */}
+        <section
+          className="card card--fortune card--world-cup"
+          style={{
+            background:
+              'radial-gradient(circle at top left, rgba(250,204,21,0.16), transparent 34%), radial-gradient(circle at bottom right, rgba(124,58,237,0.16), transparent 34%), rgba(15,15,19,0.94)',
+            border: '1px solid rgba(250,204,21,0.32)',
+            boxShadow:
+              '0 22px 70px rgba(0,0,0,0.34), 0 0 30px rgba(124,58,237,0.14)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              marginBottom: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '5px 10px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(250,204,21,0.4)',
+                  background: 'rgba(2,6,23,0.72)',
+                  color: '#fde68a',
+                  fontSize: 11,
+                  fontWeight: 900,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  marginBottom: 8,
+                }}
+              >
+                ⚽ World Cup Mode
+              </div>
 
-          <div className="two-col">
-            <div className="field field--full">
-              <label className="label">Prompt </label>
-              <input
-                className="input"
-                placeholder="e.g., gas efficiency, launch day, testnet"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-              />
+              <h2
+                className="card__title"
+                style={{
+                  color: '#facc15',
+                  textShadow: '0 0 18px rgba(250,204,21,0.22)',
+                  marginBottom: 4,
+                }}
+              >
+                Match Prophecy
+              </h2>
+
+              <p className="hint" style={{ margin: 0 }}>
+                  Enter teams and match date. AI researches the matchup, calculates prophecy criteria, renders a card, and mints it on X Layer.
+              </p>
             </div>
 
-            <div className="row">
-              <div className="field field--full">
-                <label className="label">Vibe</label>
-                <input
-                  value={vibe}
-                  onChange={(e) => setVibe(e.target.value)}
-                  className="input"
-                  placeholder="optimistic"
-                />
-              </div>
-              <div className="field field--full">
-                <label className="label">Name (optional)</label>
-                <input
-                  value={nameOpt}
-                  onChange={(e) => setNameOpt(e.target.value)}
-                  className="input"
-                  placeholder="your name/team"
-                />
-              </div>
-            </div>
           </div>
 
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={onGenerate}
-            disabled={genBusy}
-          >
-            {genBusy ? 'Generating…' : 'Generate with AI'}
-          </button>
+          <div className="row" style={{ alignItems: 'stretch', gap: 16 }}>
+            <div className="col" style={{ minWidth: 280 }}>
+              <div className="two-col">
+                <div className="field field--full">
+                  <label className="label">Team 1</label>
+                  <input
+                    className="input"
+                    value={wcHomeTeam}
+                    onChange={(e) => setWcHomeTeam(e.target.value)}
+                    placeholder="Argentina"
+                  />
+                </div>
 
-          <div className="two-col">
-            <div className="field field--full">
-              <label className="label">Fortune (preview)</label>
-              <textarea
-                className="textarea"
-                value={fortune}
-                onChange={(e) => setFortune(e.target.value)}
-                placeholder="Your fortune will appear here…"
-              />
-              <p className="hint">Tip: keep under ~160 chars (contract allows up to 240 bytes).</p>
+                <div className="field field--full">
+                  <label className="label">Team 2</label>
+                  <input
+                    className="input"
+                    value={wcAwayTeam}
+                    onChange={(e) => setWcAwayTeam(e.target.value)}
+                    placeholder="Spain"
+                  />
+                </div>
+              </div>
+
+              <div className="field field--full">
+                <label className="label">Match date</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={wcMatchDate}
+                  onChange={(e) => setWcMatchDate(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={generateWorldCupProphecy}
+                  disabled={wcBusy}
+                  style={{
+                    background: 'linear-gradient(135deg,#facc15,#f59e0b)',
+                    color: '#111827',
+                  }}
+                >
+                  {wcBusy ? 'Creating Prophecy…' : 'Create Match Prophecy'}
+                </button>
+
+               </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn--primary" onClick={downloadWorldCupProphecy} disabled={!wcImageBlob}>
+                  Download
+                </button>
+
+                <button className="btn btn--primary" onClick={copyWorldCupProphecy} disabled={!wcImageBlob}>
+                  Copy
+                </button>
+
+                <button className="btn btn--primary" onClick={shareWorldCupProphecy} disabled={!wcImageBlob || !wcProphecy}>
+                  {isFarcasterMini ? 'Share on Farcaster' : 'Share on X'}
+                </button>
+              </div>
+
+              {wcPinCid ? (
+                <div className="hint" style={{ marginTop: 10, color: '#bbf7d0' }}>
+                  IPFS: ipfs://{wcPinCid}
+                </div>
+              ) : null}
+
+              {wcProphecy ? (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    borderRadius: 14,
+                    border: '1px solid rgba(250,204,21,0.22)',
+                    background: 'rgba(2,6,23,0.42)',
+                  }}
+                >
+                  <div className="hint">
+                    Pick: <strong>{wcProphecy.pick}</strong>
+                  </div>
+                  <div className="hint">
+                    Scoreline: <strong>{wcProphecy.scoreline}</strong>
+                  </div>
+                  <div className="hint">
+                    Confidence: <strong>{wcProphecy.confidence}%</strong>
+                  </div>
+                  <div className="hint" style={{ marginTop: 8 }}>
+                    AI criteria:{' '}
+                    Form {wcProphecy.criteria.form} • Attack {wcProphecy.criteria.attack} • Defense{' '}
+                    {wcProphecy.criteria.defense} • Momentum {wcProphecy.criteria.momentum} • Fans{' '}
+                    {wcProphecy.criteria.fans}
+                  </div>
+                  {wcProphecy.location ? (
+                    <div className="hint" style={{ marginTop: 6 }}>
+                      Location: <strong>{wcProphecy.location}</strong>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-          </div>
 
-          <button
-            type="button"
-            className="btn btn--accent"
-            onClick={onMint}
-            disabled={mintBusy || isConfirming || !connected}
-          >
-            {mintBusy ? 'Waiting for wallet…' : isConfirming ? 'Confirming…' : 'Mint This Fortune'}
-          </button>
+            <div className="col" style={{ minWidth: 280, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label className="label">Prophecy card preview</label>
+
+              <div
+                onClick={() => {
+                  if (wcImageUrl) openPreviewLightbox(wcImageUrl, 'World Cup Prophecy preview');
+                }}
+                title={wcImageUrl ? 'Click to open full preview' : undefined}
+                style={{
+                  border: '1px solid rgba(250,204,21,0.32)',
+                  borderRadius: 18,
+                  padding: 8,
+                  minHeight: 360,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background:
+                    'radial-gradient(circle at top, rgba(250,204,21,0.08), rgba(2,6,23,0.72))',
+                  cursor: wcImageUrl ? 'zoom-in' : 'default',
+                  overflow: 'hidden',
+                }}
+              >
+                {wcImageUrl ? (
+                  <img
+                    src={wcImageUrl}
+                    alt="World Cup Prophecy preview"
+                    draggable={false}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: 360,
+                      borderRadius: 12,
+                      display: 'block',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      boxShadow: '0 18px 45px rgba(0,0,0,0.32)',
+                    }}
+                  />
+                ) : (
+                  <span className="muted" style={{ textAlign: 'center' }}>
+                    Your World Cup prophecy card will appear here.
+                  </span>
+                )}
+              </div>
+
+               <button
+                  type="button"
+                  className="btn btn--accent"
+                  onClick={mintWorldCupProphecy}
+                  disabled={!wcImageB64 || wcMintBusy || isConfirming || !connected}
+                >
+                  {wcMintBusy
+                    ? wcPinCid
+                      ? 'Waiting for wallet…'
+                      : 'Saving to IPFS…'
+                    : isConfirming
+                      ? 'Confirming…'
+                      : 'Mint this Prophecy'}
+                </button>
+
+           </div>
+          </div>
         </section>
 
         {/* Wallet Roast */}
@@ -1822,7 +1971,7 @@ const onShareCookieToX = React.useCallback(
         @media (min-width: 900px) {
           .card--status { grid-column: 3; order: 3; }
           .card--image { grid-column: 1; order: 1; }
-          .card--fortune { grid-column: 2; order: 2; }
+          .card--world-cup { grid-column: 2; order: 2; }
         }
 
         .col { min-width: 0; display: flex; flex-direction: column; gap: 8px; }

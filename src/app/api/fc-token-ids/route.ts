@@ -1,10 +1,11 @@
 // src/app/api/fc-token-ids/route.ts
 import { NextResponse } from 'next/server';
+import { createHmac } from 'node:crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type ChainParam = 'base' | 'mantle' | 'linea' | 'monad' | 'og';
+type ChainParam = 'base' | 'mantle' | 'linea' | 'monad' | 'og' | 'xlayer';
 
 /**
  * IMPORTANT
@@ -59,9 +60,13 @@ const CANONICAL_ADDRESSES: Record<ChainParam, string> = {
     process.env.NEXT_PUBLIC_CANONICAL_ERC721_OG ??
     process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG ??
     '',
+  xlayer:
+    process.env.NEXT_PUBLIC_CANONICAL_ERC721_XLAYER ??
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER ??
+    '',    
 };
 
-const ETHERSCAN_CHAINIDS: Record<Exclude<ChainParam, 'og'>, string> = {
+const ETHERSCAN_CHAINIDS: Record<Exclude<ChainParam, 'og' | 'xlayer'>, string> = {
   base: '8453',
   mantle: '5000',
   linea: '59144',
@@ -74,7 +79,8 @@ function isSupportedChain(value: string | null): value is ChainParam {
     value === 'mantle' ||
     value === 'linea' ||
     value === 'monad' ||
-    value === 'og'
+    value === 'og' ||
+    value === 'xlayer' 
   );
 }
 
@@ -311,8 +317,152 @@ async function fetchJson(url: string): Promise<any> {
   }
 }
 
+const OKX_XLAYER_API_BASE_URL = (
+  process.env.OKX_XLAYER_API_BASE_URL || 'https://www.okx.com'
+).replace(/\/+$/, '');
+
+const OKX_XLAYER_API_KEY = process.env.OKX_XLAYER_API_KEY || '';
+const OKX_XLAYER_API_SECRET = process.env.OKX_XLAYER_API_SECRET || '';
+const OKX_XLAYER_API_PASSPHRASE = process.env.OKX_XLAYER_API_PASSPHRASE || '';
+
+function assertOkxXLayerAuthEnv() {
+  const missing: string[] = [];
+
+  if (!OKX_XLAYER_API_KEY) missing.push('OKX_XLAYER_API_KEY');
+  if (!OKX_XLAYER_API_SECRET) missing.push('OKX_XLAYER_API_SECRET');
+  if (!OKX_XLAYER_API_PASSPHRASE) missing.push('OKX_XLAYER_API_PASSPHRASE');
+
+  if (missing.length) {
+    throw new Error(`Missing OKX X Layer API auth envs: ${missing.join(', ')}`);
+  }
+}
+
+function buildOkxSignedHeaders(params: {
+  method: 'GET' | 'POST';
+  requestPathWithQuery: string;
+  body?: string;
+}): HeadersInit {
+  assertOkxXLayerAuthEnv();
+
+  const timestamp = new Date().toISOString();
+  const body = params.body ?? '';
+  const prehash = `${timestamp}${params.method}${params.requestPathWithQuery}${body}`;
+
+const sign = createHmac('sha256', OKX_XLAYER_API_SECRET)
+  .update(prehash)
+  .digest('base64');
+
+  return {
+    accept: 'application/json, text/plain, */*',
+    'user-agent': 'Cookieverse/1.0',
+    'OK-ACCESS-KEY': OKX_XLAYER_API_KEY,
+    'OK-ACCESS-TIMESTAMP': timestamp,
+    'OK-ACCESS-PASSPHRASE': OKX_XLAYER_API_PASSPHRASE,
+    'OK-ACCESS-SIGN': sign,
+  };
+}
+
+async function fetchOkxXLayerGet(
+  pathname: string,
+  params: Record<string, string>,
+): Promise<any> {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value !== 'undefined' && value !== '') {
+      searchParams.set(key, value);
+    }
+  }
+
+  const requestPathWithQuery = `${pathname}?${searchParams.toString()}`;
+  const url = `${OKX_XLAYER_API_BASE_URL}${requestPathWithQuery}`;
+
+  const timeoutMs = Number(process.env.EXPLORER_FETCH_TIMEOUT_MS || '10000');
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+      method: 'GET',
+      headers: buildOkxSignedHeaders({
+        method: 'GET',
+        requestPathWithQuery,
+      }),
+      signal: controller.signal,
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      throw new Error(`OKX X Layer API HTTP ${res.status}: ${text.slice(0, 300)}`);
+    }
+
+    const json = text ? JSON.parse(text) : null;
+
+    if (json?.code && json.code !== '0') {
+      throw new Error(`OKX X Layer API error ${json.code}: ${json.msg || text.slice(0, 300)}`);
+    }
+
+    return json;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+function okxDataPage(json: any): any {
+  return Array.isArray(json?.data) ? json.data[0] : null;
+}
+
+function okxTotalPage(json: any): number {
+  const page = okxDataPage(json);
+  const raw = page?.totalPage ?? '1';
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function okxTokenList(json: any): any[] {
+  const page = okxDataPage(json);
+  return Array.isArray(page?.tokenList) ? page.tokenList : [];
+}
+
+async function getXLayerTokenIdsViaOkxBalanceApi(
+  owner: string,
+  contract: string,
+): Promise<number[]> {
+  const tokenIds = new Set<number>();
+
+  let page = 1;
+  let totalPage = 1;
+
+  do {
+    const json = await fetchOkxXLayerGet('/api/v5/xlayer/address/token-balance', {
+      chainShortName: 'xlayer',
+      address: owner,
+      protocolType: 'token_721',
+      tokenContractAddress: contract,
+      page: String(page),
+      limit: '50',
+    });
+
+    totalPage = okxTotalPage(json);
+
+    for (const item of okxTokenList(json)) {
+      const tokenAddress = normalizeTokenAddress(item);
+      if (tokenAddress && tokenAddress !== contract.toLowerCase()) continue;
+
+      const id = Number(normalizeTokenId(item));
+      if (Number.isFinite(id)) tokenIds.add(id);
+    }
+
+    page += 1;
+  } while (page <= totalPage);
+
+  return [...tokenIds].sort((a, b) => a - b);
+}
+
 async function getTokenIdsViaEtherscan(
-  chain: Exclude<ChainParam, 'og'>,
+  chain: Exclude<ChainParam, 'og' | 'xlayer'>,
   owner: string,
   contract: string,
 ): Promise<number[]> {
@@ -478,6 +628,18 @@ export async function GET(req: Request) {
         contract,
         tokenIds: result.tokenIds,
         warnings: result.warnings,
+      });
+    }
+
+    if (chain === 'xlayer') {
+      const tokenIds = await getXLayerTokenIdsViaOkxBalanceApi(owner, contract);
+
+      return NextResponse.json({
+        tokenIds,
+        ok: true,
+        chain,
+        source: 'okx-xlayer-address-token-balance',
+        contract,
       });
     }
 

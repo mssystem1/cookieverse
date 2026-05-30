@@ -23,6 +23,8 @@ function cookieAddressForKey(key: ChainKey): `0x${string}` {
   if (key === 'linea')  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_LINEA as `0x${string}`;
   if (key === 'mitosis') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
   if (key === 'og') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG as `0x${string}`;
+  if (key === 'xlayer') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER as `0x${string}`;
+
   return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`; // monad (default)
 }
 
@@ -31,6 +33,7 @@ function keyFromChainId(id?: number): ChainKey {
   if (id === 5000) return 'mantle';
   if (id === 59144) return 'linea';
   if (id === 16661) return 'og';
+  if (id === 196) return 'xlayer';
 
   const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777);
   if (id === mitosisId) return 'mitosis';
@@ -151,7 +154,7 @@ async function fetchHolders(
   if (!forceFresh && holdersInflight) return holdersInflight;
 
   holdersInflight = (async () => {
-    const KEYS: ChainKey[] = ["monad","base","mantle","linea","mitosis","og"];
+    const KEYS: ChainKey[] = ["monad","base","mantle","linea","mitosis","og", "xlayer"];
     const byAddr: Record<string, number> = {};
 
     for (const key of KEYS) {
@@ -236,7 +239,7 @@ export async function GET(req: Request) {
     const chainIdQ   = url.searchParams.get("chainId");
     const chainQ     = url.searchParams.get("chain"); // 'monad'|'base'|'mantle'|'mitosis'
     SELECTED_KEY = chainQ
-      ? (["monad","base","mantle","linea","mitosis", "og"].includes(chainQ) ? (chainQ as ChainKey) : "monad")
+      ? (["monad","base","mantle","linea","mitosis", "og", "xlayer"].includes(chainQ) ? (chainQ as ChainKey) : "monad")
       : keyFromChainId(chainIdHdr ? Number(chainIdHdr) : chainIdQ ? Number(chainIdQ) : undefined);
 
     // optional: "you" can be "0xEOA,0xSA"
@@ -305,7 +308,7 @@ export async function GET(req: Request) {
   // --- BEGIN: compute your total mints across all chains ---
   let youMintsAllChains = 0;
   if (YOU_LIST.length) {
-    const KEYS = ['monad','base','mantle','linea','mitosis','og'] as ChainKey[];
+    const KEYS = ['monad','base','mantle','linea','mitosis','og','xlayer'] as ChainKey[];
     for (const key of KEYS) {
       try {
         const client = getPublicClientByKey(key);

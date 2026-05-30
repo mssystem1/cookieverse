@@ -49,7 +49,8 @@ export async function GET(req: NextRequest) {
         mantle: Number(player?.totalBridges_mantle || 0),
         linea: Number(player?.totalBridges_linea || 0),
         mitosis: Number(player?.totalBridges_mitosis || 0),
-        og: Number(player?.totalBridges_0g || 0)
+        og: Number(player?.totalBridges_0g || 0),
+        xlayer: Number(player?.totalBridges_xlayer || 0)        
       }
     },
     200,

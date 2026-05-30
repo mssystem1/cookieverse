@@ -231,88 +231,165 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Providers>
           {/* Header (tabs + wallet button). Keep shell same; only page below changes with routing */}
                
-        {/* Header (logo + X profile) */}
-        <div style={{ background: "#111", borderBottom: "1px solid #2a2a2e" }}>
-          <div
-            style={{
-              maxWidth: 1280,
-              margin: "0 auto",
-              padding: "14px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-            }}
-          >
-            {/* LEFT: logo + title */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <img
-                src="/ms-logo.png"
-                alt="MS System"
-                style={{
-                  height: 80,
-                  width: 80,
-                  borderRadius: 10,
-                  objectFit: "cover",
-                }}
-              />
+          {/* Header: logo + centered World Cup banner + X profile */}
+          <div style={{ background: "#111", borderBottom: "1px solid #2a2a2e" }}>
+            <div
+              style={{
+                maxWidth: 1280,
+                margin: "0 auto",
+                padding: "8px 16px",
+                display: "grid",
+                gridTemplateColumns: "minmax(220px, 1fr) minmax(260px, 520px) minmax(220px, 1fr)",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              {/* LEFT: logo + Cookieverse */}
               <div
                 style={{
-                  fontSize: 28,
-                  fontWeight: 900,
-                  letterSpacing: "-0.02em",
-                  color: "#3c1dd9ff",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  minWidth: 0,
+                  justifySelf: "start",
                 }}
               >
-                Cookieverse
+                <img
+                  src="/ms-logo.png"
+                  alt="MS System"
+                  style={{
+                    height: 64,
+                    width: 64,
+                    borderRadius: 10,
+                    objectFit: "cover",
+                    flex: "0 0 auto",
+                  }}
+                />
+
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 900,
+                      letterSpacing: "-0.02em",
+                      color: "#3c1dd9ff",
+                      lineHeight: 1,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Cookieverse
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "#9ca3af",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    World Cup Mode
+                  </div>
+                </div>
+              </div>
+
+              {/* CENTER: compact World Cup banner */}
+              <a
+                href="/"
+                aria-label="Cookieverse World Cup"
+                style={{
+                  justifySelf: "center",
+                  display: "block",
+                  width: "100%",
+                  maxWidth: 520,
+                  height: 62,
+                  borderRadius: 14,
+                  overflow: "hidden",
+                  border: "1px solid rgba(124,58,237,0.58)",
+                  background:
+                    "radial-gradient(circle at center, rgba(124,58,237,0.22), transparent 54%), linear-gradient(135deg, rgba(15,23,42,0.98), rgba(28,8,66,0.98))",
+                  boxShadow:
+                    "0 0 0 1px rgba(15,23,42,0.9), 0 0 16px rgba(124,58,237,0.20)",
+                  textDecoration: "none",
+                }}
+              >
+                <img
+                  src="/xcup/world-cup-header-desktop.png"
+                  alt="Cookieverse World Cup"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center 44%",
+                  }}
+                />
+              </a>
+
+              {/* RIGHT: X profile pill */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  gap: 12,
+                  minWidth: 0,
+                  justifySelf: "end",
+                }}
+              >
+                {twitterUsername && (
+                  <a
+                    href={`https://x.com/${twitterUsername}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "5px 10px",
+                      borderRadius: 9999,
+                      background:
+                        "linear-gradient(135deg, #111827 0%, #020617 100%)",
+                      border: "1px solid #4b5563",
+                      textDecoration: "none",
+                      color: "#e5e7eb",
+                      fontSize: 11,
+                      boxShadow: "0 0 0 1px rgba(15,23,42,0.6)",
+                      maxWidth: 240,
+                    }}
+                  >
+                    {twitterImage && (
+                      <img
+                        src={twitterImage.replace("_normal", "_200x200")}
+                        alt="X avatar"
+                        width={36}
+                        height={36}
+                        style={{
+                          borderRadius: "50%",
+                          border: "1px solid #1f2937",
+                          flex: "0 0 auto",
+                        }}
+                      />
+                    )}
+                    <span style={{ opacity: 0.7, fontSize: 11 }}>X profile</span>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      @{twitterUsername}
+                    </span>
+                  </a>
+                )}
               </div>
             </div>
-
-            {/* RIGHT: X profile pill + wallet */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {twitterUsername && (
-                <a
-                  href={`https://x.com/${twitterUsername}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 12px",
-                    borderRadius: 9999,
-                    background:
-                      "linear-gradient(135deg, #111827 0%, #020617 100%)",
-                    border: "1px solid #4b5563",
-                    textDecoration: "none",
-                    color: "#e5e7eb",
-                    fontSize: 12,
-                    boxShadow: "0 0 0 1px rgba(15,23,42,0.6)",
-                  }}
-                >
-                  {twitterImage && (
-                    <img
-                      src={twitterImage.replace("_normal", "_200x200")}
-                      alt="X avatar"
-                      width={48}
-                      height={48}
-                      style={{
-                        borderRadius: "50%",
-                        border: "1px solid #1f2937",
-                      }}
-                    />
-                  )}
-                  <span style={{ opacity: 0.7, fontSize: 11 }}>X profile</span>
-                  <span style={{ fontWeight: 600 }}>@{twitterUsername}</span>
-                </a>
-              )}
-
-       {/* 
-           <TopUpMenu />
-           */}     
-            </div>
           </div>
-        </div>
 
 
           
@@ -413,6 +490,30 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           )}
 
           <style>{`
+            .base-app-nav__banner {
+              display: block;
+              width: 100%;
+              height: 74px;
+              border-radius: 14px;
+              overflow: hidden;
+              border: 1px solid rgba(124, 58, 237, 0.58);
+              background:
+                radial-gradient(circle at center, rgba(124,58,237,0.22), transparent 54%),
+                linear-gradient(135deg, rgba(15,23,42,0.98), rgba(28,8,66,0.98));
+              box-shadow:
+                0 0 0 1px rgba(15,23,42,0.9),
+                0 0 16px rgba(124,58,237,0.20);
+              text-decoration: none;
+            }
+
+            .base-app-nav__banner-img {
+              display: block;
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              object-position: center 44%;
+            }
+
             .base-app-shell {
               box-sizing: border-box;
               width: 100%;

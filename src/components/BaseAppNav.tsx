@@ -24,7 +24,20 @@ export default function BaseAppNav({
 
   return (
     <div className="base-app-nav">
-      {/* Top row: logo + X profile/wallet */}
+      {/* Small responsive banner. Image must fit inside, no crop. */}
+      <Link
+        href="/app"
+        className="base-app-nav__banner"
+        aria-label="Cookieverse World Cup"
+      >
+        <img
+          src="/xcup/world-cup-header-desktop.png"
+          alt="Cookieverse World Cup"
+          className="base-app-nav__banner-img"
+        />
+      </Link>
+
+      {/* Top row: logo + X profile */}
       <div className="base-app-nav__top">
         <Link href="/app" className="base-app-nav__brand">
           <img
@@ -34,7 +47,7 @@ export default function BaseAppNav({
           />
           <div>
             <div className="base-app-nav__title">Cookieverse</div>
-            <div className="base-app-nav__subtitle">Base App</div>
+            <div className="base-app-nav__subtitle">World Cup Mode</div>
           </div>
         </Link>
 

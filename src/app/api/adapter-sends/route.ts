@@ -1,4 +1,5 @@
 // src/app/api/adapter-sends/route.ts
+import { createHmac } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
   getAddress,
@@ -9,18 +10,19 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type ChainKey = 'base' | 'mantle' | 'linea' | 'monad' | 'og';
+type ChainKey = 'base' | 'mantle' | 'linea' | 'monad' | 'og' | 'xlayer';
 
 type ChainAdapterResult = {
   count: number;
   ok: boolean;
-  source:
-    | 'etherscan'
-    | 'alchemy'
-    | 'chainscan-v2'
-    | 'chainscan-old'
-    | 'disabled'
-    | 'none';
+source:
+  | 'etherscan'
+  | 'alchemy'
+  | 'chainscan-v2'
+  | 'chainscan-old'
+  | 'okx-xlayer-token-transaction-list'
+  | 'disabled'
+  | 'none';
 };
 
 const ZERO_RESULT: ChainAdapterResult = {
@@ -50,6 +52,10 @@ const CANONICAL_ADDRESSES: Record<ChainKey, string> = {
     process.env.NEXT_PUBLIC_CANONICAL_ERC721_OG ??
     process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG ??
     '',
+  xlayer:
+    process.env.NEXT_PUBLIC_CANONICAL_ERC721_XLAYER ??
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER ??
+    '',
 };
 
 const ADAPTERS: Record<ChainKey, string | undefined> = {
@@ -58,6 +64,7 @@ const ADAPTERS: Record<ChainKey, string | undefined> = {
   linea: process.env.NEXT_PUBLIC_ADAPTER_LINEA,
   monad: process.env.NEXT_PUBLIC_ADAPTER_MONAD,
   og: process.env.NEXT_PUBLIC_ADAPTER_OG,
+  xlayer: process.env.NEXT_PUBLIC_ADAPTER_XLAYER,
 };
 
 const ETHERSCAN_CHAINIDS: Partial<Record<ChainKey, string>> = {
@@ -73,6 +80,7 @@ const RPCS: Partial<Record<ChainKey, string>> = {
   linea: process.env.NEXT_PUBLIC_RPC_HTTP_LINEA,
   monad: process.env.NEXT_PUBLIC_RPC_HTTP_MONAD,
   og: process.env.NEXT_PUBLIC_RPC_HTTP_OG ?? process.env.OG_EVM_RPC_URL,
+  xlayer: process.env.NEXT_PUBLIC_RPC_HTTP_XLAYER,
 };
 
 const ETHERSCAN_API_KEY =
@@ -215,6 +223,120 @@ async function fetchJsonWithTimeout(url: string, init?: RequestInit, timeoutMs =
   } finally {
     clearTimeout(id);
   }
+}
+
+const OKX_XLAYER_API_BASE_URL = (
+  process.env.OKX_XLAYER_API_BASE_URL || 'https://www.okx.com'
+).replace(/\/+$/, '');
+
+const OKX_XLAYER_API_KEY = process.env.OKX_XLAYER_API_KEY || '';
+const OKX_XLAYER_API_SECRET = process.env.OKX_XLAYER_API_SECRET || '';
+const OKX_XLAYER_API_PASSPHRASE = process.env.OKX_XLAYER_API_PASSPHRASE || '';
+
+function assertOkxXLayerAuthEnv() {
+  const missing: string[] = [];
+
+  if (!OKX_XLAYER_API_KEY) missing.push('OKX_XLAYER_API_KEY');
+  if (!OKX_XLAYER_API_SECRET) missing.push('OKX_XLAYER_API_SECRET');
+  if (!OKX_XLAYER_API_PASSPHRASE) missing.push('OKX_XLAYER_API_PASSPHRASE');
+
+  if (missing.length) {
+    throw new Error(`Missing OKX X Layer API auth envs: ${missing.join(', ')}`);
+  }
+}
+
+function buildOkxSignedHeaders(params: {
+  method: 'GET' | 'POST';
+  requestPathWithQuery: string;
+  body?: string;
+}): HeadersInit {
+  assertOkxXLayerAuthEnv();
+
+  const timestamp = new Date().toISOString();
+  const body = params.body ?? '';
+  const prehash = `${timestamp}${params.method}${params.requestPathWithQuery}${body}`;
+
+  const sign = createHmac('sha256', OKX_XLAYER_API_SECRET)
+    .update(prehash)
+    .digest('base64');
+
+  return {
+    accept: 'application/json, text/plain, */*',
+    'user-agent': 'Cookieverse/1.0',
+    'OK-ACCESS-KEY': OKX_XLAYER_API_KEY,
+    'OK-ACCESS-TIMESTAMP': timestamp,
+    'OK-ACCESS-PASSPHRASE': OKX_XLAYER_API_PASSPHRASE,
+    'OK-ACCESS-SIGN': sign,
+  };
+}
+
+async function fetchOkxXLayerGet(
+  pathname: string,
+  params: Record<string, string>,
+): Promise<any> {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value !== 'undefined' && value !== '') {
+      searchParams.set(key, value);
+    }
+  }
+
+  const requestPathWithQuery = `${pathname}?${searchParams.toString()}`;
+  const url = `${OKX_XLAYER_API_BASE_URL}${requestPathWithQuery}`;
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+      method: 'GET',
+      headers: buildOkxSignedHeaders({
+        method: 'GET',
+        requestPathWithQuery,
+      }),
+      signal: controller.signal,
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      throw new Error(`OKX X Layer API HTTP ${res.status}: ${text.slice(0, 300)}`);
+    }
+
+    const json = text ? JSON.parse(text) : null;
+
+    if (json?.code && json.code !== '0') {
+      throw new Error(`OKX X Layer API error ${json.code}: ${json.msg || text.slice(0, 300)}`);
+    }
+
+    return json;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+function okxDataPage(json: any): any {
+  return Array.isArray(json?.data) ? json.data[0] : null;
+}
+
+function okxTotalPage(json: any): number {
+  const page = okxDataPage(json);
+  const raw = page?.totalPage ?? '1';
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function okxTransactionList(json: any): any[] {
+  const page = okxDataPage(json);
+
+  if (Array.isArray(page?.transactionList)) return page.transactionList;
+
+  // Another X Layer endpoint uses transactionLists; this keeps parser resilient.
+  if (Array.isArray(page?.transactionLists)) return page.transactionLists;
+
+  return [];
 }
 
 async function postJsonWithTimeout(url: string, body: any, timeoutMs = FETCH_TIMEOUT_MS) {
@@ -485,7 +607,7 @@ function extractUserToAdapterCountFromEtherscanJson(
 }
 
 async function fetchAdapterSendsViaEtherscan(
-  chain: Exclude<ChainKey, 'og'>,
+  chain: Exclude<ChainKey, 'og' | 'xlayer'>,
   user: Address,
 ): Promise<ChainAdapterResult> {
   const apiKey = ETHERSCAN_API_KEY;
@@ -581,7 +703,7 @@ function getAlchemyFromBlock(chain: ChainKey): `0x${string}` {
 }
 
 async function fetchAdapterSendsViaAlchemy(
-  chain: Exclude<ChainKey, 'og'>,
+  chain: Exclude<ChainKey, 'og' | 'xlayer'>,
   user: Address,
 ): Promise<ChainAdapterResult> {
   const rpc = RPCS[chain];
@@ -653,12 +775,97 @@ async function fetchAdapterSendsViaAlchemy(
   }
 }
 
+async function fetchXLayerAdapterSendsViaOkxApi(
+  user: Address,
+): Promise<ChainAdapterResult> {
+  const contractRaw = CANONICAL_ADDRESSES.xlayer;
+  const adapterRaw = ADAPTERS.xlayer;
+
+  if (!contractRaw || !adapterRaw || !isAddress(contractRaw) || !isAddress(adapterRaw)) {
+    console.warn('[adapter-sends] xlayer missing/invalid config', {
+      contract: contractRaw,
+      adapter: adapterRaw,
+    });
+
+    return ZERO_RESULT;
+  }
+
+  const contract = getAddress(contractRaw);
+  const adapter = getAddress(adapterRaw);
+
+  const hashes = new Set<string>();
+
+  try {
+    let page = 1;
+    let totalPage = 1;
+
+    do {
+      const json = await fetchOkxXLayerGet('/api/v5/xlayer/address/token-transaction-list', {
+        chainShortName: 'xlayer',
+        address: user,
+        protocolType: 'token_721',
+        tokenContractAddress: contract,
+        isFromOrTo: 'from',
+        page: String(page),
+        limit: '50',
+      });
+
+      totalPage = okxTotalPage(json);
+
+      const result = countUserToAdapterFromTransferItems({
+        chain: 'xlayer',
+        items: okxTransactionList(json),
+        user,
+        adapter,
+        contract,
+        source: 'okx-xlayer-token-transaction-list',
+      });
+
+      // countUserToAdapterFromTransferItems returns only count, so re-count hashes here
+      // to dedupe across pages.
+      for (const item of okxTransactionList(json)) {
+        const tokenAddress = normalizeTokenAddress(item);
+        if (tokenAddress && tokenAddress !== contract.toLowerCase()) continue;
+
+        const from = normalizeFrom(item);
+        const to = normalizeTo(item);
+
+        if (from === user.toLowerCase() && to === adapter.toLowerCase()) {
+          const hash = normalizeTxHash(item);
+          const tokenId = normalizeTokenId(item);
+          hashes.add(hash || `${item?.height ?? item?.blockNumber ?? ''}:${tokenId}`);
+        }
+      }
+
+      page += 1;
+    } while (page <= totalPage);
+
+    console.log(
+      '[adapter-sends] xlayer okx token-transaction-list user->adapter txs:',
+      hashes.size,
+    );
+
+    return {
+      count: hashes.size,
+      ok: true,
+      source: 'okx-xlayer-token-transaction-list',
+    };
+  } catch (error) {
+    console.error('[adapter-sends] xlayer OKX token-transaction-list failed', error);
+    return ZERO_RESULT;
+  }
+}
+
 async function fetchChainAdapterSends(
   chain: ChainKey,
   user: Address,
 ): Promise<ChainAdapterResult> {
   if (chain === 'og') {
     return fetchOgAdapterSends(user);
+  }
+  
+  if (chain === 'xlayer') {
+    return fetchXLayerAdapterSendsViaOkxApi(user);
   }
 
   // Monad: never use eth_getLogs on free Alchemy plan.
@@ -702,13 +909,14 @@ export async function GET(req: Request) {
 
   const user = getAddress(address);
 
-  const [base, mantle, linea, monad, og] = await Promise.all([
-    fetchChainAdapterSends('base', user),
-    fetchChainAdapterSends('mantle', user),
-    fetchChainAdapterSends('linea', user),
-    fetchChainAdapterSends('monad', user),
-    fetchChainAdapterSends('og', user),
-  ]);
+const [base, mantle, linea, monad, og, xlayer] = await Promise.all([
+  fetchChainAdapterSends('base', user),
+  fetchChainAdapterSends('mantle', user),
+  fetchChainAdapterSends('linea', user),
+  fetchChainAdapterSends('monad', user),
+  fetchChainAdapterSends('og', user),
+  fetchChainAdapterSends('xlayer', user),
+]);
 
   return NextResponse.json({
     address: user.toLowerCase(),
@@ -718,6 +926,7 @@ export async function GET(req: Request) {
       linea,
       monad,
       og,
+      xlayer,
     },
   });
 }

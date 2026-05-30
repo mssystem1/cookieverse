@@ -62,6 +62,10 @@ export async function POST(req: Request) {
       totalTransactions_0g: n(payload.totalTransactions_0g),
       totalImages_0g: n(payload.totalImages_0g),
 
+      totalScore_xlayer: n(payload.totalScore_xlayer),
+      totalTransactions_xlayer: n(payload.totalTransactions_xlayer),
+      totalImages_xlayer: n(payload.totalImages_xlayer),      
+
       totalScore: n(payload.totalScore),
       totalTransactions: n(payload.totalTransactions),
       totalImages: n(payload.totalImages),
@@ -73,6 +77,7 @@ export async function POST(req: Request) {
       totalBridges_linea: n(payload.totalBridges_linea),
       totalBridges_mitosis: n(payload.totalBridges_mitosis),
       totalBridges_0g: n(payload.totalBridges_0g),
+      totalBridges_xlayer: n(payload.totalBridges_xlayer),
 
       dailyKey: payload.dailyKey,
       dailyBaselineCookies: n(payload.dailyBaselineCookies),
@@ -90,17 +95,17 @@ export async function POST(req: Request) {
     // If caller did not send global totals, derive them from per-chain fields.
     row.totalScore = row.totalScore || (
       row.totalScore_monad + row.totalScore_base + row.totalScore_mantle +
-      row.totalScore_linea + row.totalScore_mitosis + row.totalScore_0g
+      row.totalScore_linea + row.totalScore_mitosis + row.totalScore_0g + row.totalScore_xlayer
     );
 
     row.totalTransactions = row.totalTransactions || (
       row.totalTransactions_monad + row.totalTransactions_base + row.totalTransactions_mantle +
-      row.totalTransactions_linea + row.totalTransactions_mitosis + row.totalTransactions_0g
+      row.totalTransactions_linea + row.totalTransactions_mitosis + row.totalTransactions_0g + row.totalTransactions_xlayer
     );
 
     row.totalImages = row.totalImages || (
       row.totalImages_monad + row.totalImages_base + row.totalImages_mantle +
-      row.totalImages_linea + row.totalImages_mitosis + row.totalImages_0g
+      row.totalImages_linea + row.totalImages_mitosis + row.totalImages_0g + row.totalImages_xlayer
     );
 
     await upsertPlayer(row as any);

@@ -41,6 +41,10 @@ export type MgidRow = {
   totalTransactions_0g: number;
   totalImages_0g: number;
 
+  totalScore_xlayer: number;
+  totalTransactions_xlayer: number;
+  totalImages_xlayer: number;  
+
   totalScore: number;
   totalTransactions: number;
   totalImages: number;
@@ -53,6 +57,7 @@ export type MgidRow = {
   totalBridges_linea: number;
   totalBridges_mitosis: number;
   totalBridges_0g: number;
+  totalBridges_xlayer: number;  
 
   dailyKey?: string;
   dailyBaselineCookies?: number;

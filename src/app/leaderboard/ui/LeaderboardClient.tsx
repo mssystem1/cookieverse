@@ -123,6 +123,8 @@ export default function LeaderboardClient({ mode = 'default' }: LeaderboardClien
                 profileLocalScore = n(p.totalScore_linea);
               } else if (mitosisId && chainId === mitosisId) {
                 profileLocalScore = n(p.totalScore_mitosis);
+              } else if (chainId === 196) {
+                profileLocalScore = n(p.totalScore_xlayer);
               } else {
                 profileLocalScore = n(p.totalScore_monad);
               }
@@ -402,6 +404,7 @@ function Table({
     if (chainId === 5000) return 'mantle';
     if (chainId === 59144) return 'linea';    
     if (chainId === 16661) return '0G'; 
+    if (chainId === 196) return 'xlayer'; 
     if (mitosisId && chainId === mitosisId) return 'mitosis';
     return 'monad';
   }, [chainId]);
@@ -420,6 +423,10 @@ function Table({
       case 'mitosis':
         // allow env override if your explorer differs
         return mitosisBase ? `${mitosisBase}/address/${addr}` : `#`;
+      case '0G':
+        return `https://chainscan.0g.ai/token/${addr}`;       
+      case 'xlayer':
+        return `https://www.okx.com/web3/explorer/xlayer/token/${addr}`;                  
       default:
         // monad testnet
         return `https://monadvision.com/address/${addr}`;
@@ -828,6 +835,8 @@ type ProfileMeta = {
   totalScore_mantle?: number;
   totalScore_linea?: number;
   totalScore_mitosis?: number;
+  totalScore_og?: number;  
+  totalScore_xlayer?: number;  
 };
 
 async function fetchProfilesFor(addresses: string[]) {
@@ -860,6 +869,8 @@ async function fetchProfilesFor(addresses: string[]) {
       totalScore_mantle: Number(r?.totalScore_mantle ?? 0),
       totalScore_linea: Number(r?.totalScore_linea ?? 0),
       totalScore_mitosis: Number(r?.totalScore_mitosis ?? 0),
+      totalScore_og: Number(r?.totalScore_og ?? 0), 
+      totalScore_xlayer: Number(r?.totalScore_xlayer ?? 0),           
     });
   }
   return out;

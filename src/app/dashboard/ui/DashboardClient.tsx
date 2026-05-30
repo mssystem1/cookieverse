@@ -7,7 +7,7 @@ import { useAccount } from "wagmi";
 // Types
 // ─────────────────────────────────────────────────────────────
 
-type ChainKey = "monad" | "base" | "mantle" | "linea" | "mitosis" | "og";
+type ChainKey = "monad" | "base" | "mantle" | "linea" | "mitosis" | "og" | "xlayer";
 
 type HoldingsResponse = {
   ok: boolean;
@@ -28,10 +28,14 @@ type MgidRowClient = {
   totalScore_mantle?: number;
   totalScore_linea?: number;
   totalScore_mitosis?: number;
-  totalScore_0g?: number;
 
+  totalScore_0g?: number;
   totalTransactions_0g?: number;
   totalImages_0g?: number;
+
+  totalScore_xlayer?: number;
+  totalTransactions_xlayer?: number;
+  totalImages_xlayer?: number;  
 
   totalBridges_monad?: number;
   totalBridges_base?: number;
@@ -39,6 +43,7 @@ type MgidRowClient = {
   totalBridges_linea?: number;
   totalBridges_mitosis?: number;
   totalBridges_0g?: number;
+  totalBridges_xlayer?: number;  
 
   // quests
   dailyKey?: string;
@@ -85,6 +90,7 @@ const CHAINS_META: { key: ChainKey; label: string; accent: string }[] = [
   { key: "linea", label: "Linea", accent: "#38bdf8" },
   { key: "mitosis", label: "Mitosis", accent: "#a855f7" },
   { key: "og", label: "0G", accent: "#c084fc" },
+  { key: "xlayer", label: "X Layer", accent: "#262525" },  
 ];
 
 const CHAIN_IDS: Record<ChainKey, number> = {
@@ -94,9 +100,10 @@ const CHAIN_IDS: Record<ChainKey, number> = {
   linea: 59144,
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
   og: 16661,
+  xlayer: 196,  
 };
 
-const BRIDGE_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "linea"]);
+const BRIDGE_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "linea", "monad", "xlayer"]);
 
 function isBridgeSupported(key: ChainKey): boolean {
   return BRIDGE_ENABLED_CHAINS.has(key);
@@ -111,6 +118,8 @@ function getBridgeCountForChain(
   if (key === "base") return Number(mgid.totalBridges_base ?? 0);
   if (key === "mantle") return Number(mgid.totalBridges_mantle ?? 0);
   if (key === "linea") return Number(mgid.totalBridges_linea ?? 0);
+  if (key === "xlayer") return Number(mgid.totalBridges_xlayer ?? 0);  
+  if (key === "monad") return Number(mgid.totalBridges_monad ?? 0);    
 
   return 0;
 }
@@ -351,6 +360,7 @@ function computeChainStats(
       if (key === "linea") storedScore = Number(mgid.totalScore_linea ?? 0);
       if (key === "mitosis") storedScore = Number(mgid.totalScore_mitosis ?? 0);
       if (key === "og") storedScore = Number(mgid.totalScore_0g ?? 0);
+      if (key === "xlayer") storedScore = Number(mgid.totalScore_xlayer ?? 0);      
     }
 
     /**
@@ -665,7 +675,7 @@ function ChainGrid(props: {
 
           {(() => {
             const showBridges =
-              c.key === "base" || c.key === "mantle" || c.key === "linea";
+              c.key === "base" || c.key === "mantle" || c.key === "linea" || c.key === "xlayer" || c.key === "monad";
 
             return (
               <>
@@ -755,7 +765,7 @@ function TasksSection(props: {
     {
       key: "dailyBridge" as const,
       title: "Daily Bridge",
-      desc: "Bridge 2 COOKIEs on Base, Mantle or Linea.",
+      desc: "Bridge 2 COOKIEs on Base, Mantle, Linea, Monad or X Layer.",
       done: tasks.dailyBridgeDone,
       progress: Math.min(tasks.dailyBridgeProgress, 2),
       target: 2,
@@ -774,7 +784,7 @@ function TasksSection(props: {
     {
       key: "weeklyBridge" as const,
       title: "Weekly Bridge",
-      desc: "Bridge 8+ COOKIEs this week on Base, Mantle or Linea.",
+      desc: "Bridge 8+ COOKIEs this week on Base, Mantle, Linea, Monad or X Layer.",
       done: tasks.weeklyBridgeDone,
       progress: Math.min(tasks.weeklyBridgeProgress, 8),
       target: 8,

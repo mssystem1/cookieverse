@@ -24,6 +24,7 @@ const CHAIN_IDS = {
   linea: 59144,
   monad: 143,
   og: Number(process.env.NEXT_PUBLIC_OG_CHAIN_ID || 16661),
+  xlayer: 196,
 } as const;
 
 const LZ_EIDS = {
@@ -32,6 +33,7 @@ const LZ_EIDS = {
   linea: 30183,
   monad: 30390,
   og: Number(process.env.NEXT_PUBLIC_LZ_EID_OG || 0),
+  xlayer: Number(process.env.NEXT_PUBLIC_LZ_EID_XLAYER || 0),
 } as const;
 
 type ChainKey = keyof typeof CHAIN_IDS;
@@ -41,6 +43,7 @@ type AnyWalletClient = any;
 
 const chainIdToChainKey = (chainId?: number | null): ChainKey | null => {
   if (!chainId) return null;
+
   switch (chainId) {
     case CHAIN_IDS.base:
       return 'base';
@@ -52,6 +55,8 @@ const chainIdToChainKey = (chainId?: number | null): ChainKey | null => {
       return 'monad';
     case CHAIN_IDS.og:
       return 'og';
+    case CHAIN_IDS.xlayer:
+      return 'xlayer';
     default:
       return null;
   }
@@ -69,6 +74,8 @@ const chainLabel = (chain: ChainKey): string => {
       return 'Monad';
     case 'og':
       return '0G';
+    case 'xlayer':
+      return 'X Layer';
   }
 };
 
@@ -96,11 +103,16 @@ const CANONICAL_OG =
   (process.env.NEXT_PUBLIC_CANONICAL_ERC721_OG ||
     process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG) as Address;
 
+const CANONICAL_XLAYER =
+  (process.env.NEXT_PUBLIC_CANONICAL_ERC721_XLAYER ||
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER) as Address;
+
 const ADAPTER_BASE = process.env.NEXT_PUBLIC_ADAPTER_BASE as Address;
 const ADAPTER_MANTLE = process.env.NEXT_PUBLIC_ADAPTER_MANTLE as Address;
 const ADAPTER_LINEA = process.env.NEXT_PUBLIC_ADAPTER_LINEA as Address;
 const ADAPTER_MONAD = process.env.NEXT_PUBLIC_ADAPTER_MONAD as Address;
 const ADAPTER_OG = process.env.NEXT_PUBLIC_ADAPTER_OG as Address;
+const ADAPTER_XLAYER = process.env.NEXT_PUBLIC_ADAPTER_XLAYER as Address;
 
 const ONFT_MANTLE = process.env.NEXT_PUBLIC_ONFT_MANTLE as Address;
 const ONFT_LINEA = process.env.NEXT_PUBLIC_ONFT_LINEA as Address;
@@ -129,6 +141,10 @@ const FLAT_FEE_WEI_OG = BigInt(
 const FLAT_FEE_WEI_MNT = BigInt(
   process.env.NEXT_PUBLIC_FLAT_FEE_WEI_MNT ?? '0',
 ); // Mantle
+
+const FLAT_FEE_WEI_OKB = BigInt(
+  process.env.NEXT_PUBLIC_FLAT_FEE_WEI_OKB ?? '0',
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ABIs (mirrors your approveAdapter.ts & sendWithFee.ts logic)
@@ -285,6 +301,7 @@ function makeExplorerTxUrl(chainId: number | undefined, hash: string): string {
   if (chainId === CHAIN_IDS.mantle) return `https://mantlescan.xyz/tx/${hash}`;
   if (chainId === CHAIN_IDS.linea) return `https://lineascan.build/tx/${hash}`;
   if (chainId === CHAIN_IDS.monad) return `https://monadscan.com/tx/${hash}`;
+  if (chainId === CHAIN_IDS.xlayer) return `https://www.okx.com/web3/explorer/xlayer/tx/${hash}`;
   if (chainId === CHAIN_IDS.og) {
     const explorer = process.env.NEXT_PUBLIC_OG_EXPLORER || 'https://chainscan-galileo.0g.ai';
     return `${explorer.replace(/\/+$/, '')}/tx/${hash}`;
@@ -310,6 +327,16 @@ type BridgeRoute = {
 const BRIDGE_ROUTES: Partial<
   Record<ChainKey, Partial<Record<ChainKey, BridgeRoute>>>
 > = {
+  xlayer: {
+    base: {
+      token: CANONICAL_XLAYER,
+      oapp: ADAPTER_XLAYER,
+      sourceKind: 'adapter',
+      dstEid: LZ_EIDS.base,
+      flatFeeWei: FLAT_FEE_WEI_OKB,
+    },
+  },
+
   og: {
     base: {
       token: CANONICAL_OG,
@@ -888,7 +915,7 @@ export default function BridgePage() {
       setSrc(chainKey);
       setError(null);
     } else {
-      setError('Unsupported chain. Please switch to Base, Mantle, Linea, Monad or 0G.');
+      setError('Unsupported chain. Please switch to Base, Mantle, Linea, Monad, 0G or X Layer.');
     }
   }, [chainId]);
 /*
@@ -1238,7 +1265,7 @@ const onChangeDst = (next: ChainKey) => {
         Fortune Cookie NFT Bridge
       </h1>
       <p className="muted" style={{ marginBottom: 24, fontSize: 14 }}>
-        Bridge your Fortune Cookies between <strong>0G</strong>,{' '}
+        Bridge your Fortune Cookies between <strong>X Layer</strong>, <strong>0G</strong>,{' '}
         <strong>Base</strong>, <strong>Mantle</strong>, <strong>Linea</strong>{' '}
         and <strong>Monad</strong> using LayerZero.
       </p>
@@ -1260,6 +1287,7 @@ const onChangeDst = (next: ChainKey) => {
               <option value="linea">Linea</option>
               <option value="monad">Monad</option>
               <option value="og">0G</option>
+              <option value="xlayer">X Layer</option>
             </select>
             <p className="hint">
               Where your NFT currently lives. The app detects this from your wallet network.
