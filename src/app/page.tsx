@@ -1226,7 +1226,7 @@ async function shareWorldCupProphecy() {
       `Pick: ${wcProphecy.pick}\n` +
       `Score: ${wcProphecy.scoreline}\n` +
       `Confidence: ${wcProphecy.confidence}%\n\n` +
-      `Minted in Cookieverse.`;
+      `Minted in Cookieverse by @MSSystemWEB3.`;
 
     if (isFarcasterMini) {
       await (sdk as any).actions.composeCast({
