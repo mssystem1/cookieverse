@@ -172,6 +172,7 @@ export default function Page() {
   const [lightboxAlt, setLightboxAlt] = React.useState('Preview');
 
   // world cup prophecy
+  const wcDateInputRef = React.useRef<HTMLInputElement | null>(null);
   const [wcHomeTeam, setWcHomeTeam] = React.useState('Argentina');
   const [wcAwayTeam, setWcAwayTeam] = React.useState('Spain');
   const [wcMatchDate, setWcMatchDate] = React.useState('');
@@ -1659,15 +1660,46 @@ React.useEffect(() => {
                 </div>
               </div>
 
-              <div className="field field--full">
-                <label className="label">Match date</label>
-                <input
-                  className="input"
-                  type="date"
-                  value={wcMatchDate}
-                  onChange={(e) => setWcMatchDate(e.target.value)}
-                />
-              </div>
+<div className="field field--full">
+  <label className="label">Match date</label>
+
+  <div className="world-cup-date-wrap">
+    <input
+      ref={wcDateInputRef}
+      className="input input--world-cup-date"
+      type="date"
+      value={wcMatchDate}
+      onChange={(e) => setWcMatchDate(e.target.value)}
+      title="Select match date"
+      onClick={() => {
+        const input = wcDateInputRef.current;
+        if (!input) return;
+
+        if (typeof input.showPicker === 'function') {
+          input.showPicker();
+        }
+      }}
+    />
+
+    <button
+      type="button"
+      className="world-cup-date-button"
+      aria-label="Select match date"
+      onClick={() => {
+        const input = wcDateInputRef.current;
+        if (!input) return;
+
+        if (typeof input.showPicker === 'function') {
+          input.showPicker();
+        } else {
+          input.focus();
+        }
+      }}
+    >
+      <span aria-hidden="true">📅</span>
+    </button>
+  </div>
+</div>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
                 <button
@@ -2436,7 +2468,102 @@ React.useEffect(() => {
           to {
             transform: rotate(360deg);
           }
-        }       
+        } 
+          
+.world-cup-date-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.input--world-cup-date {
+  width: 100%;
+  max-width: 100%;
+  height: 42px;
+  box-sizing: border-box;
+  padding-right: 52px;
+  color: #ffffff;
+  color-scheme: dark;
+  cursor: pointer;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background:
+    radial-gradient(circle at right, rgba(250, 204, 21, 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(31, 31, 36, 0.98), rgba(24, 24, 30, 0.98));
+  border: 1px solid rgba(250, 204, 21, 0.42);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+    0 0 12px rgba(250, 204, 21, 0.08);
+}
+
+.input--world-cup-date:hover {
+  border-color: rgba(250, 204, 21, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(250, 204, 21, 0.18),
+    0 0 16px rgba(250, 204, 21, 0.14);
+}
+
+.input--world-cup-date:focus {
+  outline: none;
+  border-color: rgba(250, 204, 21, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(250, 204, 21, 0.32),
+    0 0 20px rgba(250, 204, 21, 0.18);
+}
+
+/* Hide native browser calendar icon */
+.input--world-cup-date::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  display: none;
+}
+
+/* Keep date text bright */
+.input--world-cup-date::-webkit-datetime-edit,
+.input--world-cup-date::-webkit-datetime-edit-fields-wrapper,
+.input--world-cup-date::-webkit-datetime-edit-month-field,
+.input--world-cup-date::-webkit-datetime-edit-day-field,
+.input--world-cup-date::-webkit-datetime-edit-year-field {
+  color: #ffffff;
+}
+
+.input--world-cup-date::-webkit-datetime-edit-text {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.world-cup-date-button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 34px;
+  height: 28px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  border: 1px solid rgba(253, 230, 138, 0.85);
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #111827;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.74),
+    0 0 14px rgba(250, 204, 21, 0.26);
+  z-index: 2;
+  padding: 0;
+}
+
+.world-cup-date-button:hover {
+  background: linear-gradient(135deg, #fde047, #f59e0b);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.74),
+    0 0 18px rgba(250, 204, 21, 0.36);
+}
+
+.world-cup-date-button span {
+  font-size: 14px;
+  line-height: 1;
+}
       `}</style>
       {lightboxImageUrl && (
         <div
