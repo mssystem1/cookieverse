@@ -183,7 +183,19 @@ export default function Page() {
   const [wcImageB64, setWcImageB64] = React.useState<string | null>(null);
   const [wcPinCid, setWcPinCid] = React.useState<string | null>(null);
 
+  type WorldCupStage =
+    | 'idle'
+    | 'researching'
+    | 'scoring'
+    | 'rendering'
+    | 'ready'
+    | 'error';
+
   const [wcBusy, setWcBusy] = React.useState(false);
+  const [wcStage, setWcStage] = React.useState<WorldCupStage>('idle');
+  const [wcStartedAt, setWcStartedAt] = React.useState<number | null>(null);
+  const [wcElapsedSec, setWcElapsedSec] = React.useState(0);
+
   const [wcMintBusy, setWcMintBusy] = React.useState(false);
 
   // wallet roast state
@@ -471,6 +483,19 @@ export default function Page() {
     const desc = [...ids].sort((a, b) => b - a);
     return showAll ? desc : desc.slice(0, 10);
   }, [holdingIds, showAll]);
+
+  React.useEffect(() => {
+  if (!wcBusy || !wcStartedAt) {
+    setWcElapsedSec(0);
+    return;
+  }
+
+  const id = window.setInterval(() => {
+    setWcElapsedSec(Math.max(0, Math.floor((Date.now() - wcStartedAt) / 1000)));
+  }, 1000);
+
+  return () => window.clearInterval(id);
+}, [wcBusy, wcStartedAt]);
 
     // ---------- Generate with AI ----------
   const onGenerate = async () => {
@@ -1037,11 +1062,60 @@ const onShareCookieToX = React.useCallback(
   [chain?.name, isFarcasterMini],
 );
 
+function worldCupStageLabel(stage: WorldCupStage) {
+  switch (stage) {
+    case 'researching':
+      return 'AI is studying previous matches, team style and tournament context…';
+    case 'scoring':
+      return 'Calculating form, attack, defense, momentum, fans and confidence…';
+    case 'rendering':
+      return 'Rendering your collectible World Cup prophecy card…';
+    case 'ready':
+      return 'Prophecy card is ready.';
+    case 'error':
+      return 'Prophecy generation failed.';
+    default:
+      return '';
+  }
+}
+
+function worldCupStagePercent(stage: WorldCupStage) {
+  switch (stage) {
+    case 'researching':
+      return 34;
+    case 'scoring':
+      return 62;
+    case 'rendering':
+      return 86;
+    case 'ready':
+      return 100;
+    case 'error':
+      return 100;
+    default:
+      return 0;
+  }
+}
+
+const worldCupIsLoading = wcBusy || ['researching', 'scoring', 'rendering'].includes(wcStage);
+
+// Large inline prophecy loading panel removed.
+
+
 async function generateWorldCupProphecy() {
   setUiError(null);
   setWcBusy(true);
+  setWcStage('researching');
+  setWcStartedAt(Date.now());
 
   try {
+    if (wcImageUrl) URL.revokeObjectURL(wcImageUrl);
+
+    setWcProphecy(null);
+    setWcImageUrl(null);
+    setWcImageBlob(null);
+    setWcImageB64(null);
+    setWcPinCid(null);
+
     const prophecyRes = await fetch('/api/xcup/prophecy', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -1058,13 +1132,13 @@ async function generateWorldCupProphecy() {
       throw new Error(prophecyData?.error || 'Failed to generate World Cup prophecy');
     }
 
-    if (wcImageUrl) URL.revokeObjectURL(wcImageUrl);
-
+    setWcStage('scoring');
     setWcProphecy(prophecyData);
-    setWcImageUrl(null);
-    setWcImageBlob(null);
-    setWcImageB64(null);
-    setWcPinCid(null);
+
+    // Give the UI one frame to visibly move from AI research → scoring/rendering.
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+
+    setWcStage('rendering');
 
     const renderRes = await fetch('/api/xcup/render', {
       method: 'POST',
@@ -1087,10 +1161,13 @@ async function generateWorldCupProphecy() {
     setWcImageBlob(blob);
     setWcImageUrl(url);
     setWcImageB64(b64);
+    setWcStage('ready');
   } catch (e: any) {
+    setWcStage('error');
     setUiError(String(e?.message || e));
   } finally {
     setWcBusy(false);
+    setWcStartedAt(null);
   }
 }
 
@@ -1376,6 +1453,118 @@ React.useEffect(() => {
 
   const content = (
     <main className="page">
+      {worldCupIsLoading ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 18,
+            transform: 'translateX(-50%)',
+            width: 'min(520px, calc(100vw - 28px))',
+            zIndex: 9998,
+            padding: 14,
+            borderRadius: 18,
+            border: '1px solid rgba(250,204,21,0.55)',
+            background:
+              'radial-gradient(circle at top left, rgba(250,204,21,0.22), transparent 34%), radial-gradient(circle at bottom right, rgba(124,58,237,0.20), transparent 42%), rgba(2,6,23,0.94)',
+            boxShadow:
+              '0 24px 70px rgba(0,0,0,0.58), 0 0 32px rgba(250,204,21,0.18)',
+            backdropFilter: 'blur(14px)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              marginBottom: 10,
+            }}
+          >
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 9,
+                color: '#fde68a',
+                fontWeight: 950,
+                fontSize: 12,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 999,
+                  background: '#facc15',
+                  boxShadow: '0 0 18px rgba(250,204,21,0.9)',
+                  display: 'inline-block',
+                  animation: 'cookieversePulse 1.1s ease-in-out infinite',
+                }}
+              />
+              GPT-5.5 prophecy is cooking
+            </div>
+
+            <div
+              style={{
+                color: '#fde68a',
+                fontSize: 11,
+                fontWeight: 900,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {wcElapsedSec}s
+            </div>
+          </div>
+
+          <div
+            style={{
+              color: '#e5e7eb',
+              fontSize: 12,
+              lineHeight: 1.35,
+              marginBottom: 10,
+            }}
+          >
+            {worldCupStageLabel(wcStage)}
+          </div>
+
+          <div
+            style={{
+              height: 8,
+              borderRadius: 999,
+              background: 'rgba(250,204,21,0.12)',
+              overflow: 'hidden',
+              border: '1px solid rgba(250,204,21,0.18)',
+            }}
+          >
+            <div
+              style={{
+                width: `${worldCupStagePercent(wcStage)}%`,
+                height: '100%',
+                borderRadius: 999,
+                background: 'linear-gradient(90deg,#facc15,#f97316,#a855f7)',
+                boxShadow: '0 0 18px rgba(250,204,21,0.42)',
+                transition: 'width 420ms ease',
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 9,
+              color: '#9ca3af',
+              fontSize: 11,
+              lineHeight: 1.35,
+            }}
+          >
+            Do not close this page. First AI researches the match, then Cookieverse renders the card.
+          </div>
+        </div>
+      ) : null}
       {uiError ? <div className="alert">{uiError}</div> : null}
       {confirmError ? (
         <div className="alert">
@@ -1485,16 +1674,20 @@ React.useEffect(() => {
                   type="button"
                   className="btn btn--primary"
                   onClick={generateWorldCupProphecy}
-                  disabled={wcBusy}
+                  disabled={worldCupIsLoading}
                   style={{
-                    background: 'linear-gradient(135deg,#facc15,#f59e0b)',
+                    background: worldCupIsLoading
+                      ? 'linear-gradient(135deg,#fde68a,#f59e0b)'
+                      : 'linear-gradient(135deg,#facc15,#f59e0b)',
                     color: '#111827',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    minWidth: 210,
                   }}
                 >
-                  {wcBusy ? 'Creating Prophecy…' : 'Create Match Prophecy'}
+                  {worldCupIsLoading ? 'AI is creating prophecy…' : 'Create Match Prophecy'}
                 </button>
-
-               </div>
+              </div>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                 <button className="btn btn--primary" onClick={downloadWorldCupProphecy} disabled={!wcImageBlob}>
@@ -1552,6 +1745,22 @@ React.useEffect(() => {
 
             <div className="col" style={{ minWidth: 280, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <label className="label">Prophecy card preview</label>
+              {worldCupIsLoading ? (
+                <div
+                  style={{
+                    padding: '9px 11px',
+                    borderRadius: 12,
+                    border: '1px solid rgba(250,204,21,0.32)',
+                    background: 'rgba(250,204,21,0.08)',
+                    color: '#fde68a',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    lineHeight: 1.35,
+                  }}
+                >
+                  {worldCupStageLabel(wcStage)}
+                </div>
+              ) : null}
 
               <div
                 onClick={() => {
@@ -1572,26 +1781,76 @@ React.useEffect(() => {
                   overflow: 'hidden',
                 }}
               >
-                {wcImageUrl ? (
-                  <img
-                    src={wcImageUrl}
-                    alt="World Cup Prophecy preview"
-                    draggable={false}
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: 360,
-                      borderRadius: 12,
-                      display: 'block',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                      boxShadow: '0 18px 45px rgba(0,0,0,0.32)',
-                    }}
-                  />
-                ) : (
-                  <span className="muted" style={{ textAlign: 'center' }}>
-                    Your World Cup prophecy card will appear here.
-                  </span>
-                )}
+                  {wcImageUrl ? (
+                    <img
+                      src={wcImageUrl}
+                      alt="World Cup Prophecy preview"
+                      draggable={false}
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: 360,
+                        borderRadius: 12,
+                        display: 'block',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        boxShadow: '0 18px 45px rgba(0,0,0,0.32)',
+                      }}
+                    />
+                  ) : worldCupIsLoading ? (
+                    <div style={{ textAlign: 'center', padding: 18 }}>
+                      <div
+                        style={{
+                          width: 58,
+                          height: 58,
+                          borderRadius: '50%',
+                          border: '3px solid rgba(250,204,21,0.18)',
+                          borderTopColor: '#facc15',
+                          margin: '0 auto 14px',
+                          animation: 'cookieverseSpin 0.9s linear infinite',
+                        }}
+                      />
+
+                      <div
+                        style={{
+                          color: '#fde68a',
+                          fontWeight: 900,
+                          marginBottom: 6,
+                        }}
+                      >
+                        Building your prophecy card
+                      </div>
+
+                      <div className="hint" style={{ maxWidth: 290 }}>
+                        AI is generating the match logic, then Cookieverse renders the collectible image.
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 14,
+                          width: 220,
+                          maxWidth: '100%',
+                          height: 7,
+                          borderRadius: 999,
+                          overflow: 'hidden',
+                          background: 'rgba(250,204,21,0.12)',
+                          border: '1px solid rgba(250,204,21,0.18)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${worldCupStagePercent(wcStage)}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg,#facc15,#f97316,#a855f7)',
+                            transition: 'width 420ms ease',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="muted" style={{ textAlign: 'center' }}>
+                      Your World Cup prophecy card will appear here.
+                    </span>
+                  )}
               </div>
 
                <button
@@ -2161,6 +2420,23 @@ React.useEffect(() => {
           text-underline-offset: 2px;
           font-weight: 600;
         }
+        @keyframes cookieversePulse {
+          0%, 100% {
+            opacity: 0.55;
+            transform: scale(0.92);
+          }
+
+          50% {
+            opacity: 1;
+            transform: scale(1.18);
+          }
+        }
+
+        @keyframes cookieverseSpin {
+          to {
+            transform: rotate(360deg);
+          }
+        }       
       `}</style>
       {lightboxImageUrl && (
         <div

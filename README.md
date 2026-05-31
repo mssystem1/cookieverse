@@ -30,7 +30,7 @@
 
 Cookieverse is a consumer crypto app that makes onchain activity fun, visual, collectible, and shareable.
 
-Users can generate AI fortunes, mint COOKIE NFTs, roast wallets, render beautiful share cards, unlock paid Wallet Roast products through x402, create World Cup match prophecy NFTs on X Layer, bridge COOKIE NFTs across supported chains, complete Galxe-verifiable tasks, track activity in a dashboard, and compete on leaderboards.
+Users can generate AI fortunes, mint COOKIE NFTs, roast wallets, render beautiful share cards, unlock paid Wallet Roast products through x402, create GPT-5.5-powered World Cup match prophecy NFTs on X Layer with visible generation progress, bridge COOKIE NFTs across supported chains, complete Galxe-verifiable tasks, track activity in a dashboard, and compete on leaderboards.
 
 Cookieverse is built as a multi-surface product:
 
@@ -54,7 +54,8 @@ The product goal is simple:
 | --- | --- |
 | 🍪 AI Fortunes | Generate short AI fortune text and mint it as a COOKIE NFT. |
 | 🖼️ AI Image Mints | Generate or upload image-based COOKIE NFTs with IPFS metadata. |
-| ⚽ World Cup Prophecy | AI researches historical match context, creates a World Cup-style prophecy, renders a collectible PNG card, and mints it as a COOKIE NFT. |
+| ⚽ World Cup Prophecy | GPT-5.5 researches historical match context, creates a World Cup-style prophecy, renders a collectible PNG card, and mints it as a COOKIE NFT on X Layer. |
+| 🏟️ Prophecy Generation UX | Shows compact progress states while GPT-5.5 works: button state, preview spinner/progress, bottom status overlay, and research → criteria → render stage messages. |
 | 🖼️ Prophecy Card Renderer | Uses `@napi-rs/canvas` and World Cup templates to render premium match prophecy cards server-side. |
 | 🟣 X Layer Mainnet | Supports X Layer wallet connection, World Cup prophecy minting, NFT holdings, dashboard, leaderboard and bridge activity. |
 | 🌉 X Layer → Base Bridge | Bridges COOKIE NFTs from X Layer to Base through LayerZero adapter / ONFT contracts. |
@@ -138,8 +139,10 @@ flowchart TD
     FORTUNE_IMG --> PINATA1[Pinata / IPFS]
     PINATA1 --> COOKIE_NFT[FortuneCookiesAI NFT Contracts]
 
-    XCUP --> XCUP_AI[OpenAI Match Research + Prophecy JSON]
-    XCUP_AI --> XCUP_CARD[World Cup PNG Renderer<br/>@napi-rs/canvas]
+    XCUP --> XCUP_UX[Generation UX<br/>button state + preview spinner<br/>bottom GPT-5.5 status overlay]
+    XCUP_UX --> XCUP_AI[GPT-5.5 Match Research + Prophecy JSON]
+    XCUP_AI --> XCUP_CRITERIA[Prophecy Criteria<br/>form / attack / defense<br/>momentum / fans / confidence]
+    XCUP_CRITERIA --> XCUP_CARD[World Cup PNG Renderer<br/>@napi-rs/canvas]
     XCUP_CARD --> XCUP_IPFS[Pinata / IPFS]
     XCUP_IPFS --> XLAYER_MINT[X Layer mintWithImage<br/>World Cup Prophecy COOKIE NFT]
 
@@ -220,7 +223,7 @@ src/abi/FortuneCookiesAI.json
 
 World Cup Match Prophecy is the main X Layer Build X Hackathon-facing feature.
 
-It turns a simple match input into a collectible AI-powered NFT card.
+It turns a simple match input into a collectible AI-powered NFT card. The feature is designed as a premium sports + AI + NFT flow: GPT-5.5 may take longer than a smaller model, so the UI clearly shows that research, criteria calculation, and card rendering are in progress.
 
 User flow:
 
@@ -232,6 +235,7 @@ Open Cookieverse
 → Enter Team 2
 → Select match date
 → Click Create Match Prophecy
+→ UI shows GPT-5.5 progress: button loading state, preview spinner and bottom status overlay
 → AI generates match prophecy JSON
 → Server renders World Cup prophecy card PNG
 → User can download, copy, share on X, or mint
@@ -281,9 +285,75 @@ public/xcup/world-cup-header-mobile.png
 
 The rendered card uses `@napi-rs/canvas`, local template assets, local fonts, and tunable layout boxes, following the same server-side image-rendering architecture as Wallet Roast.
 
+
+#### World Cup Prophecy Generation UX
+
+The World Cup Prophecy feature intentionally keeps `gpt-5.5` as the recommended model for hackathon/demo quality.
+
+```bash
+XCUP_OPENAI_MODEL=gpt-5.5
+XCUP_RENDER_DEBUG_BOXES=0
+```
+
+Because `gpt-5.5` can take longer than smaller models, Cookieverse now treats generation as a visible product flow instead of a silent wait.
+
+During generation, users see:
+
+```txt
+Button state:
+  AI is creating prophecy…
+
+Preview state:
+  Spinner + progress indicator inside the card preview area
+
+Bottom overlay:
+  GPT-5.5 prophecy status while the request is running
+
+Stage messages:
+  research → criteria → render
+```
+
+The earlier large inline “Prophecy engine running” box was removed because it made the prophecy card UI too heavy. The final UX keeps compact indicators that make the wait understandable without breaking the layout.
+
+Generation stages:
+
+```txt
+researching:
+  GPT-5.5 is studying previous matches, team style and tournament context.
+
+scoring:
+  Cookieverse calculates form, attack, defense, momentum, fan signal and confidence.
+
+rendering:
+  Cookieverse renders the final collectible World Cup prophecy PNG card.
+
+ready:
+  The prophecy card is ready to download, copy, share, upload to IPFS, or mint on X Layer.
+```
+
+Important UI state in `src/app/page.tsx`:
+
+```tsx
+type WorldCupStage =
+  | 'idle'
+  | 'researching'
+  | 'scoring'
+  | 'rendering'
+  | 'ready'
+  | 'error';
+
+const [wcBusy, setWcBusy] = React.useState(false);
+const [wcStage, setWcStage] = React.useState<WorldCupStage>('idle');
+const [wcStartedAt, setWcStartedAt] = React.useState<number | null>(null);
+const [wcElapsedSec, setWcElapsedSec] = React.useState(0);
+```
+
+This UX is part of the product, not only a loading spinner. It helps reviewers understand that Cookieverse is running an AI research → criteria → render pipeline before producing the mintable image.
+
+
 #### World Cup Prophecy AI Flow
 
-Cookieverse uses OpenAI for World Cup prophecy generation.
+Cookieverse uses OpenAI for World Cup prophecy generation. The recommended hackathon model is `gpt-5.5` because the feature is a premium collectible experience where prophecy quality matters more than raw speed. The model can still be changed through `XCUP_OPENAI_MODEL` without code changes.
 
 Endpoint:
 
@@ -622,7 +692,7 @@ LayerZero proof placeholders:
 ```txt
 X Layer adapter contract: 0xdC4538763F8Ec6cB628684d8421B470735d8319a
 Base ONFT contract: 0x7e579E8D744bA7a3D62b9ABC43eD165bFE3f2688
-X Layer → Base bridge tx: 0xd4520802ff5283022ebf7c2006133ae32ac086c0bf324d70b64dc6a3aff71c5a
+X Layer → Base bridge tx: 0x7e579E8D744bA7a3D62b9ABC43eD165bFE3f2688
 LayerZero Scan link: https://layerzeroscan.com/tx/0xd4520802ff5283022ebf7c2006133ae32ac086c0bf324d70b64dc6a3aff71c5a
 ```
 
@@ -740,6 +810,7 @@ X Layer component:
 - X Layer Mainnet wallet connection
 - X Layer COOKIE NFT minting
 - World Cup prophecy NFT card minting
+- GPT-5.5 generation-progress UX for the AI research → criteria → render flow
 - X Layer holdings / token ID indexing
 - X Layer leaderboard and dashboard support
 - X Layer → Base LayerZero bridge route
@@ -775,7 +846,7 @@ LayerZero Scan: https://layerzeroscan.com/tx/0x5fdcb500b9b05073a54a850183d3468df
 Why this proves X Layer integration:
 
 1. User connects to X Layer Mainnet inside Cookieverse.
-2. User generates a World Cup Match Prophecy card.
+2. User generates a World Cup Match Prophecy card with visible GPT-5.5 progress states.
 3. Cookieverse renders the prophecy as a PNG card.
 4. Cookieverse uploads the card to IPFS.
 5. User mints the card through `mintWithImage()` on X Layer.
@@ -1696,6 +1767,7 @@ Switch wallet to X Layer
 → Enter Team 1 and Team 2
 → Select match date
 → Create Match Prophecy
+→ Watch compact GPT-5.5 progress states while Cookieverse researches, scores and renders
 → Preview rendered card
 → Mint Prophecy
 ```
@@ -1795,6 +1867,8 @@ Example body:
 - Wallet Roast analysis currently focuses on Base wallet data.
 - World Cup Match Prophecy is built as the X Layer hackathon feature.
 - World Cup Prophecy cards are generated by OpenAI, rendered server-side, uploaded to IPFS, and minted through `mintWithImage()` on X Layer.
+- World Cup Prophecy uses compact generation UX for GPT-5.5: button loading state, preview spinner/progress, bottom status overlay and research → criteria → render stage messages.
+- The large inline prophecy loading panel was removed to keep the main card UI clean while still showing visible progress.
 - X Layer NFT token IDs should be fetched through OKX / X Layer Onchain Data API instead of slow block scanning.
 - X Layer adapter sends should be counted through OKX / X Layer transaction data.
 - Wallet Roast minting can happen on the connected supported chain, including 0G after chain support is added.
@@ -1809,8 +1883,6 @@ Example body:
 - `/api/wallet-roast/pro` is the canonical paid backend for Bankr x402 services.
 - `buildPaidWalletRoastResponse()` is the shared paid Wallet Roast response builder for Coinbase and Bankr flows.
 - Galxe REST endpoints verify x402 usage, minting, and bridge activity and require a valid `access-token` header.
-
----
 
 ## License
 
