@@ -56,6 +56,10 @@ The product goal is simple:
 | 🖼️ AI Image Mints | Generate or upload image-based COOKIE NFTs with IPFS metadata. |
 | ⚽ World Cup Prophecy | GPT-5.5 researches historical match context, creates a World Cup-style prophecy, renders a collectible PNG card, and mints it as a COOKIE NFT on X Layer. |
 | 🏟️ Prophecy Generation UX | Shows compact progress states while GPT-5.5 works: button state, preview spinner/progress, bottom status overlay, and research → criteria → render stage messages. |
+| 🔐 Hidden Prophecy Prompt | Stores the full World Cup prophecy prompt in server-only env `XCUP_PROPHECY_PROMPT_SECRET`, not in GitHub and not in the frontend bundle. |
+| 🧾 Strict Prophecy JSON | Supports schema-driven, card-ready prophecy JSON so the renderer receives structured data instead of free-form AI prose. |
+| 🌍 World Cup Team Selector | Team 1 / Team 2 inputs support searchable World Cup teams, aliases, real flag images, and manual custom typing. |
+| 🏳️ Real Flag Rendering | Uses real flag images in the UI and rendered cards instead of emoji flags, avoiding broken Windows / Node canvas flag rendering. |
 | 🖼️ Prophecy Card Renderer | Uses `@napi-rs/canvas` and World Cup templates to render premium match prophecy cards server-side. |
 | 🟣 X Layer Mainnet | Supports X Layer wallet connection, World Cup prophecy minting, NFT holdings, dashboard, leaderboard and bridge activity. |
 | 🌉 X Layer → Base Bridge | Bridges COOKIE NFTs from X Layer to Base through LayerZero adapter / ONFT contracts. |
@@ -104,6 +108,16 @@ Routes:
 ```
 
 The Base App surface is a compact mobile/tablet experience. It uses a dedicated shell and layout constraints to make Cookieverse usable inside Base App-style environments. It also includes a compact World Cup header/banner and the same World Cup Prophecy flow.
+Base App-specific World Cup UI updates:
+
+```txt
+- World Cup header image is centered between Cookieverse branding and X profile controls.
+- Header image is responsive and uses contain-style sizing to avoid cutting.
+- Date badge is visible and World Cup-themed.
+- Team selector remains compact for mobile/Base App layout.
+- Sharing favors copy/download/native share flows where supported.
+```
+
 
 ### Farcaster Mini App
 
@@ -417,6 +431,110 @@ OPENAI_API_KEY_MFC_NEW=sk-...
 XCUP_OPENAI_MODEL=gpt-5.5
 ```
 
+#### World Cup Team Selector and Flags
+
+The World Cup Prophecy UI now uses searchable team inputs instead of plain text-only fields.
+
+Team selector behavior:
+
+```txt
+Team 1 / Team 2 start empty
+→ user can search by country name, code, nickname or alias
+→ user can select from World Cup teams with flag images
+→ user can still manually type custom teams
+→ selected names are passed into prophecy generation and card rendering
+```
+
+Implementation areas:
+
+```txt
+src/app/page.tsx
+src/lib/xcup/worldCupTeams.ts
+src/lib/xcup/renderProphecyCard.ts
+```
+
+The renderer does not rely on emoji flags. It draws real PNG flags separately from the team text.
+
+Reason:
+
+```txt
+emoji flags are unreliable in Windows browsers and @napi-rs/canvas
+they can render as AR / FR / SN or broken glyphs
+real flag images create stable social-share and NFT images
+```
+
+#### Hidden World Cup Prophecy Prompt
+
+The full World Cup prophecy prompt is private and server-only.
+
+It must be stored in:
+
+```bash
+XCUP_PROPHECY_PROMPT_SECRET="..."
+```
+
+Do not use:
+
+```bash
+NEXT_PUBLIC_XCUP_PROPHECY_PROMPT_SECRET
+```
+
+because every `NEXT_PUBLIC_*` variable can be exposed to the frontend bundle.
+
+The private prompt uses placeholders:
+
+```txt
+{{HOME_TEAM}}
+{{AWAY_TEAM}}
+{{MATCH_DATE}}
+```
+
+The API route replaces those placeholders server-side before calling OpenAI:
+
+```ts
+function replacePromptPlaceholders(template: string, input: WorldCupProphecyInput) {
+  return template
+    .replaceAll('{{HOME_TEAM}}', input.homeTeam)
+    .replaceAll('{{AWAY_TEAM}}', input.awayTeam)
+    .replaceAll('{{MATCH_DATE}}', input.matchDate);
+}
+```
+
+For local `.env.local`, use one quoted value with `\n` escapes if multiline parsing causes only the first line to load.
+
+For Vercel, store the full prompt in the Environment Variables dashboard.
+
+#### World Cup Model Strategy
+
+The World Cup prophecy model is configurable:
+
+```bash
+XCUP_OPENAI_MODEL=gpt-5-mini
+```
+
+Recommended strategy:
+
+```txt
+gpt-5-mini:
+  production default; best cost / intelligence / speed balance
+
+gpt-5.5:
+  premium demo mode; best writing quality, higher cost
+```
+
+The endpoint can also tune web search cost through `search_context_size`:
+
+```ts
+tools: [
+  {
+    type: 'web_search',
+    search_context_size: 'low',
+  },
+]
+```
+
+Use `medium` when quality is more important than cost.
+
 #### World Cup Card Rendering
 
 Endpoint:
@@ -584,6 +702,73 @@ Galxe:
 ```
 
 ---
+
+### 3.2 x402 Troubleshooting
+
+Normal first x402 response:
+
+```txt
+HTTP 402 Payment Required
+payment-required: <base64 challenge>
+```
+
+This is expected. The browser client signs the payment and retries with:
+
+```txt
+payment-signature: <signed x402 payload>
+```
+
+If the second request still returns `402`, decode the `payment-required` header to find the real reason.
+
+Common payment failure:
+
+```txt
+invalid_payload: contract call failed: unable to call contract: execution reverted
+```
+
+Most likely causes:
+
+```txt
+- connected wallet does not have enough native Base USDC
+- wrong wallet/account signed the x402 payload
+- wrong network
+- stale payment payload
+- USDC token is not native Base USDC
+```
+
+Required token for Coinbase x402 Base payments:
+
+```txt
+Base USDC:
+0x833589fCD6eDb6E08f4c7C32D4f71b54bDA02913
+```
+
+Current paid product pricing in `src/proxy.ts`:
+
+```txt
+roast-json: $0.02
+identity-roast: $0.07
+```
+
+Recommended frontend improvement:
+
+```ts
+function decodePaymentRequiredHeader(response: Response): string | null {
+  const raw =
+    response.headers.get('payment-required') ||
+    response.headers.get('PAYMENT-REQUIRED');
+
+  if (!raw) return null;
+
+  try {
+    const decoded = window.atob(raw);
+    const parsed = JSON.parse(decoded);
+    return parsed?.error ? String(parsed.error) : null;
+  } catch {
+    return null;
+  }
+}
+```
 
 ### 4. Wallet Roast Card Rendering
 
@@ -925,6 +1110,13 @@ Expected render response:
 Content-Type: image/png
 Output: World Cup prophecy PNG card
 ```
+Windows PowerShell note:
+
+```txt
+Use curl.exe, not curl.
+PowerShell aliases curl to Invoke-WebRequest, which breaks -H and --json syntax.
+```
+
 
 ---
 
@@ -1108,6 +1300,26 @@ npm run setup:og
 ```
 
 ---
+
+## World Cup Prophecy Environment
+
+```bash
+MFC_OPENAI_KEY_NAME=OPENAI_API_KEY_MFC_NEW
+OPENAI_API_KEY_MFC_NEW=sk-...
+XCUP_OPENAI_MODEL=gpt-5-mini
+XCUP_PROPHECY_PROMPT_SECRET="..."
+XCUP_RENDER_DEBUG_BOXES=0
+```
+
+`XCUP_PROPHECY_PROMPT_SECRET` is server-only and must not be committed to GitHub.
+
+Required prompt placeholders:
+
+```txt
+{{HOME_TEAM}}
+{{AWAY_TEAM}}
+{{MATCH_DATE}}
+```
 
 ## Supported Networks
 

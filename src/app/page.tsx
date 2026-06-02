@@ -91,6 +91,146 @@ function shortAddress(address?: string | null) {
 }
 
 
+
+type WorldCupTeamOption = {
+  name: string;
+  code: string;
+  aliases: string[];
+};
+
+// 48 teams from the FIFA World Cup 2026 match schedule/groups.
+// Use flagcdn image codes because Windows/Canvas often renders emoji flags as "AR", "FR", etc.
+const WORLD_CUP_TEAM_OPTIONS: WorldCupTeamOption[] = [
+  { name: 'Argentina', code: 'ar', aliases: ['arg', 'argentina', 'albiceleste', 'messi'] },
+  { name: 'Australia', code: 'au', aliases: ['aus', 'australia', 'socceroos'] },
+  { name: 'Austria', code: 'at', aliases: ['aut', 'austria', 'österreich', 'osterreich'] },
+  { name: 'Belgium', code: 'be', aliases: ['bel', 'belgium', 'red devils'] },
+  { name: 'Bosnia and Herzegovina', code: 'ba', aliases: ['bih', 'bosnia', 'bosnia and herzegovina', 'bosnia-herzegovina'] },
+  { name: 'Brazil', code: 'br', aliases: ['bra', 'brazil', 'brasil', 'seleção', 'selecao'] },
+  { name: 'Cabo Verde', code: 'cv', aliases: ['cpv', 'cabo verde', 'cape verde'] },
+  { name: 'Canada', code: 'ca', aliases: ['can', 'canada'] },
+  { name: 'Colombia', code: 'co', aliases: ['col', 'colombia', 'cafeteros'] },
+  { name: 'Congo DR', code: 'cd', aliases: ['cod', 'congo dr', 'dr congo', 'drc', 'democratic republic of congo', 'congo'] },
+  { name: "Côte d'Ivoire", code: 'ci', aliases: ['civ', "côte d'ivoire", 'cote divoire', 'ivory coast'] },
+  { name: 'Croatia', code: 'hr', aliases: ['cro', 'croatia', 'hrvatska'] },
+  { name: 'Curaçao', code: 'cw', aliases: ['cuw', 'curaçao', 'curacao'] },
+  { name: 'Czechia', code: 'cz', aliases: ['cze', 'czechia', 'czech republic'] },
+  { name: 'Ecuador', code: 'ec', aliases: ['ecu', 'ecuador'] },
+  { name: 'Egypt', code: 'eg', aliases: ['egy', 'egypt', 'pharaohs', 'salah'] },
+  { name: 'England', code: 'gb-eng', aliases: ['eng', 'england', 'three lions'] },
+  { name: 'France', code: 'fr', aliases: ['fra', 'france', 'les bleus', 'mbappe', 'mbappé'] },
+  { name: 'Germany', code: 'de', aliases: ['ger', 'germany', 'deutschland', 'mannschaft'] },
+  { name: 'Ghana', code: 'gh', aliases: ['gha', 'ghana', 'black stars'] },
+  { name: 'Haiti', code: 'ht', aliases: ['hai', 'haiti', 'grenadiers'] },
+  { name: 'IR Iran', code: 'ir', aliases: ['irn', 'iran', 'ir iran', 'team melli'] },
+  { name: 'Iraq', code: 'iq', aliases: ['irq', 'iraq'] },
+  { name: 'Japan', code: 'jp', aliases: ['jpn', 'japan', 'samurai blue'] },
+  { name: 'Jordan', code: 'jo', aliases: ['jor', 'jordan'] },
+  { name: 'Korea Republic', code: 'kr', aliases: ['kor', 'korea republic', 'south korea', 'korea', 'taeguk warriors'] },
+  { name: 'Mexico', code: 'mx', aliases: ['mex', 'mexico', 'méxico', 'el tri'] },
+  { name: 'Morocco', code: 'ma', aliases: ['mar', 'morocco', 'atlas lions'] },
+  { name: 'Netherlands', code: 'nl', aliases: ['ned', 'netherlands', 'holland', 'oranje'] },
+  { name: 'New Zealand', code: 'nz', aliases: ['nzl', 'new zealand', 'all whites'] },
+  { name: 'Norway', code: 'no', aliases: ['nor', 'norway', 'haaland'] },
+  { name: 'Panama', code: 'pa', aliases: ['pan', 'panama', 'panamá'] },
+  { name: 'Paraguay', code: 'py', aliases: ['par', 'paraguay'] },
+  { name: 'Portugal', code: 'pt', aliases: ['por', 'portugal', 'cristiano', 'ronaldo'] },
+  { name: 'Qatar', code: 'qa', aliases: ['qat', 'qatar'] },
+  { name: 'Saudi Arabia', code: 'sa', aliases: ['ksa', 'saudi', 'saudi arabia'] },
+  { name: 'Scotland', code: 'gb-sct', aliases: ['sco', 'scotland'] },
+  { name: 'Senegal', code: 'sn', aliases: ['sen', 'senegal', 'teranga lions'] },
+  { name: 'South Africa', code: 'za', aliases: ['rsa', 'south africa', 'bafana bafana'] },
+  { name: 'Spain', code: 'es', aliases: ['esp', 'spain', 'españa', 'la roja'] },
+  { name: 'Sweden', code: 'se', aliases: ['swe', 'sweden', 'sverige'] },
+  { name: 'Switzerland', code: 'ch', aliases: ['sui', 'switzerland', 'swiss'] },
+  { name: 'Tunisia', code: 'tn', aliases: ['tun', 'tunisia'] },
+  { name: 'Türkiye', code: 'tr', aliases: ['tur', 'turkey', 'türkiye', 'turkiye'] },
+  { name: 'Uruguay', code: 'uy', aliases: ['uru', 'uruguay', 'la celeste'] },
+  { name: 'USA', code: 'us', aliases: ['usa', 'united states', 'usmnt', 'america'] },
+  { name: 'Uzbekistan', code: 'uz', aliases: ['uzb', 'uzbekistan'] },
+];
+
+function normalizeWorldCupSearchText(value: string) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, '')
+    .replace(/[⚽🏆🏴]/gu, '')
+    .replace(/\b[A-Z]{2}\s+/g, '')
+    .replace(/[’']/g, '')
+    .replace(/[^a-zA-Z0-9\s.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function stripWorldCupFlag(value: string) {
+  return String(value || '')
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, '')
+    .replace(/[⚽🏆🏴]/gu, '')
+    .replace(/\b[A-Z]{2}\s+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeWorldCupTeamName(value: string) {
+  return normalizeWorldCupSearchText(stripWorldCupFlag(value));
+}
+
+function findWorldCupTeam(value: string) {
+  const clean = normalizeWorldCupTeamName(value);
+
+  if (!clean) return undefined;
+
+  return WORLD_CUP_TEAM_OPTIONS.find((team) => {
+    const name = normalizeWorldCupSearchText(team.name);
+    if (name === clean) return true;
+    return team.aliases.some((alias) => normalizeWorldCupSearchText(alias) === clean);
+  });
+}
+
+function worldCupFlagUrl(team?: WorldCupTeamOption) {
+  if (!team?.code) return '';
+  return `https://flagcdn.com/w40/${team.code}.png`;
+}
+
+function decorateWorldCupTeamName(value: string) {
+  const raw = stripWorldCupFlag(value);
+  if (!raw) return raw;
+
+  const found = findWorldCupTeam(raw);
+  return found ? found.name : raw;
+}
+
+function searchWorldCupTeams(query: string, limit = 10) {
+  const clean = normalizeWorldCupTeamName(query);
+
+  const ranked = WORLD_CUP_TEAM_OPTIONS.map((team) => {
+    const name = normalizeWorldCupSearchText(team.name);
+    const aliases = team.aliases.map((x) => normalizeWorldCupSearchText(x));
+    const haystack = [name, ...aliases].join(' ');
+
+    let score = 0;
+
+    if (!clean) score = 1;
+    else if (name === clean) score = 100;
+    else if (name.startsWith(clean)) score = 80;
+    else if (aliases.some((alias) => alias === clean)) score = 70;
+    else if (aliases.some((alias) => alias.startsWith(clean))) score = 55;
+    else if (haystack.includes(clean)) score = 35;
+
+    return { team, score };
+  })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || a.team.name.localeCompare(b.team.name))
+    .slice(0, limit)
+    .map((x) => x.team);
+
+  return ranked.length ? ranked : WORLD_CUP_TEAM_OPTIONS.slice(0, limit);
+}
+
+
+
 export default function Page() {
   const qc = useQueryClient();
   const { address, chain, isConnected } = useAccount();
@@ -173,8 +313,10 @@ export default function Page() {
 
   // world cup prophecy
   const wcDateInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [wcHomeTeam, setWcHomeTeam] = React.useState('Argentina');
-  const [wcAwayTeam, setWcAwayTeam] = React.useState('Spain');
+  const [wcHomeTeam, setWcHomeTeam] = React.useState('');
+  const [wcAwayTeam, setWcAwayTeam] = React.useState('');
+  const [wcHomeTeamOpen, setWcHomeTeamOpen] = React.useState(false);
+  const [wcAwayTeamOpen, setWcAwayTeamOpen] = React.useState(false);
   const [wcMatchDate, setWcMatchDate] = React.useState('');
   const [wcProphecy, setWcProphecy] =
     React.useState<WorldCupProphecyResult | null>(null);
@@ -1104,6 +1246,18 @@ const worldCupIsLoading = wcBusy || ['researching', 'scoring', 'rendering'].incl
 
 async function generateWorldCupProphecy() {
   setUiError(null);
+
+  const normalizedHomeTeam = decorateWorldCupTeamName(wcHomeTeam);
+  const normalizedAwayTeam = decorateWorldCupTeamName(wcAwayTeam);
+
+  if (!normalizedHomeTeam || !normalizedAwayTeam) {
+    setUiError('Choose or type both World Cup teams first.');
+    return;
+  }
+
+  setWcHomeTeam(normalizedHomeTeam);
+  setWcAwayTeam(normalizedAwayTeam);
+
   setWcBusy(true);
   setWcStage('researching');
   setWcStartedAt(Date.now());
@@ -1121,8 +1275,8 @@ async function generateWorldCupProphecy() {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        homeTeam: wcHomeTeam,
-        awayTeam: wcAwayTeam,
+        homeTeam: normalizedHomeTeam,
+        awayTeam: normalizedAwayTeam,
         matchDate: wcMatchDate,
       }),
     });
@@ -1209,16 +1363,6 @@ async function mintWorldCupProphecy() {
 
   if (!connected || !address) {
     setUiError('Connect your wallet first.');
-    return;
-  }
-
-  if (chain?.id !== CHAIN_IDS.xlayer) {
-    setUiError('Switch to X Layer to mint World Cup prophecy.');
-    return;
-  }
-
-  if (!COOKIE_ADDRESS) {
-    setUiError('Missing X Layer COOKIE contract address.');
     return;
   }
 
@@ -1452,6 +1596,264 @@ React.useEffect(() => {
                   </button>
 */
 
+
+  const wcHomeTeamSuggestions = React.useMemo(
+    () => searchWorldCupTeams(wcHomeTeam),
+    [wcHomeTeam],
+  );
+
+  const wcAwayTeamSuggestions = React.useMemo(
+    () => searchWorldCupTeams(wcAwayTeam),
+    [wcAwayTeam],
+  );
+
+  const renderWorldCupTeamInput = React.useCallback(
+    (params: {
+      label: string;
+      value: string;
+      onChange: (value: string) => void;
+      open: boolean;
+      setOpen: (open: boolean) => void;
+      suggestions: WorldCupTeamOption[];
+      placeholder: string;
+    }) => {
+      const { label, value, onChange, open, setOpen, suggestions, placeholder } = params;
+      const selectedTeam = findWorldCupTeam(value);
+      const selectedFlagUrl = worldCupFlagUrl(selectedTeam);
+
+      return (
+        <div
+          className="field field--full"
+          style={{
+            position: 'relative',
+            overflow: 'visible',
+          }}
+        >
+          <label className="label">{label}</label>
+
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              overflow: 'visible',
+            }}
+          >
+            {selectedFlagUrl ? (
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  left: 10,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 26,
+                  height: 18,
+                  borderRadius: 5,
+                  overflow: 'hidden',
+                  border: '1px solid rgba(253,230,138,0.72)',
+                  boxShadow: '0 0 12px rgba(250,204,21,0.22)',
+                  zIndex: 3,
+                  background: 'rgba(15,23,42,0.75)',
+                  display: 'inline-flex',
+                }}
+              >
+                <img
+                  src={selectedFlagUrl}
+                  alt=""
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              </span>
+            ) : null}
+
+            <input
+              value={value}
+              onChange={(e) => {
+                onChange(e.target.value);
+                setOpen(true);
+              }}
+              onFocus={() => setOpen(true)}
+              onBlur={() => {
+                window.setTimeout(() => setOpen(false), 140);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onChange(decorateWorldCupTeamName(value));
+                  setOpen(false);
+                }
+
+                if (e.key === 'Escape') {
+                  setOpen(false);
+                }
+              }}
+              placeholder={placeholder}
+              autoComplete="off"
+              spellCheck={false}
+              style={{
+                width: '100%',
+                height: 36,
+                boxSizing: 'border-box',
+                padding: selectedFlagUrl ? '0 48px 0 44px' : '0 48px 0 14px',
+                borderRadius: 12,
+                border: '1px solid rgba(250,204,21,0.48)',
+                outline: 'none',
+                color: '#ffffff',
+                background:
+                  'radial-gradient(circle at right, rgba(250,204,21,0.15), transparent 34%), linear-gradient(135deg, rgba(18,18,28,0.98), rgba(8,10,24,0.98))',
+                boxShadow:
+                  'inset 0 0 0 1px rgba(255,255,255,0.04), 0 0 18px rgba(250,204,21,0.08)',
+                fontSize: 13,
+                fontWeight: 850,
+                letterSpacing: '0.015em',
+              }}
+            />
+
+            <button
+              type="button"
+              aria-label={`Open ${label} team list`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setOpen(!open)}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: 8,
+                width: 34,
+                height: 28,
+                transform: 'translateY(-50%)',
+                borderRadius: 999,
+                border: '1px solid rgba(253,230,138,0.86)',
+                background: 'linear-gradient(135deg, #facc15, #f59e0b)',
+                color: '#111827',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow:
+                  '0 0 0 1px rgba(15,23,42,0.72), 0 0 16px rgba(250,204,21,0.28)',
+                zIndex: 4,
+                padding: 0,
+                fontSize: 15,
+                lineHeight: 1,
+              }}
+            >
+              ⚽
+            </button>
+
+            {open ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  zIndex: 60,
+                  top: 'calc(100% + 8px)',
+                  left: 0,
+                  right: 0,
+                  maxHeight: 260,
+                  overflow: 'auto',
+                  padding: 8,
+                  borderRadius: 16,
+                  border: '1px solid rgba(250,204,21,0.48)',
+                  background:
+                    'radial-gradient(circle at top right, rgba(250,204,21,0.18), transparent 34%), radial-gradient(circle at bottom left, rgba(124,58,237,0.18), transparent 38%), rgba(3,7,18,0.97)',
+                  boxShadow:
+                    '0 20px 52px rgba(0,0,0,0.58), 0 0 24px rgba(250,204,21,0.14)',
+                  backdropFilter: 'blur(14px)',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '4px 8px 8px',
+                    color: '#fde68a',
+                    fontSize: 10,
+                    fontWeight: 900,
+                    letterSpacing: '0.09em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Choose team or keep typing
+                </div>
+
+                {suggestions.map((team) => {
+                  const flagUrl = worldCupFlagUrl(team);
+
+                  return (
+                    <button
+                      key={`${label}-${team.name}`}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onChange(team.name);
+                        setOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        border: 0,
+                        borderRadius: 12,
+                        padding: '9px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        background: 'transparent',
+                        color: '#f9fafb',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background =
+                          'linear-gradient(135deg, rgba(250,204,21,0.18), rgba(124,58,237,0.16))';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 30,
+                          height: 20,
+                          borderRadius: 5,
+                          overflow: 'hidden',
+                          border: '1px solid rgba(253,230,138,0.52)',
+                          boxShadow: '0 0 8px rgba(250,204,21,0.18)',
+                          background: 'rgba(15,23,42,0.75)',
+                          flex: '0 0 auto',
+                        }}
+                      >
+                        <img
+                          src={flagUrl}
+                          alt=""
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            display: 'block',
+                          }}
+                        />
+                      </span>
+
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 850,
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        {team.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      );
+    },
+    [],
+  );
+
   const content = (
     <main className="page">
       {worldCupIsLoading ? (
@@ -1507,7 +1909,7 @@ React.useEffect(() => {
                   animation: 'cookieversePulse 1.1s ease-in-out infinite',
                 }}
               />
-              GPT-5.5 prophecy is cooking
+              AI is cooking Match Prophecy
             </div>
 
             <div
@@ -1630,7 +2032,7 @@ React.useEffect(() => {
               </h2>
 
               <p className="hint" style={{ margin: 0 }}>
-                  Enter teams and match date. AI researches the matchup, calculates prophecy criteria, renders a card, and mints it on X Layer.
+                  Enter teams and match date. AI researches the matchup, calculates prophecy criteria, renders a card.
               </p>
             </div>
 
@@ -1639,25 +2041,25 @@ React.useEffect(() => {
           <div className="row" style={{ alignItems: 'stretch', gap: 16 }}>
             <div className="col" style={{ minWidth: 280 }}>
               <div className="two-col">
-                <div className="field field--full">
-                  <label className="label">Team 1</label>
-                  <input
-                    className="input"
-                    value={wcHomeTeam}
-                    onChange={(e) => setWcHomeTeam(e.target.value)}
-                    placeholder="Argentina"
-                  />
-                </div>
+                {renderWorldCupTeamInput({
+                  label: 'Team 1',
+                  value: wcHomeTeam,
+                  onChange: setWcHomeTeam,
+                  open: wcHomeTeamOpen,
+                  setOpen: setWcHomeTeamOpen,
+                  suggestions: wcHomeTeamSuggestions,
+                  placeholder: 'Search or type team 1',
+                })}
 
-                <div className="field field--full">
-                  <label className="label">Team 2</label>
-                  <input
-                    className="input"
-                    value={wcAwayTeam}
-                    onChange={(e) => setWcAwayTeam(e.target.value)}
-                    placeholder="Spain"
-                  />
-                </div>
+                {renderWorldCupTeamInput({
+                  label: 'Team 2',
+                  value: wcAwayTeam,
+                  onChange: setWcAwayTeam,
+                  open: wcAwayTeamOpen,
+                  setOpen: setWcAwayTeamOpen,
+                  suggestions: wcAwayTeamSuggestions,
+                  placeholder: 'Search or type team 2',
+                })}
               </div>
 
 <div className="field field--full">
@@ -2564,6 +2966,142 @@ React.useEffect(() => {
   font-size: 14px;
   line-height: 1;
 }
+
+.wc-team-field {
+  position: relative;
+  overflow: visible;
+}
+
+.wc-team-combobox {
+  position: relative;
+  width: 100%;
+  overflow: visible;
+}
+
+.input--world-cup-team {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 48px;
+  color: #ffffff;
+  font-weight: 850;
+  letter-spacing: 0.015em;
+  background:
+    radial-gradient(circle at right, rgba(250,204,21,0.14), transparent 36%),
+    linear-gradient(135deg, rgba(18,18,28,0.98), rgba(8,10,24,0.98));
+  border: 1px solid rgba(250,204,21,0.34);
+}
+
+.input--world-cup-team:hover,
+.input--world-cup-team:focus {
+  border-color: rgba(250,204,21,0.78);
+  box-shadow:
+    0 0 0 1px rgba(250,204,21,0.18),
+    0 0 18px rgba(250,204,21,0.14);
+}
+
+.wc-team-picker-button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 34px;
+  height: 28px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  border: 1px solid rgba(253,230,138,0.86);
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #111827;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgba(15,23,42,0.72),
+    0 0 16px rgba(250,204,21,0.28);
+  z-index: 4;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.wc-team-picker-button:hover {
+  background: linear-gradient(135deg, #fde047, #f97316);
+  box-shadow:
+    0 0 0 1px rgba(15,23,42,0.72),
+    0 0 20px rgba(250,204,21,0.38);
+}
+
+.wc-team-popover {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(250,204,21,0.38);
+  background:
+    radial-gradient(circle at top right, rgba(250,204,21,0.14), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(124,58,237,0.16), transparent 38%),
+    rgba(3,7,18,0.96);
+  box-shadow:
+    0 20px 52px rgba(0,0,0,0.46),
+    0 0 24px rgba(250,204,21,0.10);
+  backdrop-filter: blur(14px);
+}
+
+.wc-team-popover__title {
+  padding: 4px 8px 8px;
+  color: #fde68a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.wc-team-option {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  color: #f9fafb;
+  cursor: pointer;
+  text-align: left;
+}
+
+.wc-team-option:hover {
+  background: linear-gradient(135deg, rgba(250,204,21,0.18), rgba(124,58,237,0.16));
+}
+
+.wc-team-option__flag {
+  width: 28px;
+  font-size: 19px;
+  line-height: 1;
+  text-align: center;
+  filter: drop-shadow(0 0 8px rgba(250,204,21,0.25));
+}
+
+.wc-team-option__name {
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 520px) {
+  .wc-team-popover {
+    max-height: 220px;
+  }
+
+  .wc-team-option {
+    padding: 8px 9px;
+  }
+}
+
       `}</style>
       {lightboxImageUrl && (
         <div

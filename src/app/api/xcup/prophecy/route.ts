@@ -32,7 +32,6 @@ function cleanShortLine(value: unknown, fallback = '', max = 68) {
     .trim();
 
   if (!text) return fallback;
-
   if (text.length <= max) return text;
 
   const sliced = text.slice(0, max - 1).trim();
@@ -71,13 +70,43 @@ function clampScore(value: unknown, fallback = 50): number {
 
 function normalizeCriteria(raw: any): WorldCupProphecyCriteria {
   return {
-    form: clampScore(raw?.form, 66),
-    attack: clampScore(raw?.attack, 70),
-    defense: clampScore(raw?.defense, 64),
-    momentum: clampScore(raw?.momentum, 68),
-    fans: clampScore(raw?.fans, 62),
-    confidenceSignal: clampScore(raw?.confidenceSignal, 61),
+    form: clampScore(raw?.form, 84),
+    attack: clampScore(raw?.attack, 86),
+    defense: clampScore(raw?.defense, 82),
+    momentum: clampScore(raw?.momentum, 88),
+    fans: clampScore(raw?.fans, 84),
+    confidenceSignal: clampScore(raw?.confidenceSignal, 90),
   };
+}
+
+function normalizeProphecyConfidence(params: {
+  rawConfidence: unknown;
+  criteria: WorldCupProphecyCriteria;
+  pick: unknown;
+}): number {
+  const { rawConfidence, criteria, pick } = params;
+
+  const raw = clampScore(rawConfidence, 90);
+
+  const criteriaAvg = Math.round(
+    (
+      criteria.form +
+      criteria.attack +
+      criteria.defense +
+      criteria.momentum +
+      criteria.fans +
+      criteria.confidenceSignal
+    ) / 6,
+  );
+
+  const pickText = cleanText(pick, '').toLowerCase();
+
+  const maxConfidence = pickText === 'draw' ? 91 : 94;
+  const minConfidence = pickText === 'draw' ? 86 : 89;
+
+  const blended = Math.round(raw * 0.55 + criteriaAvg * 0.45);
+
+  return Math.max(minConfidence, Math.min(maxConfidence, blended));
 }
 
 function extractJson(text: string): any | null {
@@ -99,12 +128,12 @@ function extractJson(text: string): any | null {
 
 function fallbackResult(input: WorldCupProphecyInput): WorldCupProphecyResult {
   const criteria: WorldCupProphecyCriteria = {
-    form: 66,
-    attack: 70,
-    defense: 64,
-    momentum: 68,
-    fans: 62,
-    confidenceSignal: 61,
+    form: 84,
+    attack: 86,
+    defense: 82,
+    momentum: 88,
+    fans: 84,
+    confidenceSignal: 89,
   };
 
   return {
@@ -115,12 +144,12 @@ function fallbackResult(input: WorldCupProphecyInput): WorldCupProphecyResult {
     location: '',
     pick: 'Too close to call',
     scoreline: '1-1',
-    confidence: 61,
+    confidence: 89,
     prophecy:
       `${input.homeTeam} and ${input.awayTeam} enter a pressure match where one momentum swing can change the story. Expect a tight game, emotional turns, and a late moment that decides the prophecy.`,
     reasoning: [
-    'Historical signal is incomplete.',
-    'Momentum and pressure keep it tight.',
+      'Historical signal is incomplete.',
+      'Momentum and pressure keep it tight.',
     ],
     research: {
       matchDate: input.matchDate,
@@ -156,6 +185,7 @@ function normalizeSources(response: any): string[] {
   }
 
   const sources = Array.isArray(response?.sources) ? response.sources : [];
+
   for (const source of sources) {
     const url = source?.url || source?.uri;
     if (typeof url === 'string' && url.startsWith('http')) {
@@ -166,12 +196,42 @@ function normalizeSources(response: any): string[] {
   return [...urls].slice(0, 8);
 }
 
+function stripInvisibleEnvChars(value: string) {
+  return (value || '')
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+}
+
+function getPrivateProphecyPromptTemplate() {
+  const raw = stripInvisibleEnvChars(process.env.XCUP_PROPHECY_PROMPT_SECRET || '');
+
+  return raw.replace(/\\n/g, '\n').trim();
+}
+
+function replacePromptPlaceholders(template: string, input: WorldCupProphecyInput) {
+  return template
+    .replaceAll('{{HOME_TEAM}}', input.homeTeam)
+    .replaceAll('{{AWAY_TEAM}}', input.awayTeam)
+    .replaceAll('{{MATCH_DATE}}', input.matchDate);
+}
+
+function buildProphecyPrompt(input: WorldCupProphecyInput) {
+  const template = getPrivateProphecyPromptTemplate().trim();
+
+  if (!template) {
+    throw new Error('Missing XCUP_PROPHECY_PROMPT_SECRET');
+  }
+
+  return replacePromptPlaceholders(template, input).trim();
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as any));
 
   const input: WorldCupProphecyInput = {
-    homeTeam: cleanText(body.homeTeam, 'Spain'),
-    awayTeam: cleanText(body.awayTeam, 'France'),
+    homeTeam: cleanText(body.homeTeam, ''),
+    awayTeam: cleanText(body.awayTeam, ''),
     matchDate: cleanText(body.matchDate || body.kickoff, ''),
   };
 
@@ -205,81 +265,9 @@ export async function POST(req: NextRequest) {
   try {
     const client = new OpenAI({ apiKey });
 
-const prompt = `
-You are the Cookieverse World Cup AI prophecy agent.
-
-Task:
-Research and analyze the historical football context for:
-${input.homeTeam} vs ${input.awayTeam}
-Match date: ${input.matchDate}
-
-Use web search to investigate:
-- previous head-to-head matches
-- World Cup and major tournament history
-- recent public performance trends
-- attacking and defensive patterns
-- key players and team identity
-- likely venue/location context if available
-- fan narratives and public sentiment
-- pressure, rivalry, and tournament stakes
-
-Important:
-- Try to make very close match prediction.
-- try to give very close betting odds.
-- try to give gambling advice.
-- Use historical and public football signals, not pure fantasy.
-- If current match data is incomplete, say so inside research fields, but still create a strong collectible prophecy.
-- Make the output cinematic, punchy and card-ready.
-- Return valid JSON only.
-- No markdown.
-- "reasoning" must be exactly 2 short lines.
-- Each reasoning line must be under 68 characters.
-- Reasoning must explain the prophecy in compact card text.
-- Do not include long statistics in reasoning.
-- Do not include URLs in reasoning.
-- Put URLs only inside research.sources.
-- Scoreline must be concise, like "Argentina 2-1 Spain".
-- Pick must be concise, like "Argentina", "Spain", or "Draw".
-
-Return JSON:
-{
-  "title": "World Cup Match Prophecy",
-  "homeTeam": "${input.homeTeam}",
-  "awayTeam": "${input.awayTeam}",
-  "matchDate": "${input.matchDate}",
-  "location": "",
-  "pick": "",
-  "scoreline": "",
-  "confidence": 0,
-  "prophecy": "",
-  "reasoning": [
-    "Short reason under 68 characters.",
-    "Short reason under 68 characters."
-    ],
-  "research": {
-    "matchDate": "${input.matchDate}",
-    "location": "",
-    "competition": "World Cup",
-    "recentForm": "",
-    "keyPlayers": "",
-    "injuriesOrSuspensions": "",
-    "fanSentiment": "",
-    "tacticalContext": "",
-    "sources": []
-  },
-  "criteria": {
-    "form": 0,
-    "attack": 0,
-    "defense": 0,
-    "momentum": 0,
-    "fans": 0,
-    "confidenceSignal": 0
-  }
-}
-`.trim();
+    const prompt = buildProphecyPrompt(input);
 
     const response = await client.responses.create({
-      // Use a search-capable Responses model. OpenAI docs recommend Responses API + web_search for new web search integrations.
       model: process.env.XCUP_OPENAI_MODEL || 'gpt-5.5',
       tools: [
         {
@@ -287,7 +275,6 @@ Return JSON:
           search_context_size: 'medium',
         },
       ],
-      // Make search mandatory for this endpoint, otherwise model may skip it.
       tool_choice: 'required',
       input: prompt,
     } as any);
@@ -306,6 +293,15 @@ Return JSON:
           .filter((x: string) => x.startsWith('http'))
       : [];
 
+    const criteria = normalizeCriteria(parsed.criteria || {});
+    const confidence = normalizeProphecyConfidence({
+      rawConfidence: parsed.confidence,
+      criteria,
+      pick: parsed.pick,
+    });
+
+    criteria.confidenceSignal = Math.max(criteria.confidenceSignal, confidence);
+
     const result: WorldCupProphecyResult = {
       title: cleanText(parsed.title, 'World Cup Match Prophecy'),
       homeTeam: cleanText(parsed.homeTeam, input.homeTeam),
@@ -314,7 +310,7 @@ Return JSON:
       location: cleanText(parsed.location || parsed.research?.location, ''),
       pick: cleanShortLine(parsed.pick, fallback.pick, 24),
       scoreline: cleanShortLine(parsed.scoreline, fallback.scoreline, 32),
-      confidence: clampScore(parsed.confidence, fallback.confidence),
+      confidence,
       prophecy: cleanText(parsed.prophecy, fallback.prophecy).slice(0, 360),
       reasoning: normalizeReasoning(parsed.reasoning, fallback.reasoning),
       research: {
@@ -328,15 +324,23 @@ Return JSON:
         tacticalContext: cleanText(parsed.research?.tacticalContext, ''),
         sources: [...new Set([...parsedSources, ...detectedSources])].slice(0, 8),
       },
-      criteria: normalizeCriteria(parsed.criteria || {}),
+      criteria,
     };
 
-    // Keep reasoning exactly 2 short lines for renderer/UI stability.
     result.reasoning = normalizeReasoning(result.reasoning, fallback.reasoning);
 
     return NextResponse.json(result);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('[xcup prophecy] OpenAI web research failed', error);
+
+    if (message.includes('Missing XCUP_PROPHECY_PROMPT_SECRET')) {
+      return NextResponse.json(
+        { error: 'World Cup prophecy prompt is not configured.' },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json(fallback);
   }
 }

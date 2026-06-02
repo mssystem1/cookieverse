@@ -149,8 +149,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
     },
 
     prophecyStyle: {
-      startSizePx: 29,
-      minSizePx: 19,
+      startSizePx: 23,
+      minSizePx: 13,
       lineHeight: 1.25,
       weight: 800,
       fill: '#2b1d05',
@@ -240,6 +240,211 @@ function formatMatchDate(value: string) {
   })
     .format(d)
     .toUpperCase();
+}
+
+type WorldCupTeamOption = {
+  name: string;
+  code: string;
+  aliases: string[];
+};
+
+const WORLD_CUP_TEAM_OPTIONS: WorldCupTeamOption[] = [
+  { name: 'Argentina', code: 'ar', aliases: ['arg', 'argentina', 'albiceleste', 'messi'] },
+  { name: 'Australia', code: 'au', aliases: ['aus', 'australia', 'socceroos'] },
+  { name: 'Austria', code: 'at', aliases: ['aut', 'austria', 'österreich', 'osterreich'] },
+  { name: 'Belgium', code: 'be', aliases: ['bel', 'belgium', 'red devils'] },
+  { name: 'Bosnia and Herzegovina', code: 'ba', aliases: ['bih', 'bosnia', 'bosnia and herzegovina', 'bosnia-herzegovina'] },
+  { name: 'Brazil', code: 'br', aliases: ['bra', 'brazil', 'brasil', 'seleção', 'selecao'] },
+  { name: 'Cabo Verde', code: 'cv', aliases: ['cpv', 'cabo verde', 'cape verde'] },
+  { name: 'Canada', code: 'ca', aliases: ['can', 'canada'] },
+  { name: 'Colombia', code: 'co', aliases: ['col', 'colombia', 'cafeteros'] },
+  { name: 'Congo DR', code: 'cd', aliases: ['cod', 'congo dr', 'dr congo', 'drc', 'democratic republic of congo', 'congo'] },
+  { name: "Côte d'Ivoire", code: 'ci', aliases: ['civ', "côte d'ivoire", 'cote divoire', 'ivory coast'] },
+  { name: 'Croatia', code: 'hr', aliases: ['cro', 'croatia', 'hrvatska'] },
+  { name: 'Curaçao', code: 'cw', aliases: ['cuw', 'curaçao', 'curacao'] },
+  { name: 'Czechia', code: 'cz', aliases: ['cze', 'czechia', 'czech republic'] },
+  { name: 'Ecuador', code: 'ec', aliases: ['ecu', 'ecuador'] },
+  { name: 'Egypt', code: 'eg', aliases: ['egy', 'egypt', 'pharaohs', 'salah'] },
+  { name: 'England', code: 'gb-eng', aliases: ['eng', 'england', 'three lions'] },
+  { name: 'France', code: 'fr', aliases: ['fra', 'france', 'les bleus', 'mbappe', 'mbappé'] },
+  { name: 'Germany', code: 'de', aliases: ['ger', 'germany', 'deutschland', 'mannschaft'] },
+  { name: 'Ghana', code: 'gh', aliases: ['gha', 'ghana', 'black stars'] },
+  { name: 'Haiti', code: 'ht', aliases: ['hai', 'haiti', 'grenadiers'] },
+  { name: 'IR Iran', code: 'ir', aliases: ['irn', 'iran', 'ir iran', 'team melli'] },
+  { name: 'Iraq', code: 'iq', aliases: ['irq', 'iraq'] },
+  { name: 'Japan', code: 'jp', aliases: ['jpn', 'japan', 'samurai blue'] },
+  { name: 'Jordan', code: 'jo', aliases: ['jor', 'jordan'] },
+  { name: 'Korea Republic', code: 'kr', aliases: ['kor', 'korea republic', 'south korea', 'korea', 'taeguk warriors'] },
+  { name: 'Mexico', code: 'mx', aliases: ['mex', 'mexico', 'méxico', 'el tri'] },
+  { name: 'Morocco', code: 'ma', aliases: ['mar', 'morocco', 'atlas lions'] },
+  { name: 'Netherlands', code: 'nl', aliases: ['ned', 'netherlands', 'holland', 'oranje'] },
+  { name: 'New Zealand', code: 'nz', aliases: ['nzl', 'new zealand', 'all whites'] },
+  { name: 'Norway', code: 'no', aliases: ['nor', 'norway', 'haaland'] },
+  { name: 'Panama', code: 'pa', aliases: ['pan', 'panama', 'panamá'] },
+  { name: 'Paraguay', code: 'py', aliases: ['par', 'paraguay'] },
+  { name: 'Portugal', code: 'pt', aliases: ['por', 'portugal', 'cristiano', 'ronaldo'] },
+  { name: 'Qatar', code: 'qa', aliases: ['qat', 'qatar'] },
+  { name: 'Saudi Arabia', code: 'sa', aliases: ['ksa', 'saudi', 'saudi arabia'] },
+  { name: 'Scotland', code: 'gb-sct', aliases: ['sco', 'scotland'] },
+  { name: 'Senegal', code: 'sn', aliases: ['sen', 'senegal', 'teranga lions'] },
+  { name: 'South Africa', code: 'za', aliases: ['rsa', 'south africa', 'bafana bafana'] },
+  { name: 'Spain', code: 'es', aliases: ['esp', 'spain', 'españa', 'la roja'] },
+  { name: 'Sweden', code: 'se', aliases: ['swe', 'sweden', 'sverige'] },
+  { name: 'Switzerland', code: 'ch', aliases: ['sui', 'switzerland', 'swiss'] },
+  { name: 'Tunisia', code: 'tn', aliases: ['tun', 'tunisia'] },
+  { name: 'Türkiye', code: 'tr', aliases: ['tur', 'turkey', 'türkiye', 'turkiye'] },
+  { name: 'Uruguay', code: 'uy', aliases: ['uru', 'uruguay', 'la celeste'] },
+  { name: 'USA', code: 'us', aliases: ['usa', 'united states', 'usmnt', 'america'] },
+  { name: 'Uzbekistan', code: 'uz', aliases: ['uzb', 'uzbekistan'] },
+];
+
+function normalizeWorldCupSearchText(value: string) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, '')
+    .replace(/[⚽🏆🏴]/gu, '')
+    .replace(/\b[A-Z]{2}\s+/g, '')
+    .replace(/[’']/g, '')
+    .replace(/[^a-zA-Z0-9\s.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function stripWorldCupFlag(value: string) {
+  return String(value || '')
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, '')
+    .replace(/[⚽🏆🏴]/gu, '')
+    .replace(/\b[A-Z]{2}\s+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findWorldCupTeam(value: string) {
+  const clean = normalizeWorldCupSearchText(stripWorldCupFlag(value));
+  if (!clean) return undefined;
+
+  return WORLD_CUP_TEAM_OPTIONS.find((team) => {
+    const name = normalizeWorldCupSearchText(team.name);
+    if (name === clean) return true;
+    return team.aliases.some((alias) => normalizeWorldCupSearchText(alias) === clean);
+  });
+}
+
+function escapeRegExp(value: string) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const flagImageCache = new Map<string, Promise<any | null>>();
+
+async function loadFlagImage(code: string) {
+  if (!code) return null;
+
+  const cached = flagImageCache.get(code);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2500);
+
+      try {
+        const res = await fetch(`https://flagcdn.com/w80/${code}.png`, {
+          cache: 'force-cache',
+          signal: controller.signal,
+        });
+
+        if (!res.ok) return null;
+
+        const bytes = Buffer.from(await res.arrayBuffer());
+        return await loadImage(bytes);
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (error) {
+      console.warn('world cup flag load failed', {
+        code,
+        message: error instanceof Error ? error.message : String(error),
+      });
+
+      return null;
+    }
+  })();
+
+  flagImageCache.set(code, promise);
+  return promise;
+}
+
+async function drawTeamBoxWithFlag(
+  ctx: SKRSContext2D,
+  rawTeam: string,
+  rect: RectPx,
+  style: TextStyle,
+  canvasWidth: number,
+) {
+  const clean = stripWorldCupFlag(cleanText(rawTeam, 'TEAM'));
+  const team = findWorldCupTeam(clean);
+  const name = (team?.name || clean || 'TEAM').toUpperCase();
+  const flag = team ? await loadFlagImage(team.code) : null;
+
+  if (!flag) {
+    drawTextBox(ctx, name, rect, style, canvasWidth);
+    return;
+  }
+
+  const box = rect;
+  const paddingX = style.paddingX ?? 0;
+  const maxWidth = Math.max(10, box.w - paddingX * 2);
+  const flagW = 42;
+  const flagH = 28;
+  const gap = 12;
+
+  let sizePx = style.startSizePx;
+  let px = setFont(ctx, style, sizePx);
+
+  while (sizePx > style.minSizePx) {
+    px = setFont(ctx, style, sizePx);
+    const textW = ctx.measureText(name).width;
+    const groupW = flagW + gap + textW;
+    if (groupW <= maxWidth && px * style.lineHeight <= box.h) break;
+    sizePx -= 1;
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(box.x, box.y, box.w, box.h);
+  ctx.clip();
+
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+
+  const textW = ctx.measureText(name).width;
+  const groupW = flagW + gap + textW;
+  const startX = box.x + box.w / 2 - groupW / 2;
+  const centerY = box.y + box.h / 2 + (style.visualOffsetY ?? 0);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 6;
+  ctx.drawImage(flag, startX, centerY - flagH / 2, flagW, flagH);
+  ctx.restore();
+
+  const textX = startX + flagW + gap;
+
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+
+  if (style.stroke) {
+    ctx.lineWidth = style.strokeWidth ?? 2;
+    ctx.strokeStyle = style.stroke;
+    ctx.strokeText(name, textX, centerY);
+  }
+
+  ctx.fillStyle = style.fill ?? '#ffffff';
+  ctx.fillText(name, textX, centerY);
+
+  ctx.restore();
 }
 
 function safeFontWeight(weight?: number) {
@@ -580,8 +785,14 @@ export async function renderWorldCupProphecyCard(
   const template = await loadTemplate(layout.templateFile);
   ctx.drawImage(template, 0, 0, canvas.width, canvas.height);
 
-  const home = cleanText(input.homeTeam, 'HOME').toUpperCase();
-  const away = cleanText(input.awayTeam, 'AWAY').toUpperCase();
+  const rawHome = stripWorldCupFlag(cleanText(input.homeTeam, 'HOME'));
+  const rawAway = stripWorldCupFlag(cleanText(input.awayTeam, 'AWAY'));
+
+  const homeTeam = findWorldCupTeam(rawHome);
+  const awayTeam = findWorldCupTeam(rawAway);
+
+  const home = (homeTeam?.name || rawHome || 'HOME').toUpperCase();
+  const away = (awayTeam?.name || rawAway || 'AWAY').toUpperCase();
   const date = formatMatchDate(input.matchDate);
 
   const pick = cleanText(input.pick, 'TOO CLOSE TO CALL').toUpperCase();
@@ -589,8 +800,10 @@ export async function renderWorldCupProphecyCard(
   const confidence = Math.max(0, Math.min(100, Math.round(Number(input.confidence) || 50)));
 
   const compactScoreline = scoreline
-    .replace(new RegExp(home, 'gi'), '')
-    .replace(new RegExp(away, 'gi'), '')
+    .replace(new RegExp(escapeRegExp(home), 'gi'), '')
+    .replace(new RegExp(escapeRegExp(away), 'gi'), '')
+    .replace(new RegExp(escapeRegExp(rawHome), 'gi'), '')
+    .replace(new RegExp(escapeRegExp(rawAway), 'gi'), '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -619,8 +832,8 @@ export async function renderWorldCupProphecyCard(
     ['CONF', confidence],
   ] as const;
 
-  drawTextBox(ctx, home, scaleRect(layout.homeTeamBox, layout), layout.teamStyle, canvas.width);
-  drawTextBox(ctx, away, scaleRect(layout.awayTeamBox, layout), layout.teamStyle, canvas.width);
+await drawTeamBoxWithFlag(ctx, home, scaleRect(layout.homeTeamBox, layout), layout.teamStyle, canvas.width);
+await drawTeamBoxWithFlag(ctx, away, scaleRect(layout.awayTeamBox, layout), layout.teamStyle, canvas.width);
   drawTextBox(ctx, date, scaleRect(layout.dateBox, layout), layout.dateStyle, canvas.width);
 
   drawTextBox(
