@@ -94,7 +94,128 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             }
           }'
         />
+
+
+               {!isLoggedIn ? (
+          // X login splash screen
+          <div
+            style={{
+              minHeight: '100vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              background:
+                'radial-gradient(circle at top, #111827 0, #020617 45%, #020617 100%)',
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 460,
+                borderRadius: 24,
+                padding: 28,
+                border: '1px solid rgba(55,65,81,0.9)',
+                background:
+                  'radial-gradient(circle at top left, #1d293b 0, #020617 55%)',
+                boxShadow:
+                  '0 30px 90px rgba(15,23,42,0.95), 0 0 0 1px rgba(15,23,42,0.9)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 20,
+              }}
+            >
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <img
+                  src="/ms-logo.png"
+                  alt="MS System"
+                  style={{
+                    height: 52,
+                    width: 52,
+                    borderRadius: 12,
+                    objectFit: 'cover',
+                  }}
+                />
+                <div>
+                  <div
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 800,
+                      letterSpacing: '-0.02em',
+                      color: '#e5e7eb',
+                    }}
+                  >
+                    Cookieverse
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: '#9ca3af',
+                      marginTop: 2,
+                    }}
+                  >
+                    Connect your X account to save stats, leaderboards and mints.
+                  </div>
+                </div>
+              </div>
+
+
+              <div
+                style={{
+                  height: 1,
+                  width: '100%',
+                  background:
+                    'linear-gradient(90deg, transparent, rgba(148,163,184,0.6), transparent)',
+                  opacity: 0.8,
+                }}
+              />
+
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: '#d1d5db',
+                    lineHeight: 1.5,
+                    textAlign: 'center',   
+                  }}
+                >
+                  You’ll be redirected to X to authorize Cookieverse. We only
+                  read your public profile (handle & avatar).
+                </div>
+                <div style={{ marginTop: 4, textAlign: 'center', }}>
+                  <XAuthButton callbackUrl="/" />
+                </div>
+              </div>
+
+
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 11,
+                  color: '#6b7280',
+                  lineHeight: 1.4,
+                  textAlign: 'center',   
+                }}
+              >
+                By continuing you agree that your X username can be used for
+                leaderboards, raffles and on-chain achievements in the MSSystem
+                ecosystem.
+              </div>
+            </div>
+          </div>
+        ) : (
+
+        )}
 */
+
   return (
     <html lang="en">
     <head>
@@ -112,7 +233,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
         {/* === NON-MINI (default app) === */}
         <MainChrome>
-        {!isLoggedIn ? (
+  {!isLoggedIn ? (
           // X login splash screen
           <div
             style={{
@@ -403,6 +524,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </Providers>
         )}
+
         </MainChrome>
 
         {/* === MINI (Farcaster Mini App) ===
@@ -488,7 +610,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </Providers>
           )}
-
+          
           <style>{`
             .base-app-nav__banner {
               display: block;
@@ -674,6 +796,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             .base-app-content .grid {
               grid-template-columns: 1fr !important;
               gap: 10px !important;
+            }
+
+            .base-app-content .card--image,
+            .base-app-content .card--world-cup,
+            .base-app-content .card--status {
+              grid-column: 1 / -1 !important;
             }
 
             .base-app-content .card {

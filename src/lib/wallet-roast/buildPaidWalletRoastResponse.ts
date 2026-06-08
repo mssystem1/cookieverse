@@ -7,11 +7,16 @@ import {
   type X402Product,
   type X402Provider,
 } from "../../server/x402UsageStore";
+import {
+  normalizeWalletRoastChain,
+  type WalletRoastChainKey,
+} from "./chains";
 
 type Params = {
   walletInput: string;
   product: X402Product;
   provider: X402Provider;
+  chain?: WalletRoastChainKey | string;
   includeImage: boolean;
   includeMintMetadata: boolean;
 };
@@ -25,6 +30,7 @@ function endpointFromProduct(product: X402Product) {
 export async function buildPaidWalletRoastResponse(params: Params) {
   const { walletInput, product, provider, includeImage, includeMintMetadata } =
     params;
+  const chain = normalizeWalletRoastChain(params.chain);
 
   if (!isAddress(walletInput)) {
     return {
@@ -37,7 +43,7 @@ export async function buildPaidWalletRoastResponse(params: Params) {
   }
 
   const wallet = getAddress(walletInput);
-  const analysis = await analyzeWalletRoast(wallet);
+  const analysis = await analyzeWalletRoast(wallet, chain);
 
   let image:
     | Awaited<ReturnType<typeof pinPngBufferToPinata>>
@@ -62,9 +68,10 @@ export async function buildPaidWalletRoastResponse(params: Params) {
   await recordX402Usage({
     wallet: wallet.toLowerCase() as `0x${string}`,
     product,
-    provider,
-    endpoint: endpointFromProduct(product),
-    requestId: crypto.randomUUID(),
+      provider,
+      endpoint: endpointFromProduct(product),
+      chain,
+      requestId: crypto.randomUUID(),
     imageUrl: image?.gatewayUrl,
     metadataReady: Boolean(metadata),
     createdAt: Date.now(),
@@ -77,7 +84,7 @@ export async function buildPaidWalletRoastResponse(params: Params) {
       product,
       provider,
       wallet: analysis.wallet,
-      chain: "base",
+      chain,
       archetype: analysis.classification?.archetype,
       tags: analysis.classification?.tags || [],
       walletScore: analysis.metrics?.wallet_score,

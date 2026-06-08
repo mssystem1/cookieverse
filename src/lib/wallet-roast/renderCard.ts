@@ -416,22 +416,22 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
   "Bridge Tourist": {
     designWidth: 270,
     designHeight: 647,
-    nameBox: { x: 51, y: 71, w: 167, h: 42 },
-    chainBox: { x: 89, y: 118, w: 92, h: 27 },
-    roastBox: { x: 32, y: 159, w: 205, h: 188 },
-    verdictBox: { x: 35, y: 356, w: 200, h: 61 },
+    nameBox: { x: 51, y: 70, w: 167, h: 42 },
+    chainBox: { x: 89, y: 112, w: 92, h: 27 },
+    roastBox: { x: 32, y: 156, w: 205, h: 188 },
+    verdictBox: { x: 35, y: 344, w: 200, h: 61 },
     stats: [
-      { x: 43, y: 387, w: 71, h: 20 },
-      { x: 43, y: 421, w: 71, h: 20 },
-      { x: 43, y: 453, w: 71, h: 20 },
-      { x: 155, y: 386, w: 71, h: 20 },
-      { x: 155, y: 419, w: 71, h: 20 },
-      { x: 155, y: 454, w: 71, h: 20 },
+      { x: 43, y: 381, w: 71, h: 20 },
+      { x: 43, y: 415, w: 71, h: 20 },
+      { x: 43, y: 447, w: 71, h: 20 },
+      { x: 155, y: 380, w: 71, h: 20 },
+      { x: 155, y: 413, w: 71, h: 20 },
+      { x: 155, y: 448, w: 71, h: 20 },
     ],
     tags: [
-      { x: 18, y: 553, w: 70, h: 20 },
-      { x: 104, y: 553, w: 70, h: 20 },
-      { x: 182, y: 553, w: 70, h: 20 },
+      { x: 18, y: 545, w: 70, h: 20 },
+      { x: 104, y: 545, w: 70, h: 20 },
+      { x: 182, y: 545, w: 70, h: 20 },
     //  { x: 140, y: 553, w: 27, h: 18 },
     //  { x: 173, y: 553, w: 35, h: 18 },
     ],
@@ -447,8 +447,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       visualOffsetY: -8,
     },
     roastStyle: {
-      startSize: 0.069,
-      minSize: 0.044,
+      startSize: 0.045,
+      minSize: 0.02,
       maxLines: 4,
       lineHeight: 1.28,
       fontFamily: DEFAULT_FONT,
@@ -500,10 +500,10 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       visualOffsetY: -4,
     },
     chainInline: {
-      box: { x: 89, y: 118, w: 92, h: 27 },
+      box: { x: 89, y: 116, w: 92, h: 27 },
       textStyle: { startSize: 0.05, minSize: 0.045, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#F5F7FF" },
-      iconSize: 0.055,
-      iconGap: 0.038,
+      iconSize: 0.075,
+      iconGap: 0.024,
       textOffsetY: -16,
     },
     statInline: {
@@ -553,8 +553,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       visualOffsetY: 0,
     },
     roastStyle: {
-      startSize: 0.069,
-      minSize: 0.044,
+      startSize: 0.045,
+      minSize: 0.02,
       maxLines: 4,
       lineHeight: 1.28,
       fontFamily: DEFAULT_FONT,
@@ -608,8 +608,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
     chainInline: {
       box: { x: 89, y: 118, w: 92, h: 27 },
       textStyle: { startSize: 0.05, minSize: 0.045, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#FFF7FF" },
-      iconSize: 0.055,
-      iconGap: 0.038,
+      iconSize: 0.075,
+      iconGap: 0.024,
       textOffsetY: -13,
     },
     statInline: {
@@ -659,8 +659,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       visualOffsetY: -8,
     },
     roastStyle: {
-      startSize: 0.069,
-      minSize: 0.044,
+      startSize: 0.045,
+      minSize: 0.02,
       maxLines: 4,
       lineHeight: 1.28,
       fontFamily: DEFAULT_FONT,
@@ -714,8 +714,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
     chainInline: {
       box: { x: 89, y: 118, w: 92, h: 27 },
       textStyle: { startSize: 0.055, minSize: 0.05, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#F2FDFF" },
-      iconSize: 0.055,
-      iconGap: 0.038,
+      iconSize: 0.075,
+      iconGap: 0.024,
       textOffsetY: -21,
     },
     statInline: {
@@ -765,8 +765,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       visualOffsetY: -14,
     },
     roastStyle: {
-      startSize: 0.069,
-      minSize: 0.044,
+      startSize: 0.045,
+      minSize: 0.020,
       maxLines: 4,
       lineHeight: 1.28,
       fontFamily: DEFAULT_FONT,
@@ -820,8 +820,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
     chainInline: {
       box: { x: 89, y: 118, w: 92, h: 27 },
       textStyle: { startSize: 0.055, minSize: 0.05, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#FFF7FF" },
-      iconSize: 0.055,
-      iconGap: 0.038,
+      iconSize: 0.075,
+      iconGap: 0.024,
       textOffsetY: -25,
     },
     statInline: {
@@ -871,8 +871,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       visualOffsetY: -14,
     },
     roastStyle: {
-      startSize: 0.069,
-      minSize: 0.044,
+      startSize: 0.045,
+      minSize: 0.020,
       maxLines: 4,
       lineHeight: 1.28,
       fontFamily: DEFAULT_FONT,
@@ -926,8 +926,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
     chainInline: {
       box: { x: 89, y: 118, w: 92, h: 27 },
       textStyle: { startSize: 0.055, minSize: 0.05,  lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#F9FFEF" },
-      iconSize: 0.055,
-      iconGap: 0.038,
+      iconSize: 0.075,
+      iconGap: 0.024,
       textOffsetY: -25,
     },
     statInline: {
@@ -977,8 +977,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       visualOffsetY: -8,
     },
     roastStyle: {
-      startSize: 0.069,
-      minSize: 0.044,
+      startSize: 0.045,
+      minSize: 0.02,
       maxLines: 4,
       lineHeight: 1.28,
       fontFamily: DEFAULT_FONT,
@@ -1032,8 +1032,8 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
     chainInline: {
       box: { x: 89, y: 118, w: 92, h: 27 },
       textStyle: { startSize: 0.050, minSize: 0.046, lineHeight: 1, fontFamily: DEFAULT_FONT, fill: "#F5FBFF" },
-      iconSize: 0.055,
-      iconGap: 0.038,
+      iconSize: 0.075,
+      iconGap: 0.024,
       textOffsetY: -16,
     },
     statInline: {
@@ -1332,9 +1332,12 @@ export async function renderCard(data: WalletRoastAnalysis): Promise<Buffer> {
   const verdict = getVerdictText(data);
   const tags = getRenderableTags(data);
   const stats = getStats(data);
+  const chainLabel = data.chain_label || data.chain || "Base";
+  const chainIcon =
+    data.chain === "base" || data.chain === "mantle" ? data.chain : undefined;
 
   drawTextBox(ctx, displayName, theme.nameBox, theme.nameStyle, theme, width, height);
-  await drawInlineIconText(ctx, "Base", "base", theme.chainInline, theme, width, height);
+  await drawInlineIconText(ctx, chainLabel, chainIcon, theme.chainInline, theme, width, height);
   drawTextBox(ctx, mainRoast, theme.roastBox, theme.roastStyle, theme, width, height);
   drawTextBox(ctx, verdict, theme.verdictBox, theme.verdictStyle, theme, width, height);
 

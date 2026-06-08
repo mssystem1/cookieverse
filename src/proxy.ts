@@ -7,14 +7,26 @@ type ProxyHandler = (req: NextRequest) => Response | Promise<Response>;
 const COINBASE_X402_PATHS = new Set([
   "/api/x402/coinbase/wallet-roast/json",
   "/api/x402/coinbase/wallet-roast/identity",
+  "/api/x402/coinbase/xcup/prophecy",
+]);
+
+const QUESTFLOW_X402_PATHS = new Set([
+  "/api/x402/questflow/wallet-roast/identity",
+  "/api/x402/questflow/xcup/prophecy",
 ]);
 
 let cachedProxy: ProxyHandler | null = null;
+let cachedQuestflowProxy: ProxyHandler | null = null;
+
+const SUPPORTED_KINDS_TIMEOUT_MS = Number(
+  process.env.X402_SUPPORTED_KINDS_TIMEOUT_MS || "2500"
+);
 
 function allowedOrigin(req: NextRequest) {
   const origin = req.headers.get("origin");
 
   if (
+    (origin && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(origin)) ||
     origin === "http://127.0.0.1:3000" ||
     origin === "http://localhost:3000" ||
     origin === "https://cookieverse.tech" ||
@@ -31,9 +43,9 @@ function corsHeaders(req: NextRequest) {
     "Access-Control-Allow-Origin": allowedOrigin(req),
     "Access-Control-Allow-Methods": "POST,OPTIONS",
     "Access-Control-Allow-Headers":
-      "Content-Type, X-PAYMENT, x-payment, PAYMENT-SIGNATURE, payment-signature, Access-Control-Expose-Headers, access-control-expose-headers",
+      "Content-Type, X-PAYMENT, x-payment, PAYMENT-SIGNATURE, payment-signature, X-402-Transaction-Hash, x-402-transaction-hash, X-402-Timestamp, x-402-timestamp, Access-Control-Expose-Headers, access-control-expose-headers",
     "Access-Control-Expose-Headers":
-      "payment-required, PAYMENT-REQUIRED, x-payment-response, X-PAYMENT-RESPONSE, payment-response, PAYMENT-RESPONSE",
+      "payment-required, PAYMENT-REQUIRED, x-payment-response, X-PAYMENT-RESPONSE, payment-response, PAYMENT-RESPONSE, X-402-Amount, X-402-Token, X-402-Network, X-402-Chain-Id, X-402-Recipient",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
@@ -61,6 +73,61 @@ function json(req: NextRequest, payload: unknown, status = 500) {
       "Cache-Control": "no-store",
     },
   });
+}
+
+function supportedFallback(network: X402Network) {
+  return {
+    kinds: [
+      {
+        x402Version: 2,
+        scheme: "exact",
+        network,
+      },
+    ],
+    extensions: [],
+    signers: {},
+  };
+}
+
+function withSupportedKindsFallback<T extends { getSupported: () => Promise<any> }>(
+  client: T,
+  network: X402Network,
+  label: string
+): T {
+  return new Proxy(client as any, {
+    get(target, prop, receiver) {
+      if (prop !== "getSupported") {
+        const value = Reflect.get(target, prop, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+
+      return async () => {
+        try {
+          return await Promise.race([
+            target.getSupported(),
+            new Promise((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      `${label} facilitator supported-kind discovery timed out`
+                    )
+                  ),
+                SUPPORTED_KINDS_TIMEOUT_MS
+              )
+            ),
+          ]);
+        } catch (error) {
+          console.warn(
+            `[cookieverse:x402-supported-fallback:${label}]`,
+            error instanceof Error ? error.message : error
+          );
+
+          return supportedFallback(network);
+        }
+      };
+    },
+  }) as T;
 }
 
 function getNetwork(): X402Network {
@@ -122,8 +189,10 @@ async function buildPaymentProxy(): Promise<ProxyHandler> {
   const network = getNetwork();
   const payTo = getPayTo();
 
-  const facilitatorClient = new coreServer.HTTPFacilitatorClient(
-    coinbaseX402.facilitator
+  const facilitatorClient = withSupportedKindsFallback(
+    new coreServer.HTTPFacilitatorClient(coinbaseX402.facilitator),
+    network,
+    "coinbase"
   );
 
   const server = new nextX402.x402ResourceServer(facilitatorClient).register(
@@ -160,6 +229,112 @@ async function buildPaymentProxy(): Promise<ProxyHandler> {
           "Cookieverse Onchain Identity Roast. Returns roast JSON, rendered image, and NFT metadata.",
         mimeType: "application/json",
       },
+
+      "/api/x402/coinbase/xcup/prophecy": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: process.env.X402_XCUP_PROPHECY_PRICE || "$0.1",
+            network,
+            payTo,
+          },
+        ],
+        description:
+          "Cookieverse World Cup Match Prophecy. Generates research-backed prophecy JSON, renders a PNG card, and returns NFT-ready metadata.",
+        mimeType: "application/json",
+      },
+    },
+    server
+  );
+
+  return handler as unknown as ProxyHandler;
+}
+
+async function buildQuestflowPaymentProxy(): Promise<ProxyHandler> {
+  const enabled =
+    process.env.NEXT_PUBLIC_X402_MANTLE_ENABLED === "true" &&
+    process.env.X402_MANTLE_SERVER_PROVIDER === "questflow";
+
+  if (!enabled) {
+    return (req) =>
+      json(
+        req,
+        {
+          ok: false,
+          error: "Mantle Questflow x402 is disabled.",
+        },
+        503
+      );
+  }
+
+  const facilitatorUrl =
+    process.env.QUESTFLOW_FACILITATOR_URL || "https://facilitator.questflow.ai";
+  const apiKey = process.env.QUESTFLOW_FACILITATOR_API_KEY || "";
+  const payTo = process.env.QUESTFLOW_X402_PAY_TO || "";
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(payTo)) {
+    throw new Error("Missing or invalid QUESTFLOW_X402_PAY_TO");
+  }
+
+  const [nextX402, evmServer, coreServer] = await Promise.all([
+    import("@x402/next"),
+    import("@x402/evm/exact/server"),
+    import("@x402/core/server"),
+  ]);
+
+  const network = "eip155:5000" as `${string}:${string}`;
+  const authHeaders = apiKey
+    ? async () => {
+        const value = `Bearer ${apiKey}`;
+        return {
+          verify: { authorization: value },
+          settle: { authorization: value },
+          supported: { authorization: value },
+        };
+      }
+    : undefined;
+
+  const facilitatorClient = withSupportedKindsFallback(
+    new coreServer.HTTPFacilitatorClient({
+      url: facilitatorUrl,
+      createAuthHeaders: authHeaders,
+    }),
+    network,
+    "questflow"
+  );
+
+  const server = new nextX402.x402ResourceServer(facilitatorClient).register(
+    network,
+    new evmServer.ExactEvmScheme()
+  );
+
+  const handler = nextX402.paymentProxy(
+    {
+      "/api/x402/questflow/wallet-roast/identity": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: process.env.X402_MANTLE_WALLET_ROAST_PRICE || "$0.07",
+            network,
+            payTo,
+          },
+        ],
+        description: "Cookieverse Wallet Roast on Mantle.",
+        mimeType: "application/json",
+      },
+
+      "/api/x402/questflow/xcup/prophecy": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: process.env.X402_MANTLE_XCUP_PROPHECY_PRICE || "$0.09",
+            network,
+            payTo,
+          },
+        ],
+        description: "Cookieverse World Cup Prophecy on Mantle.",
+        mimeType: "application/json",
+      },
     },
     server
   );
@@ -180,7 +355,11 @@ async function getProxy() {
 }
 
 export async function proxy(req: NextRequest) {
-  if (!COINBASE_X402_PATHS.has(req.nextUrl.pathname)) {
+  const path = req.nextUrl.pathname;
+  const isCoinbase = COINBASE_X402_PATHS.has(path);
+  const isQuestflow = QUESTFLOW_X402_PATHS.has(path);
+
+  if (!isCoinbase && !isQuestflow) {
     return NextResponse.next();
   }
 
@@ -192,11 +371,23 @@ export async function proxy(req: NextRequest) {
   }
 
   try {
-    const handler = await getProxy();
-    const res = await handler(req);
-    return withCors(req, res);
+    if (isCoinbase) {
+      const handler = await getProxy();
+      const res = await handler(req);
+      return withCors(req, res);
+    }
+
+    if (isQuestflow) {
+      const handler =
+        cachedQuestflowProxy ||
+        (cachedQuestflowProxy = await buildQuestflowPaymentProxy());
+      const res = await handler(req);
+      return withCors(req, res);
+    }
+
+    return NextResponse.next();
   } catch (error) {
-    console.error("[cookieverse:coinbase-x402-proxy-failed]", error);
+    console.error("[cookieverse:x402-proxy-failed]", error);
 
     return json(
       req,
@@ -205,7 +396,7 @@ export async function proxy(req: NextRequest) {
         error:
           error instanceof Error
             ? error.message
-            : "Cookieverse Coinbase x402 proxy failed.",
+            : "Cookieverse x402 proxy failed.",
       },
       500
     );
@@ -216,5 +407,8 @@ export const config = {
   matcher: [
     "/api/x402/coinbase/wallet-roast/json",
     "/api/x402/coinbase/wallet-roast/identity",
+    "/api/x402/coinbase/xcup/prophecy",
+    "/api/x402/questflow/wallet-roast/identity",
+    "/api/x402/questflow/xcup/prophecy",
   ],
 };

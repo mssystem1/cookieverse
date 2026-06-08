@@ -1,4 +1,5 @@
 import type { ScoreBreakdown, WalletRoastAnalysis } from "./types";
+import { getPrimaryChainMetrics } from "./chains";
 
 function clamp(value: number, min = 0, max = 100) {
   if (!Number.isFinite(value)) return min;
@@ -71,7 +72,7 @@ export function computeMetrics(
     __activeDateKeys: string[];
   }
 ): Omit<WalletRoastAnalysis, "classification" | "roast_inputs" | "roast_text"> {
-  const base = input.chains.base;
+  const base = getPrimaryChainMetrics(input.chains, input.chain);
   const longestStreak = longestDateStreak(input.__activeDateKeys);
 
   const nonSpamHoldings = base.erc20_holdings.filter((t) => !t.is_spam);
@@ -137,6 +138,8 @@ export function computeMetrics(
 
   return {
     wallet: input.wallet,
+    chain: input.chain,
+    chain_label: input.chain_label,
     identity: input.identity,
     portfolio: {
       total_usd: round(totalUsd, 4),
@@ -149,7 +152,7 @@ export function computeMetrics(
     },
     chains: {
       ...input.chains,
-      base: {
+      [input.chain]: {
         ...base,
         longest_streak: longestStreak,
         dust_usd: round(dustUsd, 4),

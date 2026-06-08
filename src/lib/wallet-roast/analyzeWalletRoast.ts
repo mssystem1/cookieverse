@@ -1,5 +1,5 @@
 import { assertWalletRoastConfig } from "./config";
-import { fetchBaseWalletData } from "./fetchBaseWalletData";
+import { fetchWalletRoastData } from "./fetchBaseWalletData";
 import { normalizeWalletData } from "./normalizeWalletData";
 import { computeMetrics } from "./computeMetrics";
 import { classifyArchetype } from "./classifyArchetype";
@@ -8,6 +8,11 @@ import { buildTraits } from "./buildTraits";
 import { generateRoast } from "./generateRoast";
 import { fallbackRoast } from "./fallbackRoast";
 import type { TokenHolding, WalletRoastAnalysis } from "./types";
+import {
+  getPrimaryChainMetrics,
+  normalizeWalletRoastChain,
+  type WalletRoastChainKey,
+} from "./chains";
 
 const RESPONSE_TOKEN_LIMIT = Number(process.env.WALLET_ROAST_RESPONSE_TOKEN_LIMIT ?? "25");
 
@@ -20,8 +25,8 @@ function tokenSortScore(token: TokenHolding) {
 }
 
 function compactForResponse(analysis: WalletRoastAnalysis): WalletRoastAnalysis {
-  const base = analysis.chains.base;
-  const compactHoldings = [...base.erc20_holdings]
+  const primaryChain = getPrimaryChainMetrics(analysis.chains, analysis.chain);
+  const compactHoldings = [...primaryChain.erc20_holdings]
     .sort((a, b) => tokenSortScore(b) - tokenSortScore(a))
     .slice(0, RESPONSE_TOKEN_LIMIT);
 
@@ -29,19 +34,23 @@ function compactForResponse(analysis: WalletRoastAnalysis): WalletRoastAnalysis 
     ...analysis,
     chains: {
       ...analysis.chains,
-      base: {
-        ...base,
+      [analysis.chain]: {
+        ...primaryChain,
         erc20_holdings: compactHoldings,
       },
     },
   };
 }
 
-export async function analyzeWalletRoast(wallet: string): Promise<WalletRoastAnalysis> {
-  assertWalletRoastConfig();
+export async function analyzeWalletRoast(
+  wallet: string,
+  chainInput: WalletRoastChainKey | string = "base"
+): Promise<WalletRoastAnalysis> {
+  const chain = normalizeWalletRoastChain(chainInput);
+  assertWalletRoastConfig(chain);
 
-  const raw = await fetchBaseWalletData(wallet);
-  const normalized = await normalizeWalletData(wallet, raw);
+  const raw = await fetchWalletRoastData(wallet, chain);
+  const normalized = await normalizeWalletData(wallet, raw, chain);
   const withMetrics = computeMetrics(normalized);
 
   const classified = classifyArchetype(withMetrics);

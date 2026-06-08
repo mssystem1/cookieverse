@@ -7,18 +7,27 @@ export const walletRoastConfig = {
   ogProviderAddress: process.env.OG_PROVIDER_ADDRESS || "",
   ogModel: process.env.OG_MODEL || "openai/gpt-oss-20b",
   ogLedgerFundAmount: Number(process.env.OG_LEDGER_FUND_AMOUNT || "3"),
+  ogAutoTopUpLedger: process.env.OG_AUTO_TOP_UP_LEDGER !== "false",
+  ogLedgerTopUpTargetAmount: Number(process.env.OG_LEDGER_TOP_UP_TARGET_AMOUNT || "3"),
+  ogRequestTimeoutMs: Number(process.env.OG_REQUEST_TIMEOUT_MS || "60000"),
 
   basescanApiKey: process.env.ETHERSCAN_API_KEY || "",
-  dustThresholdUsd: Number(process.env.WALLET_ROAST_DUST_THRESHOLD_USD || "1.5"),
+  dustThresholdUsd: Number(process.env.WALLET_ROAST_DUST_THRESHOLD_USD || "5"),
 
   ogProviderFundAmount: Number(process.env.OG_PROVIDER_FUND_AMOUNT || "2"),
 };
 
-export function assertWalletRoastConfig() {
+export function assertWalletRoastConfig(chain: "base" | "mantle" | "xlayer" = "base") {
   const missing: string[] = [];
 
-  if (!walletRoastConfig.basescanApiKey) {
+  if ((chain === "base" || chain === "mantle") && !walletRoastConfig.basescanApiKey) {
     missing.push("BASESCAN_API_KEY");
+  }
+
+  if (chain === "xlayer") {
+    if (!process.env.OKX_XLAYER_API_KEY) missing.push("OKX_XLAYER_API_KEY");
+    if (!process.env.OKX_XLAYER_API_SECRET) missing.push("OKX_XLAYER_API_SECRET");
+    if (!process.env.OKX_XLAYER_API_PASSPHRASE) missing.push("OKX_XLAYER_API_PASSPHRASE");
   }
 
   if (walletRoastConfig.provider === "openai" && !process.env.OPENAI_API_KEY_MFC_NEW) {

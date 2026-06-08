@@ -17,7 +17,7 @@ const wagmiConfig = createConfig({
   chains: [baseMainnet],
   transports: { [baseMainnet.id]: http() }, // your RPC setup (can keep http() if set globally)
   connectors: [
-    miniAppConnector()
+    miniAppConnector() as any
   ]
 });
 

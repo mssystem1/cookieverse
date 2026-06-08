@@ -1,4 +1,5 @@
 import type { WalletRoastAnalysis } from "./types";
+import { getPrimaryChainMetrics } from "./chains";
 
 function addUnique(tags: string[], tag: string) {
   if (!tags.includes(tag)) tags.push(tag);
@@ -9,9 +10,10 @@ export function buildTags(
   archetype: string
 ): string[] {
   const tags: string[] = [];
-  const nftCount = x.metrics.nft_holdings_count ?? x.chains.base.nft_holdings_count;
-  const bridgeTxCount = x.metrics.bridge_tx_count ?? x.chains.base.bridge_tx_count;
-  const spamTokenCount = x.metrics.spam_token_count ?? x.chains.base.spam_token_count ?? 0;
+  const primaryChain = getPrimaryChainMetrics(x.chains, x.chain);
+  const nftCount = x.metrics.nft_holdings_count ?? primaryChain.nft_holdings_count;
+  const bridgeTxCount = x.metrics.bridge_tx_count ?? primaryChain.bridge_tx_count;
+  const spamTokenCount = x.metrics.spam_token_count ?? primaryChain.spam_token_count ?? 0;
 
   if (nftCount >= 100) addUnique(tags, "NFT addict");
   else if (nftCount >= 10) addUnique(tags, "NFT minter");
@@ -25,7 +27,7 @@ export function buildTags(
   if (spamTokenCount >= 25) addUnique(tags, "airdrop magnet");
   else if (x.portfolio.dust_ratio >= 30) addUnique(tags, "dust farmer");
 
-  if (x.portfolio.defi_ratio >= 35 || (x.chains.base.defi_position_count ?? 0) >= 2) {
+  if (x.portfolio.defi_ratio >= 35 || (primaryChain.defi_position_count ?? 0) >= 2) {
     addUnique(tags, "DeFi user");
   }
 

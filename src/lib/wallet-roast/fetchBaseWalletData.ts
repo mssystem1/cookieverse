@@ -15,9 +15,14 @@ import {
 } from "viem";
 import { base, mainnet } from "viem/chains";
 import { walletRoastConfig } from "./config";
+import { createHmac } from "node:crypto";
+import {
+  getWalletRoastChainConfig,
+  type WalletRoastChainKey,
+  type WalletRoastChainConfig,
+} from "./chains";
 
 const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
-const BASE_CHAIN_ID = 8453;
 
 const ETHERSCAN_TIMEOUT_MS = 12_000;
 const ETHERSCAN_MAX_CONCURRENT = Number(process.env.ETHERSCAN_MAX_CONCURRENT ?? "2");
@@ -27,16 +32,46 @@ const ETHERSCAN_MAX_PAGES = Number(process.env.ETHERSCAN_MAX_PAGES ?? "10");
 const CACHE_TTL_MS = 30_000;
 
 const BASENAME_TIMEOUT_MS = 4_500;
+const ENS_REGISTRY_ADDRESS = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e" as const;
 const BASENAME_L2_RESOLVER_ADDRESS = "0xC6d566A56A1aFf6508b41f6c90ff131615583BCD" as const;
 const BASE_RPC_URL =
   process.env.BASE_RPC_URL ?? process.env.NEXT_PUBLIC_BASE_RPC_URL ?? "https://mainnet.base.org";
+const XLAYER_RPC_URL =
+  process.env.XLAYER_RPC_URL ??
+  process.env.NEXT_PUBLIC_RPC_HTTP_XLAYER ??
+  "https://rpc.xlayer.tech";
 const ETHEREUM_RPC_URL =
   process.env.ETHEREUM_RPC_URL ??
   process.env.MAINNET_RPC_URL ??
   process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL;
+const ENS_RPC_URL = ETHEREUM_RPC_URL ?? "https://ethereum-rpc.publicnode.com";
 const ENABLE_BASENAME_ENSIP19_FALLBACK = process.env.ENABLE_BASENAME_ENSIP19_FALLBACK === "true";
+const ENS_REVERSE_CHAIN_IDS = [
+  1, // Ethereum mainnet
+  base.id,
+  5000, // Mantle
+  196, // X Layer
+  42161, // Arbitrum One
+  42170, // Arbitrum Nova
+  10, // Optimism
+  137, // Polygon
+];
+const WALLET_ROAST_NAME_OVERRIDES =
+  process.env.WALLET_ROAST_NAME_OVERRIDES ??
+  process.env.NEXT_PUBLIC_WALLET_ROAST_NAME_OVERRIDES ??
+  "";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const ENS_REGISTRY_ABI = [
+  {
+    type: "function",
+    name: "resolver",
+    stateMutability: "view",
+    inputs: [{ name: "node", type: "bytes32" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
 
 const L2_RESOLVER_ABI = [
   {
@@ -133,7 +168,7 @@ async function runLimited<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-function buildEtherscanV2Url(params: Record<string, string>) {
+function buildEtherscanV2Url(params: Record<string, string>, chainId: number) {
   const apiKey = walletRoastConfig.basescanApiKey;
   if (!apiKey) {
     throw new Error("Missing walletRoastConfig.basescanApiKey. Use your Etherscan V2 API key here.");
@@ -142,7 +177,7 @@ function buildEtherscanV2Url(params: Record<string, string>) {
   const url = new URL(ETHERSCAN_V2_API);
 
   Object.entries({
-    chainid: String(BASE_CHAIN_ID),
+    chainid: String(chainId),
     apikey: apiKey,
     ...params,
   }).forEach(([key, value]) => {
@@ -217,6 +252,7 @@ async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
 async function callEtherscanV2<T = any>(
   params: Record<string, string>,
   opts?: {
+    chainId?: number;
     timeoutMs?: number;
     retries?: number;
     cacheTtlMs?: number;
@@ -226,7 +262,7 @@ async function callEtherscanV2<T = any>(
   const retries = opts?.retries ?? ETHERSCAN_RETRIES;
   const cacheTtlMs = opts?.cacheTtlMs ?? CACHE_TTL_MS;
 
-  const url = buildEtherscanV2Url(params);
+  const url = buildEtherscanV2Url(params, opts?.chainId ?? 8453);
   const now = Date.now();
 
   const cached = responseCache.get(url);
@@ -281,7 +317,7 @@ async function callEtherscanV2<T = any>(
 
 async function callEtherscanV2Paged(
   params: Record<string, string>,
-  opts?: { pageSize?: number; maxPages?: number }
+  opts?: { chainId?: number; pageSize?: number; maxPages?: number }
 ): Promise<EtherscanResponse<any[]>> {
   const pageSize = opts?.pageSize ?? ETHERSCAN_PAGE_SIZE;
   const maxPages = opts?.maxPages ?? ETHERSCAN_MAX_PAGES;
@@ -293,7 +329,7 @@ async function callEtherscanV2Paged(
       page: String(page),
       offset: String(pageSize),
       sort: params.sort ?? "asc",
-    });
+    }, { chainId: opts?.chainId });
 
     if (isNoRows(payload)) {
       return { status: "1", message: "OK", result };
@@ -359,10 +395,14 @@ function chainIdToReverseCoinTypeHex(chainId: number) {
   return ((0x80000000 | chainId) >>> 0).toString(16).toUpperCase();
 }
 
-function addressToBasenameReverseNode(address: Address): Hex {
+function addressToEnsReverseNode(address: Address, chainId: number): Hex {
   const addressLabelHash = keccak256(stringToBytes(address.toLowerCase().slice(2)));
-  const reverseNamespaceNode = namehash(`${chainIdToReverseCoinTypeHex(base.id)}.reverse`);
+  const reverseNamespaceNode = namehash(`${chainIdToReverseCoinTypeHex(chainId)}.reverse`);
   return keccak256(concat([reverseNamespaceNode, addressLabelHash]));
+}
+
+function addressToBasenameReverseNode(address: Address): Hex {
+  return addressToEnsReverseNode(address, base.id);
 }
 
 async function ethCallJsonRpc({
@@ -468,6 +508,137 @@ async function resolveBasenameViaEnsip19(address: Address): Promise<string | nul
   }
 }
 
+function cleanResolvedName(name: unknown): string | null {
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+}
+
+function resolveDisplayNameOverride(address: Address): string | null {
+  const raw = WALLET_ROAST_NAME_OVERRIDES.trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const value = parsed[address] ?? parsed[address.toLowerCase()];
+    return cleanResolvedName(value);
+  } catch {
+    for (const item of raw.split(/[,\n]/)) {
+      const [rawAddress, ...nameParts] = item.split("=");
+      if (!rawAddress || !nameParts.length) continue;
+      if (normalizeAddr(rawAddress) !== address.toLowerCase()) continue;
+      return cleanResolvedName(nameParts.join("=").trim());
+    }
+  }
+
+  return null;
+}
+
+async function resolveEnsNameForCoinType(
+  client: ReturnType<typeof createPublicClient>,
+  address: Address,
+  chainId?: number
+): Promise<string | null> {
+  try {
+    const params =
+      chainId && chainId !== 1
+        ? { address, coinType: toCoinType(chainId) }
+        : { address };
+    const name = await Promise.race([
+      client.getEnsName(params),
+      timeoutPromise(BASENAME_TIMEOUT_MS + 500, null),
+    ]);
+
+    return cleanResolvedName(name);
+  } catch (error) {
+    console.warn("resolveEnsNameForCoinType failed:", { chainId, error });
+    return null;
+  }
+}
+
+async function resolveEnsNameFromRegistry(
+  address: Address,
+  chainId: number
+): Promise<string | null> {
+  try {
+    const node = addressToEnsReverseNode(address, chainId);
+    const resolverCall = encodeFunctionData({
+      abi: ENS_REGISTRY_ABI,
+      functionName: "resolver",
+      args: [node],
+    });
+
+    const resolverResult = await Promise.race([
+      ethCallJsonRpc({
+        rpcUrl: ENS_RPC_URL,
+        to: ENS_REGISTRY_ADDRESS,
+        data: resolverCall,
+        timeoutMs: BASENAME_TIMEOUT_MS,
+      }),
+      timeoutPromise<Hex | null>(BASENAME_TIMEOUT_MS + 500, null),
+    ]);
+
+    if (!resolverResult) return null;
+
+    const resolver = decodeFunctionResult({
+      abi: ENS_REGISTRY_ABI,
+      functionName: "resolver",
+      data: resolverResult,
+    });
+
+    if (
+      typeof resolver !== "string" ||
+      normalizeAddr(resolver) === ZERO_ADDRESS
+    ) {
+      return null;
+    }
+
+    const nameCall = encodeFunctionData({
+      abi: L2_RESOLVER_ABI,
+      functionName: "name",
+      args: [node],
+    });
+
+    const nameResult = await Promise.race([
+      ethCallJsonRpc({
+        rpcUrl: ENS_RPC_URL,
+        to: getAddress(resolver),
+        data: nameCall,
+        timeoutMs: BASENAME_TIMEOUT_MS,
+      }),
+      timeoutPromise<Hex | null>(BASENAME_TIMEOUT_MS + 500, null),
+    ]);
+
+    if (!nameResult) return null;
+
+    const decoded = decodeFunctionResult({
+      abi: L2_RESOLVER_ABI,
+      functionName: "name",
+      data: nameResult,
+    });
+
+    return cleanResolvedName(decoded);
+  } catch (error) {
+    console.warn("resolveEnsNameFromRegistry failed:", { chainId, error });
+    return null;
+  }
+}
+
+async function resolveEnsName(address: Address): Promise<string | null> {
+  const client = createPublicClient({
+    chain: mainnet,
+    transport: http(ENS_RPC_URL, { timeout: BASENAME_TIMEOUT_MS }),
+  });
+
+  for (const chainId of ENS_REVERSE_CHAIN_IDS) {
+    const name = await resolveEnsNameForCoinType(client, address, chainId);
+    if (name) return name;
+
+    const directName = await resolveEnsNameFromRegistry(address, chainId);
+    if (directName) return directName;
+  }
+
+  return null;
+}
+
 async function resolveBasename(address: string): Promise<string | null> {
   if (!isAddress(address)) return null;
   const checksum = getAddress(address);
@@ -476,6 +647,27 @@ async function resolveBasename(address: string): Promise<string | null> {
   if (l2Name) return l2Name;
 
   return resolveBasenameViaEnsip19(checksum);
+}
+
+async function resolveWalletDisplayName(
+  address: string,
+  chain: WalletRoastChainKey
+): Promise<string | null> {
+  if (!isAddress(address)) return null;
+  const checksum = getAddress(address);
+
+  const override = resolveDisplayNameOverride(checksum);
+  if (override) return override;
+
+  if (chain === "base") {
+    const basename = await resolveBasename(checksum);
+    if (basename) return basename;
+  }
+
+  const ensName = await resolveEnsName(checksum);
+  if (ensName) return ensName;
+
+  return resolveDisplayNameOverride(checksum);
 }
 
 function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
@@ -655,12 +847,17 @@ function buildNftBalancesFromTransfers(
   };
 }
 
-export async function fetchBaseWalletData(wallet: string) {
+async function fetchEtherscanWalletData(
+  wallet: string,
+  chainConfig: WalletRoastChainConfig
+) {
   if (!isAddress(wallet)) {
     throw new Error(`Invalid wallet address: ${wallet}`);
   }
 
   const normalizedWallet = getAddress(wallet);
+  const chainId = chainConfig.chainId;
+  const shouldFetchNativeUsdPrice = chainConfig.nativePriceSymbol === "ETH";
 
   const [
     basenameResult,
@@ -672,17 +869,23 @@ export async function fetchBaseWalletData(wallet: string) {
     tokenNftTxResult,
     token1155TxResult,
   ] = await Promise.allSettled([
-    resolveBasename(normalizedWallet),
+    resolveWalletDisplayName(normalizedWallet, chainConfig.key),
     callEtherscanV2({
       module: "account",
       action: "balance",
       address: normalizedWallet,
       tag: "latest",
-    }),
-    callEtherscanV2({
-      module: "stats",
-      action: "ethprice",
-    }),
+    }, { chainId }),
+    shouldFetchNativeUsdPrice
+      ? callEtherscanV2({
+          module: "stats",
+          action: "ethprice",
+        }, { chainId })
+      : Promise.resolve({
+          status: "1",
+          message: "OK",
+          result: { ethusd: "0" },
+        } as EtherscanResponse<any>),
     callEtherscanV2Paged({
       module: "account",
       action: "txlist",
@@ -690,7 +893,7 @@ export async function fetchBaseWalletData(wallet: string) {
       startblock: "0",
       endblock: "999999999",
       sort: "asc",
-    }),
+    }, { chainId }),
     callEtherscanV2Paged({
       module: "account",
       action: "txlistinternal",
@@ -698,7 +901,7 @@ export async function fetchBaseWalletData(wallet: string) {
       startblock: "0",
       endblock: "999999999",
       sort: "asc",
-    }),
+    }, { chainId }),
     callEtherscanV2Paged({
       module: "account",
       action: "tokentx",
@@ -706,7 +909,7 @@ export async function fetchBaseWalletData(wallet: string) {
       startblock: "0",
       endblock: "999999999",
       sort: "asc",
-    }),
+    }, { chainId }),
     callEtherscanV2Paged({
       module: "account",
       action: "tokennfttx",
@@ -714,7 +917,7 @@ export async function fetchBaseWalletData(wallet: string) {
       startblock: "0",
       endblock: "999999999",
       sort: "asc",
-    }),
+    }, { chainId }),
     callEtherscanV2Paged({
       module: "account",
       action: "token1155tx",
@@ -722,7 +925,7 @@ export async function fetchBaseWalletData(wallet: string) {
       startblock: "0",
       endblock: "999999999",
       sort: "asc",
-    }),
+    }, { chainId }),
   ]);
 
   const txlist = settledValue<EtherscanResponse<any[]>>(txlistResult, createEmptyListResponse());
@@ -771,8 +974,416 @@ export async function fetchBaseWalletData(wallet: string) {
     bridgeTxCount,
     meta: {
       source: "etherscan-v2-lite",
-      chainid: BASE_CHAIN_ID,
+      chainid: chainId,
+      chain: chainConfig.key,
       warnings: [txlist.warning, txlistinternal.warning, tokentx.warning, tokennfttx.warning, token1155tx.warning].filter(Boolean),
     },
   };
+}
+
+export async function fetchBaseWalletData(wallet: string) {
+  return fetchEtherscanWalletData(wallet, getWalletRoastChainConfig("base"));
+}
+
+const OKX_XLAYER_API_BASE_URL = (
+  process.env.OKX_XLAYER_API_BASE_URL || "https://www.okx.com"
+).replace(/\/+$/, "");
+
+const OKX_XLAYER_API_KEY = process.env.OKX_XLAYER_API_KEY || "";
+const OKX_XLAYER_API_SECRET = process.env.OKX_XLAYER_API_SECRET || "";
+const OKX_XLAYER_API_PASSPHRASE = process.env.OKX_XLAYER_API_PASSPHRASE || "";
+const OKX_XLAYER_PAGE_LIMIT = process.env.OKX_XLAYER_PAGE_LIMIT || "50";
+const OKX_XLAYER_MAX_PAGES = Number(process.env.OKX_XLAYER_MAX_PAGES || "8");
+
+function assertOkxXLayerAuthEnv() {
+  const missing: string[] = [];
+
+  if (!OKX_XLAYER_API_KEY) missing.push("OKX_XLAYER_API_KEY");
+  if (!OKX_XLAYER_API_SECRET) missing.push("OKX_XLAYER_API_SECRET");
+  if (!OKX_XLAYER_API_PASSPHRASE) missing.push("OKX_XLAYER_API_PASSPHRASE");
+
+  if (missing.length) {
+    throw new Error(`Missing OKX X Layer API auth envs: ${missing.join(", ")}`);
+  }
+}
+
+function buildOkxSignedHeaders(params: {
+  method: "GET" | "POST";
+  requestPathWithQuery: string;
+  body?: string;
+}): HeadersInit {
+  assertOkxXLayerAuthEnv();
+
+  const timestamp = new Date().toISOString();
+  const body = params.body ?? "";
+  const prehash = `${timestamp}${params.method}${params.requestPathWithQuery}${body}`;
+  const sign = createHmac("sha256", OKX_XLAYER_API_SECRET)
+    .update(prehash)
+    .digest("base64");
+
+  return {
+    accept: "application/json, text/plain, */*",
+    "user-agent": "Cookieverse/1.0",
+    "OK-ACCESS-KEY": OKX_XLAYER_API_KEY,
+    "OK-ACCESS-TIMESTAMP": timestamp,
+    "OK-ACCESS-PASSPHRASE": OKX_XLAYER_API_PASSPHRASE,
+    "OK-ACCESS-SIGN": sign,
+  };
+}
+
+async function fetchOkxXLayerGet(
+  pathname: string,
+  params: Record<string, string>
+): Promise<any> {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value) searchParams.set(key, value);
+  }
+
+  const requestPathWithQuery = `${pathname}?${searchParams.toString()}`;
+  const url = `${OKX_XLAYER_API_BASE_URL}${requestPathWithQuery}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ETHERSCAN_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      method: "GET",
+      headers: buildOkxSignedHeaders({
+        method: "GET",
+        requestPathWithQuery,
+      }),
+      signal: controller.signal,
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      throw new Error(`OKX X Layer API HTTP ${res.status}: ${text.slice(0, 300)}`);
+    }
+
+    const json = text ? JSON.parse(text) : null;
+
+    if (json?.code && json.code !== "0") {
+      throw new Error(`OKX X Layer API error ${json.code}: ${json.msg || text.slice(0, 300)}`);
+    }
+
+    return json;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function okxDataPage(json: any): any {
+  return Array.isArray(json?.data) ? json.data[0] : null;
+}
+
+function okxTotalPage(json: any): number {
+  const raw = okxDataPage(json)?.totalPage ?? "1";
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, OKX_XLAYER_MAX_PAGES) : 1;
+}
+
+function okxTokenList(json: any): any[] {
+  const page = okxDataPage(json);
+  return Array.isArray(page?.tokenList) ? page.tokenList : [];
+}
+
+function okxTransactionList(json: any): any[] {
+  const page = okxDataPage(json);
+  if (Array.isArray(page?.transactionList)) return page.transactionList;
+  if (Array.isArray(page?.transactionLists)) return page.transactionLists;
+  return [];
+}
+
+function rawOkxField(item: any, ...keys: string[]) {
+  for (const key of keys) {
+    const parts = key.split(".");
+    let value = item;
+    for (const part of parts) value = value?.[part];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return undefined;
+}
+
+function decimalToRawAmount(value: unknown, decimals: number) {
+  const text = String(value ?? "0").trim();
+  if (!text || !/^\d+(\.\d+)?$/.test(text)) return "0";
+
+  const [whole, fraction = ""] = text.split(".");
+  const safeDecimals = Math.max(0, Math.min(36, decimals));
+  const paddedFraction = fraction.padEnd(safeDecimals, "0").slice(0, safeDecimals);
+  const raw = `${whole}${paddedFraction}`.replace(/^0+/, "");
+  return raw || "0";
+}
+
+function okxTokenAddress(item: any) {
+  return normalizeAddr(
+    rawOkxField(
+      item,
+      "tokenContractAddress",
+      "tokenAddress",
+      "contractAddress",
+      "token.tokenContractAddress",
+      "token.address",
+      "token.hash"
+    )
+  );
+}
+
+function okxTokenId(item: any) {
+  const raw = rawOkxField(
+    item,
+    "tokenId",
+    "tokenID",
+    "token_id",
+    "tokenInstance.id",
+    "token_instance.id",
+    "token_instance.token_id"
+  );
+
+  if (typeof raw === "number" || typeof raw === "bigint") return String(raw);
+  if (typeof raw === "string" && raw.startsWith("0x")) return BigInt(raw).toString();
+  return String(raw ?? "");
+}
+
+function okxTimestamp(item: any) {
+  const raw = rawOkxField(item, "timeStamp", "timestamp", "transactionTime", "txTime", "blockTime");
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return String(n > 10_000_000_000 ? Math.floor(n / 1000) : n);
+}
+
+function okxTxHash(item: any) {
+  return String(
+    rawOkxField(item, "txId", "hash", "txHash", "transactionHash", "transaction_hash") || ""
+  ).toLowerCase();
+}
+
+function okxAddressLike(item: any, ...keys: string[]) {
+  return String(rawOkxField(item, ...keys) || "").toLowerCase();
+}
+
+function okxTokenBalanceToExplorerToken(item: any) {
+  const decimals = Number(rawOkxField(item, "tokenDecimal", "decimals", "token.decimals") ?? 18);
+  const safeDecimals = Number.isFinite(decimals) ? decimals : 18;
+  const rawBalance = rawOkxField(item, "balance", "rawBalance", "tokenQuantity");
+  const decimalBalance = rawOkxField(item, "holdingAmount", "amount", "tokenAmount", "quantity");
+
+  return {
+    TokenAddress: getValidAddress(okxTokenAddress(item)),
+    TokenName: String(rawOkxField(item, "tokenName", "name", "token.name") || ""),
+    TokenSymbol: String(rawOkxField(item, "tokenSymbol", "symbol", "token.symbol") || ""),
+    TokenQuantity:
+      typeof rawBalance === "string" && /^\d+$/.test(rawBalance)
+        ? rawBalance
+        : decimalToRawAmount(decimalBalance, safeDecimals),
+    TokenDivisor: String(safeDecimals),
+    TokenPriceUSD: String(rawOkxField(item, "tokenPrice", "priceUsd", "price_usd") || "0"),
+  };
+}
+
+const XLAYER_NATIVE_OKB_PRICE_ADDRESSES = new Set([
+  "0xdb32fcf62fc0f8720944f136a72c47c17929c877", // z0WOKB on X Layer
+]);
+
+function getXLayerNativeOkbPriceUsdFromBalances(items: any[]) {
+  for (const item of items) {
+    const address = okxTokenAddress(item);
+    const symbol = String(rawOkxField(item, "tokenSymbol", "symbol", "token.symbol") || "");
+    const price = Number(rawOkxField(item, "tokenPrice", "priceUsd", "price_usd") || "0");
+
+    if (
+      Number.isFinite(price) &&
+      price > 0 &&
+      (XLAYER_NATIVE_OKB_PRICE_ADDRESSES.has(address) ||
+        /^(okb|wokb|z0wokb)$/i.test(symbol.trim()))
+    ) {
+      return price;
+    }
+  }
+
+  return 0;
+}
+
+function okxTransferToExplorerTx(item: any) {
+  const decimals = Number(rawOkxField(item, "tokenDecimal", "decimals", "token.decimals") ?? 18);
+  const safeDecimals = Number.isFinite(decimals) ? decimals : 18;
+  const rawValue = rawOkxField(item, "value", "rawAmount");
+  const decimalValue = rawOkxField(item, "amount", "tokenAmount", "quantity");
+
+  return {
+    hash: okxTxHash(item),
+    from: okxAddressLike(item, "from", "fromAddress", "from_address", "from.address"),
+    to: okxAddressLike(item, "to", "toAddress", "to_address", "to.address"),
+    contractAddress: getValidAddress(okxTokenAddress(item)),
+    tokenName: String(rawOkxField(item, "tokenName", "name", "token.name", "symbol") || ""),
+    tokenSymbol: String(rawOkxField(item, "tokenSymbol", "symbol", "token.symbol") || ""),
+    tokenDecimal: String(safeDecimals),
+    value:
+      typeof rawValue === "string" && /^\d+$/.test(rawValue)
+        ? rawValue
+        : decimalToRawAmount(decimalValue, safeDecimals),
+    tokenID: okxTokenId(item),
+    methodId: String(rawOkxField(item, "methodId", "method_id") || ""),
+    functionName: String(rawOkxField(item, "functionName", "method") || ""),
+    timeStamp: okxTimestamp(item),
+    isFromContract: Boolean(rawOkxField(item, "isFromContract")),
+    isToContract: Boolean(rawOkxField(item, "isToContract")),
+  };
+}
+
+async function fetchOkxTokenBalances(owner: string, protocolType: "token_20" | "token_721") {
+  const items: any[] = [];
+  let page = 1;
+  let totalPage = 1;
+
+  do {
+    const json = await fetchOkxXLayerGet("/api/v5/xlayer/address/token-balance", {
+      chainShortName: "xlayer",
+      address: owner,
+      protocolType,
+      page: String(page),
+      limit: OKX_XLAYER_PAGE_LIMIT,
+    });
+
+    totalPage = okxTotalPage(json);
+    items.push(...okxTokenList(json));
+    page += 1;
+  } while (page <= totalPage);
+
+  return items;
+}
+
+async function fetchOkxTokenTransactions(owner: string, protocolType: "token_20" | "token_721") {
+  const items: any[] = [];
+  let page = 1;
+  let totalPage = 1;
+
+  do {
+    const json = await fetchOkxXLayerGet("/api/v5/xlayer/address/token-transaction-list", {
+      chainShortName: "xlayer",
+      address: owner,
+      protocolType,
+      page: String(page),
+      limit: OKX_XLAYER_PAGE_LIMIT,
+    });
+
+    totalPage = okxTotalPage(json);
+    items.push(...okxTransactionList(json));
+    page += 1;
+  } while (page <= totalPage);
+
+  return items;
+}
+
+async function fetchNativeBalanceViaRpc(wallet: string, rpcUrl: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ETHERSCAN_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(rpcUrl, {
+      method: "POST",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_getBalance",
+        params: [wallet, "latest"],
+      }),
+    });
+
+    const payload = await res.json().catch(() => null);
+    const result = payload?.result;
+
+    if (!res.ok || payload?.error || typeof result !== "string") {
+      return "0";
+    }
+
+    return BigInt(result).toString();
+  } catch {
+    return "0";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchXLayerWalletData(wallet: string) {
+  if (!isAddress(wallet)) {
+    throw new Error(`Invalid wallet address: ${wallet}`);
+  }
+
+  const normalizedWallet = getAddress(wallet);
+
+  const [displayName, balance, erc20Balances, nftBalances, erc20Txs, erc721Txs] =
+    await Promise.all([
+      resolveWalletDisplayName(normalizedWallet, "xlayer"),
+      fetchNativeBalanceViaRpc(normalizedWallet, XLAYER_RPC_URL),
+      fetchOkxTokenBalances(normalizedWallet, "token_20"),
+      fetchOkxTokenBalances(normalizedWallet, "token_721"),
+      fetchOkxTokenTransactions(normalizedWallet, "token_20"),
+      fetchOkxTokenTransactions(normalizedWallet, "token_721"),
+    ]);
+
+  const tokenTransfers = erc20Txs.map(okxTransferToExplorerTx);
+  const nftTransfers = erc721Txs.map(okxTransferToExplorerTx);
+  const nativeOkbUsd = getXLayerNativeOkbPriceUsdFromBalances(erc20Balances);
+  const txByHash = new Map<string, any>();
+
+  for (const tx of [...tokenTransfers, ...nftTransfers]) {
+    const hash = String(tx.hash || "").toLowerCase();
+    if (hash && !txByHash.has(hash)) txByHash.set(hash, tx);
+  }
+
+  const txs = [...txByHash.values()];
+
+  const bridgeTxCount = countBridgeTransactions({
+    txs,
+    tokenTransfers,
+    erc721Transfers: nftTransfers,
+  });
+
+  return {
+    basename: displayName,
+    balance: { status: "1", message: "OK", result: balance },
+    ethprice: { status: "1", message: "OK", result: { ethusd: String(nativeOkbUsd) } },
+    txlist: { status: "1", message: "OK", result: txs },
+    txlistinternal: createEmptyListResponse(),
+    tokentx: { status: "1", message: "OK", result: tokenTransfers },
+    tokennfttx: { status: "1", message: "OK", result: nftTransfers },
+    token1155tx: createEmptyListResponse(),
+    tokenbalance: {
+      status: "1",
+      message: "OK",
+      result: erc20Balances.map(okxTokenBalanceToExplorerToken),
+    },
+    nftbalance: {
+      status: "1",
+      message: "OK",
+      result: nftBalances,
+    },
+    bridgeTxCount,
+    meta: {
+      source: "okx-xlayer",
+      chainid: 196,
+      chain: "xlayer",
+      warnings: [],
+    },
+  };
+}
+
+export async function fetchWalletRoastData(
+  wallet: string,
+  chain: WalletRoastChainKey = "base"
+) {
+  const chainConfig = getWalletRoastChainConfig(chain);
+
+  if (chainConfig.dataSource === "okx-xlayer") {
+    return fetchXLayerWalletData(wallet);
+  }
+
+  return fetchEtherscanWalletData(wallet, chainConfig);
 }

@@ -3,14 +3,24 @@ import os from "node:os";
 import path from "node:path";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 
-export type X402Product = "roast-json" | "identity-roast";
-export type X402Provider = "bankr" | "coinbase";
+export type X402Product = "roast-json" | "identity-roast" | "xcup-prophecy";
+export type X402Provider =
+  | "bankr"
+  | "coinbase"
+  | "questflow"
+  | "mantle-devkit"
+  | "cookieverse-mantle"
+  | "okx";
 
 export type X402UsageEvent = {
   wallet: `0x${string}`;
   product: X402Product;
   provider: X402Provider;
-  endpoint: "cookieverse-roast-json" | "cookieverse-identity-roast";
+  chain?: "base" | "mantle" | "xlayer";
+  endpoint:
+    | "cookieverse-roast-json"
+    | "cookieverse-identity-roast"
+    | "cookieverse-xcup-prophecy";
   requestId: string;
   imageUrl?: string;
   metadataReady?: boolean;
@@ -131,12 +141,14 @@ export async function getX402UsageSummary(address: string) {
 
   const roastJson = events.filter((e) => e.product === "roast-json").length;
   const identityRoast = events.filter((e) => e.product === "identity-roast").length;
+  const xcupProphecy = events.filter((e) => e.product === "xcup-prophecy").length;
 
   return {
     address: normAddr(address),
     total: events.length,
     roastJson,
     identityRoast,
+    xcupProphecy,
     lastUsedAt: events.length ? events[events.length - 1].createdAt : null
   };
 }

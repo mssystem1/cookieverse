@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>Cookieverse turns wallets into AI-powered social identities: fortune NFTs, paid x402 Wallet Roast products, World Cup prophecy NFTs on X Layer, cross-chain COOKIEs, dashboards, Galxe tasks, and leaderboards.</b>
+  <b>Cookieverse turns wallets into AI-powered social identities: fortune NFTs, chain-aware Wallet Roast cards, paid HTTP 402/x402 products on Base, Mantle and X Layer, World Cup prophecy NFTs, cross-chain COOKIEs, dashboards, Galxe tasks, and leaderboards.</b>
 </p>
 
 <p align="center">
@@ -20,7 +20,8 @@
   <img src="https://img.shields.io/badge/X%20Layer-World%20Cup%20NFTs-7C3AED?style=for-the-badge" alt="X Layer World Cup NFTs" />
   <img src="https://img.shields.io/badge/LayerZero-X%20Layer%20%E2%86%92%20Base-000000?style=for-the-badge" alt="LayerZero X Layer to Base" />
   <img src="https://img.shields.io/badge/0G-Compute%20%2B%20Chain-111827?style=for-the-badge" alt="0G Compute and Chain" />
-  <img src="https://img.shields.io/badge/x402-Coinbase%20%2B%20Bankr-0052FF?style=for-the-badge" alt="x402 Coinbase and Bankr" />
+  <img src="https://img.shields.io/badge/Mantle-Native%20MNT%20402-00A56A?style=for-the-badge" alt="Mantle native MNT HTTP 402" />
+  <img src="https://img.shields.io/badge/x402-Base%20%2B%20Mantle%20%2B%20X%20Layer-0052FF?style=for-the-badge" alt="x402 and HTTP 402 payments" />
   <img src="https://img.shields.io/badge/Galxe-REST%20Tasks-111827?style=for-the-badge" alt="Galxe REST Tasks" />
 </p>
 
@@ -30,7 +31,7 @@
 
 Cookieverse is a consumer crypto app that makes onchain activity fun, visual, collectible, and shareable.
 
-Users can generate AI fortunes, mint COOKIE NFTs, roast wallets, render beautiful share cards, unlock paid Wallet Roast products through x402, create GPT-5.5-powered World Cup match prophecy NFTs on X Layer with visible generation progress, bridge COOKIE NFTs across supported chains, complete Galxe-verifiable tasks, track activity in a dashboard, and compete on leaderboards.
+Users can generate AI fortunes, mint COOKIE NFTs, roast wallets across supported chains, render beautiful share cards, unlock paid Wallet Roast and World Cup Prophecy products through x402-style payment flows, create GPT-5.5-powered World Cup match prophecy NFTs with visible generation progress, bridge COOKIE NFTs across supported chains, complete Galxe-verifiable tasks, track activity in a dashboard, and compete on leaderboards.
 
 Cookieverse is built as a multi-surface product:
 
@@ -48,22 +49,82 @@ The product goal is simple:
 
 ---
 
+## Mantle Turing Test Hackathon 2026 Focus
+
+Cookieverse is being prepared for the Mantle Turing Test Hackathon 2026 on DoraHacks:
+
+```txt
+https://dorahacks.io/hackathon/mantleturingtesthackathon2026
+```
+
+The hackathon is described as a two-phase AI competition backed by Mantle ecosystem partners, with Phase 2, **AI Awakening**, focused on Human vs. AI mechanisms across six tracks. Cookieverse aligns most directly with:
+
+```txt
+Consumer & Viral DApps:
+  Gamified, shareable consumer applications.
+
+Agentic Wallets & Economy:
+  Wallet-centered economies and paid AI actions.
+
+AI x on-chain infrastructure:
+  AI outputs become verifiable paid, rendered, mintable artifacts.
+```
+
+The Mantle-facing submission focus is:
+
+```txt
+Mantle-native AI consumer payments:
+  Native MNT HTTP 402 payment gate
+  Wallet Roast on Mantle
+  World Cup Match Prophecy on Mantle
+  Rendered PNG collectibles
+  NFT minting through mintWithImage()
+  Upstash Redis replay protection
+  Vercel Blob audit/payment history
+```
+
+Why this matters for the hackathon:
+
+1. Cookieverse uses Mantle mainnet, not only a mocked payment screen.
+2. Users pay native `MNT` for AI-generated products.
+3. The backend verifies Mantle transactions with `viem`.
+4. Each transaction hash can unlock only one paid result through an atomic Redis replay lock.
+5. Paid results are real Cookieverse artifacts: rendered Wallet Roast cards and World Cup Prophecy cards ready for IPFS and NFT minting.
+6. The app is consumer-facing and viral by design: every paid AI result can be downloaded, copied, shared on X, and minted.
+7. The payment trail, mint trail, and activity layer make the AI outcome inspectable on-chain.
+
+Mantle DevKit remains useful for experimentation, but the production Mantle path is now Cookieverse's own Mantle-native HTTP 402 flow because the DevKit path was observed returning repeated `402 Payment Required` on Mantle mainnet retries.
+
+Current Mantle implementation files:
+
+```txt
+src/lib/server/mantleNative402.ts
+src/app/api/x402/mantle-native/wallet-roast/identity/route.ts
+src/app/api/x402/mantle-native/xcup/prophecy/route.ts
+src/lib/x402/client.ts
+src/lib/x402/config.ts
+docs/mantle-x402-facilitator-guide.md
+```
+
+---
+
 ## Feature Snapshot
 
 | Area | What it does |
 | --- | --- |
 | 🍪 AI Fortunes | Generate short AI fortune text and mint it as a COOKIE NFT. |
 | 🖼️ AI Image Mints | Generate or upload image-based COOKIE NFTs with IPFS metadata. |
-| ⚽ World Cup Prophecy | GPT-5.5 researches historical match context, creates a World Cup-style prophecy, renders a collectible PNG card, and mints it as a COOKIE NFT on X Layer. |
+| ⚽ World Cup Prophecy | GPT-5.5 researches historical match context, creates a World Cup-style prophecy, renders a collectible PNG card, and mints it as a COOKIE NFT. Supports paid x402-style flows on Base, Mantle, and X Layer where enabled. |
 | 🏟️ Prophecy Generation UX | Shows compact progress states while GPT-5.5 works: button state, preview spinner/progress, bottom status overlay, and research → criteria → render stage messages. |
 | 🔐 Hidden Prophecy Prompt | Stores the full World Cup prophecy prompt in server-only env `XCUP_PROPHECY_PROMPT_SECRET`, not in GitHub and not in the frontend bundle. |
 | 🧾 Strict Prophecy JSON | Supports schema-driven, card-ready prophecy JSON so the renderer receives structured data instead of free-form AI prose. |
 | 🌍 World Cup Team Selector | Team 1 / Team 2 inputs support searchable World Cup teams, aliases, real flag images, and manual custom typing. |
 | 🏳️ Real Flag Rendering | Uses real flag images in the UI and rendered cards instead of emoji flags, avoiding broken Windows / Node canvas flag rendering. |
 | 🖼️ Prophecy Card Renderer | Uses `@napi-rs/canvas` and World Cup templates to render premium match prophecy cards server-side. |
-| 🟣 X Layer Mainnet | Supports X Layer wallet connection, World Cup prophecy minting, NFT holdings, dashboard, leaderboard and bridge activity. |
+| 🟣 X Layer Mainnet | Supports X Layer wallet connection, Wallet Roast, World Cup prophecy minting, NFT holdings, dashboard, leaderboard, bridge activity, and OKX x402 payments. |
+| 🟢 Mantle Mainnet | Supports Wallet Roast and World Cup Prophecy paid with native MNT through Cookieverse HTTP 402, plus COOKIE NFT support, holdings, dashboard, leaderboard and bridge activity. |
 | 🌉 X Layer → Base Bridge | Bridges COOKIE NFTs from X Layer to Base through LayerZero adapter / ONFT contracts. |
-| 🔥 Wallet Roast | Analyze a Base wallet and turn it into a funny AI roast card. |
+| 🔥 Wallet Roast | Analyze Base, Mantle, or X Layer wallet activity and turn it into a funny AI identity roast card. Normal Wallet Roast remains available on Monad, Linea, Mitosis, and 0G. |
 | 🧠 Wallet Archetypes | Classify wallets as Bridge Tourist, Dust Farmer, Silent Whale, NFT Addict, DeFi Goblin, or Onchain Civilian. |
 | 🤖 AI Providers | Uses 0G Compute by default and can route Wallet Roast generation through OpenAI. |
 | ⛓️ 0G Mainnet | Supports Wallet Roast NFT minting on 0G Mainnet for product expansion and hackathon proof. |
@@ -73,9 +134,11 @@ The product goal is simple:
 | 🏆 Leaderboard | Ranks users by Cookieverse activity. |
 | 📊 Dashboard | Tracks holdings, image mints, quests, boosts, and activity. |
 | 🐦 X Sharing | Lets users share generated cards, mints, and roast content on X. |
-| 💳 x402 Paid Roasts | Supports paid Wallet Roast products through Coinbase x402 and Bankr x402. |
-| 🏦 Coinbase x402 | Cookieverse acts as the x402 seller for paid roast endpoints protected by `src/proxy.ts`. |
-| 🤖 Bankr x402 | Bankr Cloud acts as the x402 seller and calls Cookieverse paid backend after payment. |
+| 💳 Paid HTTP 402 / x402 Products | Supports paid Wallet Roast and World Cup Prophecy across Coinbase/CDP x402 on Base, Cookieverse native MNT HTTP 402 on Mantle, and OKX x402 on X Layer. |
+| 🏦 Coinbase x402 | Cookieverse acts as the x402 seller for Base paid routes protected by `src/proxy.ts`. |
+| 🟢 Mantle Native 402 | Cookieverse verifies native MNT payments on Mantle mainnet, locks tx hashes in Upstash Redis, and writes Blob audit/payment history. |
+| 🟣 OKX x402 | Cookieverse supports OKX x402 paid Wallet Roast and World Cup Prophecy on X Layer. |
+| 🤖 Bankr x402 | Bankr Cloud can act as an external seller and call Cookieverse paid backend after payment. |
 | ✅ Galxe REST Tasks | Verifies x402 usage, COOKIE minting, and bridge activity for Galxe campaigns. |
 
 ---
@@ -144,6 +207,7 @@ flowchart TD
     SURFACES --> FORTUNE[AI Fortune Minting]
     SURFACES --> XCUP[World Cup Match Prophecy]
     SURFACES --> ROAST[Wallet Roast]
+    SURFACES --> PAID[Paid HTTP 402 / x402 Gateway]
     SURFACES --> BRIDGE[LayerZero Bridge]
     SURFACES --> DASH[Dashboard]
     SURFACES --> BOARD[Leaderboard]
@@ -153,14 +217,24 @@ flowchart TD
     FORTUNE_IMG --> PINATA1[Pinata / IPFS]
     PINATA1 --> COOKIE_NFT[FortuneCookiesAI NFT Contracts]
 
-    XCUP --> XCUP_UX[Generation UX<br/>button state + preview spinner<br/>bottom GPT-5.5 status overlay]
+    XCUP --> XCUP_MODE{Free or Paid Prophecy}
+    XCUP_MODE -->|free / normal| XCUP_UX[Generation UX<br/>button state + preview spinner<br/>bottom GPT-5.5 status overlay]
+    XCUP_MODE -->|paid on Base / Mantle / X Layer| PAID
     XCUP_UX --> XCUP_AI[GPT-5.5 Match Research + Prophecy JSON]
     XCUP_AI --> XCUP_CRITERIA[Prophecy Criteria<br/>form / attack / defense<br/>momentum / fans / confidence]
     XCUP_CRITERIA --> XCUP_CARD[World Cup PNG Renderer<br/>@napi-rs/canvas]
     XCUP_CARD --> XCUP_IPFS[Pinata / IPFS]
-    XCUP_IPFS --> XLAYER_MINT[X Layer mintWithImage<br/>World Cup Prophecy COOKIE NFT]
+    XCUP_IPFS --> PROPHECY_MINT[mintWithImage<br/>World Cup Prophecy COOKIE NFT]
 
-    ROAST --> WALLET_DATA[Base Wallet Data<br/>Etherscan V2 + Basename]
+    ROAST --> ROAST_CHAIN{Selected Chain}
+    ROAST_CHAIN -->|Base| BASE_DATA[Base Wallet Data<br/>Etherscan V2 + Basename]
+    ROAST_CHAIN -->|Mantle| MANTLE_DATA[Mantle Wallet Data<br/>Etherscan V2 / Mantle RPC]
+    ROAST_CHAIN -->|X Layer| XLAYER_DATA[X Layer Wallet Data<br/>OKX Onchain Data API]
+    ROAST_CHAIN -->|Monad / Linea / Mitosis / 0G| NORMAL_ROAST[Normal Wallet Roast Context<br/>connected chain support]
+    BASE_DATA --> WALLET_DATA[Normalized Wallet Data]
+    MANTLE_DATA --> WALLET_DATA
+    XLAYER_DATA --> WALLET_DATA
+    NORMAL_ROAST --> WALLET_DATA
     WALLET_DATA --> METRICS[Wallet Metrics Engine<br/>Portfolio, DeFi, NFTs,<br/>Bridge Activity, Dust, Tx Count]
     METRICS --> ARCHETYPE[Archetype Classifier<br/>Bridge Tourist / Dust Farmer<br/>Silent Whale / NFT Addict<br/>DeFi Goblin / Onchain Civilian]
     ARCHETYPE --> PROMPT[Roast Prompt Builder]
@@ -177,15 +251,42 @@ flowchart TD
     OPENAI --> ROAST_JSON[Roast Text JSON]
     OGVERIFY --> ROAST_JSON
 
-    ROAST_JSON --> X402PAID[x402 Paid Products<br/>roast-json / identity-roast]
-    X402PAID --> X402USAGE[x402 Usage Store<br/>Vercel Blob]
+    ROAST_JSON --> ROAST_OUTPUT{Product Output}
+    ROAST_OUTPUT -->|normal / paid| CARD[Wallet Roast Card Renderer<br/>PNG with @napi-rs/canvas]
+    ROAST_OUTPUT -->|paid identity-roast| PAID
+
+    PAID --> PAY_ROUTE{Provider by Chain}
+    PAY_ROUTE -->|Base| COINBASE_X402[Coinbase/CDP x402<br/>src/proxy.ts + @x402/next]
+    PAY_ROUTE -->|Mantle| MANTLE_402[Cookieverse Mantle-native HTTP 402<br/>native MNT payment]
+    PAY_ROUTE -->|X Layer| OKX_X402[OKX x402<br/>OKX x402 core + EVM exact]
+    PAY_ROUTE -->|Optional Mantle| QUESTFLOW[Questflow Facilitator<br/>when enabled]
+    PAY_ROUTE -->|Debug Mantle| DEVKIT[Mantle DevKit<br/>local/debug only]
+    PAY_ROUTE -->|External seller| BANKR[Bankr x402<br/>service key backend call]
+
+    COINBASE_X402 --> PAID_BUILDERS[Paid Response Builders]
+    OKX_X402 --> PAID_BUILDERS
+    QUESTFLOW --> PAID_BUILDERS
+    DEVKIT --> PAID_BUILDERS
+    BANKR --> PAID_BUILDERS
+
+    MANTLE_402 --> MNT_TX[walletClient.sendTransaction<br/>0.1 MNT to treasury]
+    MNT_TX --> MNT_VERIFY[viem Mantle Verification<br/>tx / receipt / payer / receiver / amount]
+    MNT_VERIFY --> REDIS_LOCK[Upstash Redis REST<br/>SET mantle-payment:txHash NX]
+    REDIS_LOCK --> BLOB_AUDIT[Vercel Blob<br/>Mantle payment audit/history]
+    BLOB_AUDIT --> PAID_BUILDERS
+
+    PAID_BUILDERS --> PAID_ROAST[buildPaidWalletRoastResponse]
+    PAID_BUILDERS --> PAID_XCUP[buildPaidWorldCupProphecyResponse]
+    PAID_ROAST --> X402USAGE[x402 Usage Store<br/>Vercel Blob]
+    PAID_XCUP --> X402USAGE
     X402USAGE --> GALXE[Galxe REST Verification<br/>x402 / mint / bridge]
-    ROAST_JSON --> CARD[Wallet Roast Card Renderer<br/>PNG with @napi-rs/canvas]
     CARD --> PINATA2[Pinata / IPFS]
     PINATA2 --> ROAST_MINT[Mint Wallet Roast NFT<br/>mintWithImage fortune + imageURI]
 
-    COOKIE_NFT --> CHAINS[Supported NFT Networks<br/>Monad / Base / Mantle / Linea / Mitosis / X Layer]
-    XLAYER_MINT --> XLAYER[X Layer Mainnet<br/>World Cup Prophecy NFTs]
+    COOKIE_NFT --> CHAINS[Supported NFT Networks<br/>Monad / Base / Mantle / Linea / Mitosis / X Layer / 0G]
+    PROPHECY_MINT --> CHAINS
+    PROPHECY_MINT --> XLAYER[X Layer Mainnet<br/>World Cup Prophecy NFTs]
+    PROPHECY_MINT --> MANTLE[Mantle Mainnet<br/>Hackathon paid AI products]
     ROAST_MINT --> OGCHAIN[0G Mainnet<br/>CookieverseWalletRoastOG ERC-721]
 
     BRIDGE --> LZ[LayerZero ONFT Bridge]
@@ -195,6 +296,7 @@ flowchart TD
     DASH --> HOLDINGS[Holdings API]
     HOLDINGS --> CHAINS
     HOLDINGS --> XLAYER
+    HOLDINGS --> MANTLE
     HOLDINGS --> OGCHAIN
 
     BOARD --> MGID[MGID / Ranking Storage<br/>Vercel Blob]
@@ -203,6 +305,7 @@ flowchart TD
     XCUP_CARD --> SHARE
 
     XLAYER --> OKXAPI[OKX / X Layer Onchain Data API<br/>Token IDs + adapter sends]
+    MANTLE --> MANTLESCAN[Mantle RPC / Mantlescan-compatible data<br/>payments + wallet activity]
     OGCHAIN --> OGEXPLORER[0G ChainScan<br/>Contract + Mint Transaction Proof]
 ```
 
@@ -626,25 +729,34 @@ Onchain Civilian
 
 ---
 
-### 3.1 Paid Wallet Roast with x402
+### 3.1 Paid HTTP 402 / x402 Products
 
-Cookieverse supports two paid Wallet Roast products through x402:
+Cookieverse supports paid AI products through chain-specific HTTP 402 / x402 flows.
 
 ```txt
-roast-json
-identity-roast
+Wallet Roast:
+  roast-json
+  identity-roast
+
+World Cup Match Prophecy:
+  xcup-prophecy
 ```
 
 | Product | Purpose | Output |
 | --- | --- | --- |
 | `roast-json` | Fast paid Wallet Roast API | Archetype, scores, tags, traits, headline, light roast, savage roast, verdict |
 | `identity-roast` | Full paid onchain identity roast | Roast JSON, rendered PNG card, IPFS image, NFT-ready metadata |
+| `xcup-prophecy` | Full paid World Cup prophecy | Prophecy JSON, rendered PNG card, IPFS image, NFT-ready metadata |
 
-Cookieverse supports two x402 providers:
+Cookieverse supports multiple paid providers:
 
 | Provider | Seller | Flow |
 | --- | --- | --- |
-| Coinbase x402 | Cookieverse | Frontend calls Cookieverse protected x402 routes. `src/proxy.ts` verifies payment with Coinbase/CDP facilitator before route logic runs. |
+| Coinbase/CDP x402 | Cookieverse | Base paid routes are protected by `src/proxy.ts`. Payment is verified through Coinbase/CDP x402 before route logic runs. |
+| Cookieverse Mantle-native HTTP 402 | Cookieverse | Mantle users pay native `MNT`; Cookieverse verifies the Mantle tx with `viem`, locks tx hash replay in Upstash Redis, and records Blob audit/payment history. |
+| OKX x402 | Cookieverse + OKX | X Layer paid routes use OKX x402 client/server libraries and require a confirmed settlement response. |
+| Questflow x402 | Questflow | Optional Mantle provider when facilitator access is available. Disabled unless explicitly selected. |
+| Mantle DevKit x402 | Mantle DevKit | Debug/experimental only. Not recommended for Mantle mainnet production because mainnet retries were observed returning repeated `402`. |
 | Bankr x402 | Bankr Cloud | Frontend or agents call Bankr x402 endpoints. Bankr verifies payment, then calls Cookieverse `/api/wallet-roast/pro` with `COOKIEVERSE_SERVICE_KEY`. |
 
 Coinbase x402 route flow:
@@ -657,6 +769,36 @@ User
 → Coinbase/CDP facilitator
 → buildPaidWalletRoastResponse()
 → x402 usage recorded in Vercel Blob
+```
+
+Mantle-native HTTP 402 route flow:
+
+```txt
+User on Mantle
+→ Cookieverse frontend
+→ /api/x402/mantle-native/wallet-roast/identity
+   or /api/x402/mantle-native/xcup/prophecy
+→ API returns HTTP 402 with MNT payment requirement
+→ walletClient.sendTransaction({ to: MANTLE_PAY_TO, value: 0.1 MNT })
+→ frontend retries original request with paymentTxHash
+→ requireMantleNativePayment()
+→ Mantle RPC / viem transaction + receipt verification
+→ Upstash Redis SET mantle-payment:{txHash} NX
+→ optional Vercel Blob audit/payment history
+→ buildPaidWalletRoastResponse() or buildPaidWorldCupProphecyResponse()
+→ rendered PNG + metadata returned
+```
+
+OKX X Layer x402 route flow:
+
+```txt
+User on X Layer
+→ Cookieverse frontend
+→ /api/x402/okx/wallet-roast/identity
+   or /api/x402/okx/xcup/prophecy
+→ OKX x402 payment payload is signed
+→ Cookieverse verifies/settles with OKX x402 server libraries
+→ paid result is returned only after settlement response confirms transfer
 ```
 
 Bankr x402 route flow:
@@ -679,8 +821,16 @@ src/lib/x402/config.ts
 src/lib/x402/client.ts
 src/app/api/x402/coinbase/wallet-roast/json/route.ts
 src/app/api/x402/coinbase/wallet-roast/identity/route.ts
+src/app/api/x402/coinbase/xcup/prophecy/route.ts
+src/app/api/x402/mantle-native/wallet-roast/identity/route.ts
+src/app/api/x402/mantle-native/xcup/prophecy/route.ts
+src/app/api/x402/okx/wallet-roast/identity/route.ts
+src/app/api/x402/okx/xcup/prophecy/route.ts
 src/app/api/wallet-roast/pro/route.ts
 src/lib/wallet-roast/buildPaidWalletRoastResponse.ts
+src/lib/xcup/buildPaidWorldCupProphecyResponse.ts
+src/lib/server/mantleNative402.ts
+src/lib/server/okxX402.ts
 src/server/x402UsageStore.ts
 x402/cookieverse-roast-json/index.ts
 x402/cookieverse-identity-roast/index.ts
@@ -691,6 +841,16 @@ Security model:
 ```txt
 Coinbase x402:
   Payment is verified by Cookieverse x402 proxy.
+
+Cookieverse Mantle-native HTTP 402:
+  Payment is a native MNT transfer on Mantle mainnet.
+  Backend verifies tx hash, payer, receiver, value, chain, receipt status.
+  Upstash Redis atomic SET NX prevents tx hash replay.
+  Vercel Blob records audit/payment history after verification.
+
+OKX x402:
+  Payment is verified and settled through OKX x402 libraries.
+  Cookieverse requires a settlement response before treating the request as paid.
 
 Bankr x402:
   Payment is verified by Bankr.
@@ -1327,10 +1487,10 @@ Cookieverse currently supports or is designed around these networks:
 
 | Network | Purpose |
 | --- | --- |
-| X Layer | World Cup Prophecy minting, COOKIE NFT support, holdings, leaderboard and X Layer → Base bridge source. |
-| Base | Base App surface, Wallet Roast analysis, COOKIE minting and X Layer bridge destination. |
+| X Layer | Wallet Roast, OKX x402 paid flows, World Cup Prophecy minting, COOKIE NFT support, holdings, leaderboard and X Layer → Base bridge source. |
+| Base | Base App surface, Coinbase/CDP x402 paid flows, Wallet Roast analysis, World Cup Prophecy paid wrapper, COOKIE minting and X Layer bridge destination. |
 | Monad | COOKIE NFT minting and bridge route. |
-| Mantle | COOKIE NFT support and bridge route. |
+| Mantle | Mantle Turing Test Hackathon 2026 focus: native MNT HTTP 402 paid Wallet Roast and World Cup Prophecy, COOKIE NFT support, holdings, dashboard, leaderboard and bridge route. |
 | Linea | COOKIE NFT support and bridge route. |
 | Mitosis | COOKIE NFT support. |
 | 0G Mainnet | Wallet Roast NFT minting and bridge route. |
@@ -1523,6 +1683,16 @@ src/
           wallet-roast/
             json/route.ts
             identity/route.ts
+          xcup/prophecy/route.ts
+        mantle-native/
+          wallet-roast/identity/route.ts
+          xcup/prophecy/route.ts
+        okx/
+          wallet-roast/identity/route.ts
+          xcup/prophecy/route.ts
+        questflow/
+          wallet-roast/identity/route.ts
+          xcup/prophecy/route.ts
 
       galxe/
         x402/route.ts
@@ -1570,6 +1740,11 @@ src/
       client.ts
       config.ts
 
+    server/
+      mantleNative402.ts
+      mantleDevkitX402.ts
+      okxX402.ts
+
     galxe/
       response.ts
 
@@ -1600,6 +1775,9 @@ src/
   server/
     mgidStore.ts
     x402UsageStore.ts
+
+docs/
+  mantle-x402-facilitator-guide.md
 
 public/
   xcup/
@@ -1736,9 +1914,9 @@ ETHEREUM_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/...
 ENABLE_BASENAME_ENSIP19_FALLBACK=false
 ```
 
-### x402 Paid Wallet Roast
+### Paid HTTP 402 / x402 Products
 
-Cookieverse supports `coinbase`, `bankr`, or `disabled` x402 modes.
+Cookieverse supports paid Wallet Roast and World Cup Prophecy flows across Base, Mantle, and X Layer.
 
 ```bash
 NEXT_PUBLIC_X402_PROVIDER=coinbase
@@ -1748,9 +1926,26 @@ NEXT_PUBLIC_X402_PROVIDER=coinbase
 X402_PROVIDER=disabled
 ```
 
+Provider routing:
+
+```txt
+Base:
+  NEXT_PUBLIC_X402_PROVIDER=coinbase
+  X402_SERVER_PROVIDER=coinbase
+
+Mantle:
+  NEXT_PUBLIC_X402_MANTLE_ENABLED=true
+  NEXT_PUBLIC_X402_MANTLE_PROVIDER=cookieverse-mantle
+  X402_MANTLE_SERVER_PROVIDER=cookieverse-mantle
+
+X Layer:
+  NEXT_PUBLIC_X402_XLAYER_ENABLED=true
+  provider is OKX x402
+```
+
 #### Coinbase x402
 
-Cookieverse acts as the seller. `src/proxy.ts` protects only Coinbase x402 routes.
+Cookieverse acts as the seller on Base. `src/proxy.ts` protects only Coinbase x402 routes.
 
 ```bash
 X402_SERVER_PROVIDER=coinbase
@@ -1775,7 +1970,115 @@ Coinbase protected routes:
 ```txt
 /api/x402/coinbase/wallet-roast/json
 /api/x402/coinbase/wallet-roast/identity
+/api/x402/coinbase/xcup/prophecy
 ```
+
+#### Cookieverse Mantle-native HTTP 402
+
+Cookieverse uses native `MNT` payments on Mantle mainnet for the Mantle Turing Test Hackathon 2026 path.
+
+This is an HTTP 402 / x402-style flow, not a full official ERC-20 x402 `exact` facilitator yet. The reason is practical: native `MNT` is not an ERC-20 token, while official EVM x402 `exact` flows are ERC-20 based through EIP-3009 or Permit2.
+
+```bash
+NEXT_PUBLIC_X402_MANTLE_ENABLED=true
+NEXT_PUBLIC_X402_MANTLE_PROVIDER=cookieverse-mantle
+X402_MANTLE_SERVER_PROVIDER=cookieverse-mantle
+
+MANTLE_RPC_URL=https://rpc.mantle.xyz
+MANTLE_PAY_TO=0xYourCookieverseTreasuryWallet
+
+MANTLE_WALLET_ROAST_PRICE_WEI=100000000000000000
+MANTLE_XCUP_PROPHECY_PRICE_WEI=100000000000000000
+```
+
+`100000000000000000 wei = 0.1 MNT`.
+
+Upstash Redis / Vercel Marketplace integration:
+
+```bash
+KV_REST_API_URL=https://...
+KV_REST_API_TOKEN=...
+```
+
+The code also accepts:
+
+```bash
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+Blob audit/payment history:
+
+```bash
+BLOB_READ_WRITE_TOKEN=...
+```
+
+Mantle-native protected routes:
+
+```txt
+/api/x402/mantle-native/wallet-roast/identity
+/api/x402/mantle-native/xcup/prophecy
+```
+
+Mantle-native verification checks:
+
+```txt
+txHash exists
+transaction exists on Mantle
+receipt exists and status is success
+tx.from equals connected payer
+tx.to equals MANTLE_PAY_TO
+tx.value >= product price
+tx.chainId is Mantle mainnet when available
+tx hash has not already been used
+feature request hash is recorded for audit
+```
+
+#### OKX x402 on X Layer
+
+Cookieverse uses OKX x402 for paid Wallet Roast and World Cup Prophecy on X Layer.
+
+```bash
+NEXT_PUBLIC_X402_XLAYER_ENABLED=true
+
+OKX_X402_API_KEY=...
+OKX_X402_API_SECRET=...
+OKX_X402_API_PASSPHRASE=...
+OKX_X402_PAY_TO=0xYourXLayerReceiverWallet
+```
+
+OKX protected routes:
+
+```txt
+/api/x402/okx/wallet-roast/identity
+/api/x402/okx/xcup/prophecy
+```
+
+#### Questflow and Mantle DevKit
+
+Questflow can be used later if facilitator access is available:
+
+```bash
+NEXT_PUBLIC_X402_MANTLE_ENABLED=true
+NEXT_PUBLIC_X402_MANTLE_PROVIDER=questflow
+X402_MANTLE_SERVER_PROVIDER=questflow
+QUESTFLOW_FACILITATOR_URL=https://facilitator.questflow.ai
+QUESTFLOW_FACILITATOR_API_KEY=...
+QUESTFLOW_X402_PAY_TO=0x...
+```
+
+Mantle DevKit remains debug/experimental:
+
+```bash
+NEXT_PUBLIC_X402_MANTLE_PROVIDER=mantle-devkit
+X402_MANTLE_SERVER_PROVIDER=mantle-devkit
+MANTLE_DEVKIT_APP_ID=...
+MANTLE_DEVKIT_X402_PAY_TO=0x...
+MANTLE_DEVKIT_NETWORK=mantle
+MANTLE_DEVKIT_TESTNET=false
+```
+
+For production Mantle mainnet, prefer `cookieverse-mantle`.
 
 #### Bankr x402
 
@@ -2076,14 +2379,15 @@ Example body:
 
 ## Implementation Notes
 
-- Wallet Roast analysis currently focuses on Base wallet data.
-- World Cup Match Prophecy is built as the X Layer hackathon feature.
-- World Cup Prophecy cards are generated by OpenAI, rendered server-side, uploaded to IPFS, and minted through `mintWithImage()` on X Layer.
+- Wallet Roast analysis is chain-aware for Base, Mantle, and X Layer paid flows; normal Wallet Roast remains available for Monad, Linea, Mitosis, and 0G app contexts.
+- World Cup Match Prophecy started as the X Layer hackathon feature and now also supports paid Base, Mantle, and X Layer wrappers where x402/HTTP 402 is enabled.
+- For the Mantle Turing Test Hackathon 2026, Cookieverse focuses on native MNT HTTP 402 payments for AI consumer products on Mantle mainnet.
+- World Cup Prophecy cards are generated by OpenAI, rendered server-side, uploaded to IPFS, and minted through `mintWithImage()`.
 - World Cup Prophecy uses compact generation UX for GPT-5.5: button loading state, preview spinner/progress, bottom status overlay and research → criteria → render stage messages.
 - The large inline prophecy loading panel was removed to keep the main card UI clean while still showing visible progress.
 - X Layer NFT token IDs should be fetched through OKX / X Layer Onchain Data API instead of slow block scanning.
 - X Layer adapter sends should be counted through OKX / X Layer transaction data.
-- Wallet Roast minting can happen on the connected supported chain, including 0G after chain support is added.
+- Wallet Roast minting can happen on the connected supported chain.
 - OpenAI is the default Wallet Roast provider.
 - 0G Compute can be enabled with `WALLET_ROAST_PROVIDER=og`.
 - The Wallet Roast card is rendered as PNG before upload and mint.
@@ -2091,9 +2395,13 @@ Example body:
 - `getAllMints()` is recommended for all deployed COOKIE contracts used by Cookieverse holdings APIs.
 - 0G proof should be shown as both a runtime app flow and a ChainScan mint transaction.
 - X Layer proof should be shown through wallet connection, prophecy mint transaction, explorer link, holdings read, and LayerZero bridge proof.
-- Coinbase x402 and Bankr x402 are separate paid Wallet Roast provider paths.
+- Coinbase x402, Cookieverse Mantle-native HTTP 402, OKX x402, Questflow x402, Mantle DevKit, and Bankr x402 are separate paid provider paths with different trust and settlement models.
+- Mantle-native HTTP 402 uses native `MNT`, `viem` transaction verification, Upstash Redis replay locking, and Vercel Blob audit/payment history.
+- Mantle DevKit is kept as debug/experimental; production Mantle mainnet should use `cookieverse-mantle`.
+- OKX x402 on X Layer requires a settlement response before Cookieverse treats the payment as successful.
 - `/api/wallet-roast/pro` is the canonical paid backend for Bankr x402 services.
-- `buildPaidWalletRoastResponse()` is the shared paid Wallet Roast response builder for Coinbase and Bankr flows.
+- `buildPaidWalletRoastResponse()` is the shared paid Wallet Roast response builder.
+- `buildPaidWorldCupProphecyResponse()` is the shared paid World Cup Prophecy response builder.
 - Galxe REST endpoints verify x402 usage, minting, and bridge activity and require a valid `access-token` header.
 
 ## License

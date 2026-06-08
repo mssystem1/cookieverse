@@ -1,5 +1,6 @@
 export type WalletRoastRequest = {
   wallet: string;
+  chain?: "base" | "mantle" | "xlayer";
 };
 
 export type WalletIdentity = {
@@ -125,6 +126,8 @@ export type RoastText = {
 
 export type WalletRoastAnalysis = {
   wallet: string;
+  chain: "base" | "mantle" | "xlayer";
+  chain_label?: string;
   identity: WalletIdentity;
   portfolio: WalletPortfolio;
   chains: Record<string, ChainMetrics>;

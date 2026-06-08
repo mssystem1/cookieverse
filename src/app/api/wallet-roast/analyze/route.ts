@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeWalletRoast } from "../../../../lib/wallet-roast/analyzeWalletRoast";
+import { normalizeWalletRoastChain } from "../../../../lib/wallet-roast/chains";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +11,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing wallet" }, { status: 400 });
     }
 
-    const analysis = await analyzeWalletRoast(wallet);
+    const chain = normalizeWalletRoastChain(body?.chain);
+    const analysis = await analyzeWalletRoast(wallet, chain);
     return NextResponse.json(analysis);
   } catch (error) {
     const message =

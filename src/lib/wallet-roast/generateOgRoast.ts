@@ -67,8 +67,27 @@ export async function generateOgRoast(
 
 
 import { buildRoastPrompt } from "./buildRoastPrompt";
+import { walletRoastConfig } from "./config";
 import { createOgOpenAIClient } from "./ogRoastClient";
 import type { WalletRoastAnalysis, RoastText } from "./types";
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeout) clearTimeout(timeout);
+  });
+}
 
 function parseJson(content: string): unknown {
   const trimmed = content.trim();
@@ -131,28 +150,39 @@ export async function generateOgRoast(
   const { broker, openai, model, providerAddress } =
     await createOgOpenAIClient(prompt);
 
+  console.log("0G roast: requesting chat completion");
+
   const { data: completion, response } =
-    await openai.chat.completions
-      .create({
+    await withTimeout(
+      openai.chat.completions
+        .create(
+          {
         /**
          * Use model from 0G provider metadata.
          * Do not override it with walletRoastConfig.ogModel here.
          */
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are Cookieverse Wallet Roast writer. Return strict JSON only. Do not use markdown. Do not add explanations.",
+            model,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are Cookieverse Wallet Roast writer. Return strict JSON only. Do not use markdown. Do not add explanations.",
+              },
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+            temperature: 0.8,
           },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.8,
-      })
-      .withResponse();
+          { timeout: walletRoastConfig.ogRequestTimeoutMs }
+        )
+        .withResponse(),
+      walletRoastConfig.ogRequestTimeoutMs + 5_000,
+      "0G chat completion"
+    );
+
+  console.log("0G roast: chat completion received");
 
   const content = completion.choices?.[0]?.message?.content;
 
@@ -174,7 +204,13 @@ export async function generateOgRoast(
    * getRequestHeaders(providerAddress, prompt)
    * processResponse(providerAddress, chatId, content)
    */
-  await broker.inference.processResponse(providerAddress, chatId, content);
+  console.log("0G roast: settling provider response", { chatId });
+  await withTimeout(
+    broker.inference.processResponse(providerAddress, chatId, content),
+    walletRoastConfig.ogRequestTimeoutMs,
+    "0G processResponse"
+  );
+  console.log("0G roast: provider response settled");
 
   const parsed = parseJson(content);
 

@@ -1,5 +1,4 @@
 /** @type {import('next').NextConfig} */
-console.log(">> next.config.js loaded");
 
 const nextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],

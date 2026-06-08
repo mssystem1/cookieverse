@@ -1,4 +1,8 @@
 import { walletRoastConfig } from "./config";
+import {
+  getWalletRoastChainConfig,
+  type WalletRoastChainKey,
+} from "./chains";
 import type { WalletRoastAnalysis, ChainMetrics, TokenCategory, TokenHolding, TokenPriceSource } from "./types";
 
 function toNum(value: unknown, fallback = 0): number {
@@ -53,6 +57,9 @@ function getEthUsd(raw: any): number {
 const STABLECOIN_ADDRESSES = new Set([
   "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", // USDC on Base
   "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca", // USDbC on Base
+  "0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9", // USDC on Mantle
+  "0x74b7f16337b8972027f6196a17a631ac6de26d22", // USDC on X Layer
+  "0x779ded0c9e1022225f8e0630b35a9b54be713736", // USDt0 on X Layer
 ]);
 
 const WETH_LIKE_ADDRESSES = new Set([
@@ -61,6 +68,8 @@ const WETH_LIKE_ADDRESSES = new Set([
   "0x48bf8fcd44e2977c8a9a744658431a8e6c0d866c", // Seamless WETH
   "0x04c0599ae5a44757c0af6f9ec3b93da8976c150a", // weETH.base
   "0x7c307e128efa31f540f2e2d976c995e0b65f51f6", // Aave Base weETH
+  "0xdeaddeaddeaddeaddeaddeaddeaddeaddead1111", // WETH on Mantle
+  "0x5a77f1443d16ee5761d310e38b62f77f726bc71c", // X Layer bridged WETH
 ]);
 
 function looksLikeSpamToken(name: string, symbol: string): boolean {
@@ -79,7 +88,8 @@ function looksLikeSpamToken(name: string, symbol: string): boolean {
 }
 
 function isStableSymbol(symbol: string): boolean {
-  return /^(usdc|usdbc|usdt|dai|lusd|eusd|usds|usd\+|crvusd)$/i.test(symbol.trim());
+  const normalized = symbol.trim().replace("₮", "t");
+  return /^(usdc|usdbc|usdt|usdt0|usd0|dai|lusd|eusd|usds|usd\+|crvusd)$/i.test(normalized);
 }
 
 function isWrappedEthLike(name: string, symbol: string): boolean {
@@ -96,19 +106,43 @@ function isDefiPositionToken(name: string, symbol: string): boolean {
     text.includes("wcusdc") ||
     text.includes("vault") ||
     text.includes("lp token") ||
+    text.includes("staked okb") ||
     /^aBas/i.test(symbol) ||
     /^c(USDC|DAI|USDT|ETH|WBTC)/i.test(symbol) ||
+    /^stOKB$/i.test(symbol) ||
     /^sWETH$/i.test(symbol) ||
     /\b(lp|vault|receipt)\b/i.test(symbol)
   );
 }
 
-function classifyToken(name: string, symbol: string, address: string, isSpam: boolean): TokenCategory {
+const MEME_TOKEN_HINTS: Record<WalletRoastChainKey, RegExp> = {
+  // Researched from current CoinGecko ecosystem/category pages and kept conservative.
+  // Do not include infra/yield symbols like AERO, MNT, mETH, cmETH, or WETH.
+  base: /\b(brett|toshi|degen|keycat|doginme|higher|tybg|mfer|benji|miggles|based\s*bunny|bunny|normie|mochi)\b/i,
+  mantle: /\b(mantle\s*inu|minu|beardy|beardy\s*dragon|puff|puff\s*the\s*dragon)\b/i,
+  xlayer: /\b(xdog|x-dog|niuma|niu\s*ma)\b/i,
+};
+
+function isKnownMemeToken(
+  chain: WalletRoastChainKey,
+  name: string,
+  symbol: string
+) {
+  return MEME_TOKEN_HINTS[chain].test(`${name} ${symbol}`);
+}
+
+function classifyToken(
+  chain: WalletRoastChainKey,
+  name: string,
+  symbol: string,
+  address: string,
+  isSpam: boolean
+): TokenCategory {
   if (isSpam) return "spam_or_scam";
   if (STABLECOIN_ADDRESSES.has(address) || isStableSymbol(symbol)) return "stablecoin";
   if (WETH_LIKE_ADDRESSES.has(address) || isWrappedEthLike(name, symbol)) return "wrapped_eth";
   if (isDefiPositionToken(name, symbol)) return "defi_position";
-  if (/degen|toshi|brett|aero|boomer|based|meme/i.test(`${name} ${symbol}`)) return "meme";
+  if (isKnownMemeToken(chain, name, symbol)) return "meme";
   return "unknown";
 }
 
@@ -156,12 +190,14 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export async function normalizeWalletData(
   wallet: string,
-  raw: any
+  raw: any,
+  chainKey: WalletRoastChainKey = "base"
 ): Promise<
   Omit<WalletRoastAnalysis, "metrics" | "classification" | "roast_inputs" | "roast_text"> & {
     __activeDateKeys: string[];
   }
 > {
+  const chainConfig = getWalletRoastChainConfig(chainKey);
   const ethUsd = getEthUsd(raw);
 
   const nativeWeiRaw = raw?.balance?.result;
@@ -195,7 +231,7 @@ export async function normalizeWalletData(
       isSpam,
     });
     const usdValue = amount * price;
-    const category = classifyToken(name, symbol, tokenAddress, isSpam);
+    const category = classifyToken(chainConfig.key, name, symbol, tokenAddress, isSpam);
     const isDefiPosition = !isSpam && (category === "defi_position" || isDefiPositionToken(name, symbol));
     const isDust = !isSpam && price > 0 && usdValue > 0 && usdValue < walletRoastConfig.dustThresholdUsd;
 
@@ -234,9 +270,9 @@ export async function normalizeWalletData(
   const defiPositionCount = erc20Holdings.filter((t) => t.is_defi_position_token).length;
 
   const chain: ChainMetrics = {
-    chain_id: 8453,
+    chain_id: chainConfig.chainId,
     native_balance: {
-      symbol: "ETH",
+      symbol: chainConfig.nativeSymbol,
       amount: nativeAmount.toFixed(6),
       usd_value: nativeUsdValue,
       price_usd: ethUsd,
@@ -265,6 +301,8 @@ export async function normalizeWalletData(
 
   return {
     wallet,
+    chain: chainConfig.key,
+    chain_label: chainConfig.label,
     identity: {
       label: raw?.basename || null,
       name_tag: raw?.basename || null,
@@ -280,7 +318,7 @@ export async function normalizeWalletData(
       dust_ratio: 0,
     },
     chains: {
-      base: chain,
+      [chainConfig.key]: chain,
     },
     __activeDateKeys: activeDateKeys,
   };

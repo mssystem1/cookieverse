@@ -15,6 +15,7 @@ export function buildWalletRoastNftMetadata(
   const archetype = analysis.classification?.archetype || "Onchain Civilian";
   const headline = analysis.roast_text?.headline || "Cookieverse Wallet Roast";
   const wallet = analysis.wallet;
+  const chainLabel = analysis.chain_label || analysis.chain || "Base";
 
   const label =
     analysis.identity?.basename ||
@@ -26,12 +27,12 @@ export function buildWalletRoastNftMetadata(
     name: `Cookieverse Wallet Roast: ${label}`,
     description:
       `${headline}\n\n` +
-      `A Cookieverse AI wallet roast generated from Base onchain activity. ` +
+      `A Cookieverse AI wallet roast generated from ${chainLabel} onchain activity. ` +
       `Includes archetype, scores, traits, and roast verdict.`,
     image: imageUri,
     external_url: "https://www.cookieverse.tech/app",
     attributes: [
-      attribute("Chain", "Base"),
+      attribute("Chain", chainLabel),
       attribute("Archetype", archetype),
       attribute("Wallet Score", analysis.metrics.wallet_score),
       attribute("Degeneracy Score", analysis.metrics.degeneracy_score),
@@ -44,6 +45,7 @@ export function buildWalletRoastNftMetadata(
     cookieverse: {
       version: "1.0",
       product: "wallet-roast-identity",
+      chain: analysis.chain,
       wallet,
       basename: analysis.identity?.basename || null,
       tags: analysis.classification?.tags || [],

@@ -9,6 +9,7 @@ import {
   type X402Product,
   type X402Provider,
 } from "../../../../server/x402UsageStore";
+import { normalizeWalletRoastChain } from "../../../../lib/wallet-roast/chains";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,16 @@ function providerFromRequest(req: NextRequest, body: Body): X402Provider {
   const header = req.headers.get("x-cookieverse-x402-provider") || "";
   const raw = String(body.provider || header || "bankr").toLowerCase();
 
-  if (raw === "coinbase" || raw === "bankr") return raw;
+  if (
+    raw === "coinbase" ||
+    raw === "bankr" ||
+    raw === "questflow" ||
+    raw === "mantle-devkit" ||
+    raw === "cookieverse-mantle" ||
+    raw === "okx"
+  ) {
+    return raw;
+  }
 
   return "bankr";
 }
@@ -71,7 +81,7 @@ function compactResponse(params: {
     product,
     provider,
     wallet: analysis.wallet,
-    chain: "base",
+    chain: analysis.chain,
     archetype: analysis.classification?.archetype,
     tags: analysis.classification?.tags || [],
     walletScore: analysis.metrics?.wallet_score,
@@ -93,20 +103,9 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json().catch(() => ({}))) as Body;
     const walletInput = String(body.wallet || body.address || "").trim();
-    const chain = String(body.chain || "base").toLowerCase();
+    const chain = normalizeWalletRoastChain(body.chain);
     const product = productFromRequest(req, body);
     const provider = providerFromRequest(req, body);
-
-    if (chain !== "base") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Wallet Roast paid API v1 is Base-only because the current Cookieverse analyzer uses Base/Etherscan V2 data."
-        },
-        { status: 400 }
-      );
-    }
 
     if (!isAddress(walletInput)) {
       return NextResponse.json(
@@ -127,7 +126,7 @@ export async function POST(req: NextRequest) {
         ? body.includeMintMetadata
         : product === "identity-roast";
 
-    const analysis = await analyzeWalletRoast(wallet);
+    const analysis = await analyzeWalletRoast(wallet, chain);
 
     let image: Awaited<ReturnType<typeof pinPngBufferToPinata>> | undefined;
     let metadata: unknown | undefined;
@@ -153,6 +152,7 @@ export async function POST(req: NextRequest) {
       product,
       provider,
       endpoint: endpointFromProduct(product),
+      chain,
       requestId,
       imageUrl: image?.gatewayUrl,
       metadataReady: Boolean(metadata),

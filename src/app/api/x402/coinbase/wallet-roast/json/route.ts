@@ -10,8 +10,8 @@ function headers(req: NextRequest) {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "POST,OPTIONS",
-"Access-Control-Allow-Headers":
-  "Content-Type, X-PAYMENT, x-payment, PAYMENT-SIGNATURE, payment-signature, Access-Control-Expose-Headers, access-control-expose-headers",
+    "Access-Control-Allow-Headers":
+      "Content-Type, X-PAYMENT, x-payment, PAYMENT-SIGNATURE, payment-signature, Access-Control-Expose-Headers, access-control-expose-headers",
     "Access-Control-Expose-Headers":
       "x-payment-response, X-PAYMENT-RESPONSE, payment-response, PAYMENT-RESPONSE",
     "Cache-Control": "no-store",
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     walletInput,
     product: "roast-json",
     provider: "coinbase",
+    chain: "base",
     includeImage: false,
     includeMintMetadata: false,
   });

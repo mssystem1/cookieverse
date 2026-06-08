@@ -135,6 +135,48 @@ function extractLedgerAvailableBalance(ledger: any): bigint {
   return toWeiBigInt(value);
 }
 
+function weiToOgNumber(value: bigint) {
+  return Number(ethers.formatEther(value));
+}
+
+async function depositOgLedgerTopUp(params: {
+  broker: Awaited<ReturnType<typeof getOgBroker>>;
+  availableBalanceWei: bigint;
+  requiredBalanceWei: bigint;
+}) {
+  if (!walletRoastConfig.ogAutoTopUpLedger) {
+    throw new Error(
+      `0G ledger balance is too low. Available: ${ethers.formatEther(
+        params.availableBalanceWei
+      )} OG. Required minimum: ${walletRoastConfig.ogLedgerFundAmount} OG.`
+    );
+  }
+
+  const targetWei = ethers.parseEther(
+    String(
+      Math.max(
+        walletRoastConfig.ogLedgerFundAmount,
+        walletRoastConfig.ogLedgerTopUpTargetAmount
+      )
+    )
+  );
+  const topUpTargetWei =
+    params.availableBalanceWei < targetWei ? targetWei : params.requiredBalanceWei;
+  const deficitWei = topUpTargetWei - params.availableBalanceWei;
+  const minimumDepositWei = ethers.parseEther("0.001");
+  const depositWei = deficitWei > minimumDepositWei ? deficitWei : minimumDepositWei;
+  const depositAmount = Math.ceil(weiToOgNumber(depositWei) * 1000) / 1000;
+
+  console.log(
+    `0G ledger below minimum. Depositing ${depositAmount} OG into Compute ledger ` +
+      `(available ${ethers.formatEther(params.availableBalanceWei)} OG, target ${ethers.formatEther(
+        topUpTargetWei
+      )} OG).`
+  );
+
+  await params.broker.ledger.depositFund(depositAmount);
+}
+
 async function logOgWalletStatus() {
   const signer = getOgSigner();
 
@@ -159,24 +201,34 @@ async function ensureLedgerFunded() {
     const message = String(error?.message || error);
 
     if (message.toLowerCase().includes("account does not exist")) {
+      if (!walletRoastConfig.ogAutoTopUpLedger) {
+        throw new Error(
+          [
+            "0G native wallet is funded, but 0G Compute ledger account does not exist.",
+            "",
+            "Automatic 0G ledger top-up is disabled.",
+            "Set OG_AUTO_TOP_UP_LEDGER=true or run the one-time setup script first.",
+            "",
+            `Wallet provider address from config: ${walletRoastConfig.ogProviderAddress}`,
+            `Required ledger minimum: ${walletRoastConfig.ogLedgerFundAmount} OG`,
+            "",
+            `Original error: ${message}`,
+          ].join("\n")
+        );
+      }
+
+      const initialAmount = Math.max(
+        walletRoastConfig.ogLedgerFundAmount,
+        walletRoastConfig.ogLedgerTopUpTargetAmount
+      );
+      console.log(`0G ledger missing. Creating and funding with ${initialAmount} OG.`);
+      await broker.ledger.depositFund(initialAmount);
+      ledger = await broker.ledger.getLedger();
+    } else {
       throw new Error(
-        [
-          "0G native wallet is funded, but 0G Compute ledger account does not exist.",
-          "",
-          "Your roast runtime does not create or fund the ledger automatically.",
-          "Run the one-time setup script first.",
-          "",
-          `Wallet provider address from config: ${walletRoastConfig.ogProviderAddress}`,
-          `Required ledger minimum: ${walletRoastConfig.ogLedgerFundAmount} OG`,
-          "",
-          `Original error: ${message}`,
-        ].join("\n")
+        `0G ledger check failed. Original error: ${message}`
       );
     }
-
-    throw new Error(
-      `0G ledger check failed. I did not try to create or fund the ledger. Original error: ${message}`
-    );
   }
 
   const availableBalanceWei = extractLedgerAvailableBalance(ledger);
@@ -186,11 +238,27 @@ async function ensureLedgerFunded() {
   );
 
   if (availableBalanceWei < requiredBalanceWei) {
-    throw new Error(
-      `0G ledger balance is too low. Available: ${ethers.formatEther(
-        availableBalanceWei
-      )} OG. Required minimum: ${walletRoastConfig.ogLedgerFundAmount} OG.`
+    await depositOgLedgerTopUp({
+      broker,
+      availableBalanceWei,
+      requiredBalanceWei,
+    });
+
+    ledger = await broker.ledger.getLedger();
+    const refreshedAvailableWei = extractLedgerAvailableBalance(ledger);
+
+    if (refreshedAvailableWei < requiredBalanceWei) {
+      throw new Error(
+        `0G ledger top-up did not reach the required minimum. Available: ${ethers.formatEther(
+          refreshedAvailableWei
+        )} OG. Required minimum: ${walletRoastConfig.ogLedgerFundAmount} OG.`
+      );
+    }
+
+    console.log(
+      `0G ledger top-up OK: ${ethers.formatEther(refreshedAvailableWei)} OG available.`
     );
+    return;
   }
 
   console.log(
@@ -209,13 +277,9 @@ export async function createOgOpenAIClient(prompt: string) {
   const broker = await getOgBroker();
 
   /**
-   * Runtime is read-only.
-   * It only checks existing wallet + ledger status.
-   *
-   * It does NOT call:
-   * - broker.ledger.addLedger()
-   * - broker.ledger.depositFund()
-   * - broker.ledger.transferFund()
+   * Keep the Compute ledger funded before the SDK builds request headers.
+   * If OG_AUTO_TOP_UP_LEDGER is not "false", this may deposit from the
+   * configured server wallet into its own 0G Compute ledger.
    */
   await logOgWalletStatus();
   await ensureLedgerFunded();
@@ -236,6 +300,7 @@ export async function createOgOpenAIClient(prompt: string) {
     apiKey: "unused",
     defaultHeaders,
     maxRetries: 0,
+    timeout: walletRoastConfig.ogRequestTimeoutMs,
   });
 
   return {

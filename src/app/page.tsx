@@ -28,9 +28,14 @@ import { shareToX } from '../lib/share';
 
 import {
   callCookieverseX402Roast,
+  callCookieverseX402Prophecy,
+  type CookieverseX402Chain,
   type CookieverseX402Product,
 } from "../lib/x402/client";
-import { x402Enabled, x402Provider } from "../lib/x402/config";
+import {
+  getX402ProviderForChain,
+  isX402Enabled,
+} from "../lib/x402/config";
 
 import type { WorldCupProphecyResult } from '../lib/xcup/types';
 
@@ -50,6 +55,88 @@ const CHAIN_IDS = {
   og: 16661,
   xlayer: 196,
 } as const;
+
+type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | 'og' | 'xlayer';
+
+type WalletRoastStage =
+  | 'idle'
+  | 'payment'
+  | 'collecting'
+  | 'ai'
+  | 'rendering'
+  | 'ready'
+  | 'error';
+
+const WALLET_ROAST_PROGRESS_STEPS: Array<{
+  stage: WalletRoastStage;
+  label: string;
+}> = [
+  { stage: 'payment', label: 'Payment' },
+  { stage: 'collecting', label: 'On-chain data' },
+  { stage: 'ai', label: 'AI roast' },
+  { stage: 'rendering', label: 'PNG render' },
+];
+
+function walletRoastStageLabel(stage: WalletRoastStage) {
+  switch (stage) {
+    case 'payment':
+      return 'Waiting for wallet signature and payment confirmation.';
+    case 'collecting':
+      return 'Collecting NFTs, tokens, bridge traces and transactions.';
+    case 'ai':
+      return 'AI is turning the wallet trail into a roast.';
+    case 'rendering':
+      return 'Rendering the collectible PNG preview.';
+    case 'ready':
+      return 'Wallet Roast card is ready.';
+    case 'error':
+      return 'Wallet Roast failed.';
+    default:
+      return 'Ready to roast.';
+  }
+}
+
+function walletRoastStagePercent(stage: WalletRoastStage) {
+  switch (stage) {
+    case 'payment':
+      return 22;
+    case 'collecting':
+      return 48;
+    case 'ai':
+      return 72;
+    case 'rendering':
+      return 88;
+    case 'ready':
+    case 'error':
+      return 100;
+    default:
+      return 0;
+  }
+}
+
+function walletRoastStepIndex(stage: WalletRoastStage) {
+  const index = WALLET_ROAST_PROGRESS_STEPS.findIndex((item) => item.stage === stage);
+  return index < 0 ? -1 : index;
+}
+
+function walletRoastStatusLabel(stage: WalletRoastStage) {
+  switch (stage) {
+    case 'payment':
+      return 'Payment';
+    case 'collecting':
+      return 'Collecting';
+    case 'ai':
+      return 'Roasting';
+    case 'rendering':
+      return 'Rendering';
+    case 'ready':
+      return 'Card ready';
+    case 'error':
+      return 'Failed';
+    default:
+      return 'Idle';
+  }
+}
 
 function cookieAddressFor(chainId?: number): `0x${string}` | undefined {
   if (chainId === CHAIN_IDS.base) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_BASE as `0x${string}`;
@@ -245,15 +332,10 @@ export default function Page() {
     return <main className="page"><div className="muted">Unsupported network.</div></main>;
   }
 
-  const isBaseChain = connected && chain?.id === CHAIN_IDS.base;
-  const shouldUseX402Roast = Boolean(x402Enabled && isBaseChain);
-
   const pathname = usePathname();
   const { isFarcasterMini, isBaseAppRoute, isCompactLayout } = useAppMode();
 
   const [fcUsername, setFcUsername] = React.useState<string>('');
-
-  type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | 'og' | 'xlayer';
 
   const CHAIN_BY_ID: Record<number, ChainKey> = {
     [CHAIN_IDS.monad]: 'monad',
@@ -264,6 +346,43 @@ export default function Page() {
     [CHAIN_IDS.og]: 'og',
     [CHAIN_IDS.xlayer]: 'xlayer',
   };
+
+  const selectedChainKey = CHAIN_BY_ID[chain?.id || 0] || 'monad';
+  const selectedX402Chain = (
+    selectedChainKey === 'base' ||
+    selectedChainKey === 'mantle' ||
+    selectedChainKey === 'xlayer'
+      ? selectedChainKey
+      : null
+  ) as CookieverseX402Chain | null;
+  const selectedX402Provider = selectedX402Chain
+    ? getX402ProviderForChain(selectedX402Chain)
+    : 'disabled';
+  const walletRoastSupportedChain = Boolean(selectedX402Chain);
+  const walletRoastRequiresNetworkSwitch = connected && !walletRoastSupportedChain;
+  const walletRoastSwitchMessage =
+    'Switch to Base, X Layer, or Mantle to create a Wallet Roast.';
+  const shouldUseX402Roast = Boolean(
+    connected &&
+      selectedX402Chain &&
+      isX402Enabled(selectedX402Chain)
+  );
+  const shouldUseX402Prophecy = shouldUseX402Roast;
+  const walletRoastNetworkLabel =
+    selectedChainKey === 'mantle'
+      ? 'Mantle'
+      : selectedChainKey === 'xlayer'
+        ? 'X Layer'
+        : selectedChainKey === 'base'
+          ? 'Base'
+          : selectedChainKey === 'linea'
+            ? 'Linea'
+            : selectedChainKey === 'mitosis'
+              ? 'Mitosis'
+              : selectedChainKey === 'og'
+                ? '0G'
+                : 'Monad';
+  const walletRoastCardClass = `card card--image card--wallet-roast card--wallet-roast-${selectedChainKey}`;
 
   function currentKey(id?: number): ChainKey {
     return id && CHAIN_BY_ID[id] ? CHAIN_BY_ID[id] : 'monad';
@@ -349,6 +468,11 @@ export default function Page() {
   const [roastImageUrl, setRoastImageUrl] = React.useState<string | null>(null);
   const [roastImageBlob, setRoastImageBlob] = React.useState<Blob | null>(null);
   const [roastImageB64, setRoastImageB64] = React.useState<string | null>(null);
+  const [walletRoastStage, setWalletRoastStage] =
+    React.useState<WalletRoastStage>('idle');
+  const [walletRoastStartedAt, setWalletRoastStartedAt] =
+    React.useState<number | null>(null);
+  const [walletRoastElapsedSec, setWalletRoastElapsedSec] = React.useState(0);
   const [walletRoastMintStage, setWalletRoastMintStage] =
     React.useState<'idle' | 'pinning' | 'minting'>('idle');
 
@@ -366,6 +490,7 @@ export default function Page() {
 
   const [x402RoastBusy, setX402RoastBusy] =
   React.useState<CookieverseX402Product | null>(null);
+  const walletRoastIsLoading = roastBusy || roastRenderBusy || !!x402RoastBusy;
 
   // ---------- Clear everything on disconnect ----------
   const clearWalletUI = React.useCallback(() => {
@@ -593,7 +718,8 @@ export default function Page() {
   );
 
   React.useEffect(() => {
-    if (!connected || !address) return;
+    const username = fcUsername.trim();
+    if (!connected || !address || !username) return;
 
     let cancelled = false;
 
@@ -602,7 +728,7 @@ export default function Page() {
       try {
         await fetch('/api/mgid-upsert', {
           method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-farcaster-username': fcUsername },
+          headers: { 'content-type': 'application/json', 'x-farcaster-username': username },
           body: JSON.stringify({ address }),
         });
       } catch (e) {
@@ -617,7 +743,7 @@ export default function Page() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [connected, address]);
+  }, [connected, address, fcUsername]);
 
   const totalTransactions_current = totalScore_current;
 
@@ -627,7 +753,7 @@ export default function Page() {
     return showAll ? desc : desc.slice(0, 10);
   }, [holdingIds, showAll]);
 
-  React.useEffect(() => {
+React.useEffect(() => {
   if (!wcBusy || !wcStartedAt) {
     setWcElapsedSec(0);
     return;
@@ -639,6 +765,25 @@ export default function Page() {
 
   return () => window.clearInterval(id);
 }, [wcBusy, wcStartedAt]);
+
+React.useEffect(() => {
+  if (!walletRoastIsLoading || !walletRoastStartedAt) {
+    setWalletRoastElapsedSec(0);
+    return;
+  }
+
+  setWalletRoastElapsedSec(
+    Math.max(0, Math.floor((Date.now() - walletRoastStartedAt) / 1000))
+  );
+
+  const id = window.setInterval(() => {
+    setWalletRoastElapsedSec(
+      Math.max(0, Math.floor((Date.now() - walletRoastStartedAt) / 1000))
+    );
+  }, 1000);
+
+  return () => window.clearInterval(id);
+}, [walletRoastIsLoading, walletRoastStartedAt]);
 
     // ---------- Generate with AI ----------
   const onGenerate = async () => {
@@ -829,7 +974,7 @@ export default function Page() {
   }
 
   function buildWalletRoastShareText(roast: any) {
-    const headline = roast?.roast_text?.headline || 'Wallet Roast';
+    const headline = roast?.roast_text?.headline || 'x402 Wallet Roast';
     const archetype = roast?.classification?.archetype || 'Onchain Civilian';
     return `${headline} | Archetype: ${archetype} 🍪`;
   }
@@ -866,14 +1011,43 @@ const generateWalletRoast = async () => {
     return;
   }
 
+  if (walletRoastRequiresNetworkSwitch) {
+    setWalletRoastStage('idle');
+    setUiError(walletRoastSwitchMessage);
+    return;
+  }
+
+  if (roastImageUrl) {
+    URL.revokeObjectURL(roastImageUrl);
+  }
+  setRoastData(null);
+  setRoastImageUrl(null);
+  setRoastImageBlob(null);
+  setRoastImageB64(null);
+  setPinCid(null);
+  setWalletRoastMintStage('idle');
+
   setRoastBusy(true);
-  setRoastRenderBusy(true);
+  setRoastRenderBusy(false);
+  setWalletRoastStartedAt(Date.now());
+  setWalletRoastStage('collecting');
+
+  const progressTimers: number[] = [
+    window.setTimeout(() => {
+      setWalletRoastStage((stage) =>
+        stage === 'collecting' ? 'ai' : stage
+      );
+    }, 8000),
+  ];
 
   try {
     const analyzeRes = await fetch('/api/wallet-roast/analyze', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ wallet: walletToAnalyze }),
+      body: JSON.stringify({
+        wallet: walletToAnalyze,
+        chain: selectedX402Chain || 'base',
+      }),
     });
 
     const analyzeData = await analyzeRes.json();
@@ -891,6 +1065,9 @@ const generateWalletRoast = async () => {
     setRoastImageB64(null);
     setPinCid(null);
     setWalletRoastMintStage('idle');
+
+    setWalletRoastStage('rendering');
+    setRoastRenderBusy(true);
 
     const renderRes = await fetch('/api/wallet-roast/render', {
       method: 'POST',
@@ -917,11 +1094,15 @@ const generateWalletRoast = async () => {
     setRoastImageBlob(blob);
     setRoastImageUrl(url);
     setRoastImageB64(b64);
+    setWalletRoastStage('ready');
   } catch (e: any) {
+    setWalletRoastStage('error');
     setUiError(String(e?.message || e));
   } finally {
+    progressTimers.forEach((timer) => window.clearTimeout(timer));
     setRoastBusy(false);
     setRoastRenderBusy(false);
+    setWalletRoastStartedAt(null);
   }
 };
 
@@ -938,18 +1119,67 @@ const generateWalletRoastViaX402 = async (product: CookieverseX402Product) => {
     return;
   }
 
-  if (chain?.id !== 8453) {
-    setUiError("Switch to Base to pay with x402 USDC.");
+  if (!selectedX402Chain) {
+    setWalletRoastStage('idle');
+    setUiError(walletRoastSwitchMessage);
     return;
   }
 
+  if (roastImageUrl) {
+    URL.revokeObjectURL(roastImageUrl);
+  }
+  setRoastData(null);
+  setRoastImageUrl(null);
+  setRoastImageBlob(null);
+  setRoastImageB64(null);
+  setPinCid(null);
+  setWalletRoastMintStage("idle");
+
   setX402RoastBusy(product);
+  setWalletRoastStartedAt(Date.now());
+  setWalletRoastStage('payment');
+
+  const progressTimers: number[] = [];
+  const clearProgressTimers = () => {
+    progressTimers.forEach((timer) => window.clearTimeout(timer));
+    progressTimers.length = 0;
+  };
+  const advanceWalletRoastStage = (
+    allowedStages: WalletRoastStage[],
+    nextStage: WalletRoastStage
+  ) => {
+    setWalletRoastStage((stage) =>
+      allowedStages.includes(stage) ? nextStage : stage
+    );
+  };
+  const startPaidProcessingStages = () => {
+    clearProgressTimers();
+    advanceWalletRoastStage(['payment'], 'collecting');
+    progressTimers.push(
+      window.setTimeout(() => {
+        advanceWalletRoastStage(['payment', 'collecting'], 'ai');
+      }, 7000)
+    );
+  };
+
+  progressTimers.push(
+    window.setTimeout(() => {
+      advanceWalletRoastStage(['payment'], 'collecting');
+    }, 9000)
+  );
+  progressTimers.push(
+    window.setTimeout(() => {
+      advanceWalletRoastStage(['payment', 'collecting'], 'ai');
+    }, 18000)
+  );
 
   try {
     const data = await callCookieverseX402Roast({
       walletClient,
       wallet: address,
       product,
+      chain: selectedX402Chain,
+      onPaidRequest: startPaidProcessingStages,
     });
 
     if (roastImageUrl) {
@@ -964,25 +1194,35 @@ const generateWalletRoastViaX402 = async (product: CookieverseX402Product) => {
     setPinCid(null);
     setWalletRoastMintStage("idle");
 
-    if (data.image?.gatewayUrl) {
-      const imgRes = await fetch(data.image.gatewayUrl, { cache: "no-store" });
+    setWalletRoastStage('rendering');
 
-      if (!imgRes.ok) {
-        throw new Error(`Failed to fetch x402 roast image: HTTP ${imgRes.status}`);
-      }
+    const gatewayUrl = data.image?.gatewayUrl;
 
-      const blob = await imgRes.blob();
-      const url = URL.createObjectURL(blob);
-      const b64 = await blobToBase64(blob);
-
-      setRoastImageBlob(blob);
-      setRoastImageUrl(url);
-      setRoastImageB64(b64);
+    if (!gatewayUrl) {
+      throw new Error("x402 wallet roast response did not include rendered image.");
     }
+
+    const imgRes = await fetch(gatewayUrl, { cache: "no-store" });
+
+    if (!imgRes.ok) {
+      throw new Error(`Failed to fetch x402 roast image: HTTP ${imgRes.status}`);
+    }
+
+    const blob = await imgRes.blob();
+    const url = URL.createObjectURL(blob);
+    const b64 = await blobToBase64(blob);
+
+    setRoastImageBlob(blob);
+    setRoastImageUrl(url);
+    setRoastImageB64(b64);
+    setWalletRoastStage('ready');
   } catch (e: any) {
+    setWalletRoastStage('error');
     setUiError(String(e?.message || e));
   } finally {
+    clearProgressTimers();
     setX402RoastBusy(null);
+    setWalletRoastStartedAt(null);
   }
 };
 
@@ -1029,15 +1269,26 @@ const onShareWalletRoast = async () => {
       throw new Error('Render wallet roast image first.');
     }
 
-    const basename =
+    const displayName =
       roastData?.identity?.basename ||
       roastData?.identity?.label ||
       roastData?.identity?.name_tag ||
       shortAddress(roastData?.wallet) ||
       'Unknown wallet';
+    const roastChainLabel =
+      roastData?.chain_label ||
+      (roastData?.chain === 'mantle'
+        ? 'Mantle'
+        : roastData?.chain === 'xlayer'
+          ? 'X Layer'
+          : roastData?.chain === 'base'
+            ? 'Base'
+            : walletRoastNetworkLabel);
 
-    const lightRoast =
-      roastData?.roast_text?.light_roast || 'Wallet Roast';
+    const headline = roastData?.roast_text?.headline || 'Quiet wallet. Minimal chaos. Nothing loud onchain';
+
+    const savageRoast =
+      roastData?.roast_text?.savage_roast || 'Wallet Roast';
 
     const archetype =
       roastData?.classification?.archetype || 'Onchain Civilian';
@@ -1051,11 +1302,12 @@ const onShareWalletRoast = async () => {
         : 'https://www.cookieverse.tech/app';
 
     const text =
-      `Name: ${basename}\n` +
-      `Wallet Roast: ${lightRoast}\n` +
+      `Name: ${displayName}\n` +
+      `Headline: ${headline}\n` +
+      `Wallet Roast: ${savageRoast}\n` +
       `Archetype: ${archetype}\n` +
       `Verdict: ${verdict}\n\n` +
-      `Wallet Roast Made with Cookieverse 🍪 on @base 🟦 and powered with @0G_labs, @canva and @etherscan`;
+      `Wallet Roast Made with Cookieverse 🍪 on ${roastChainLabel} and powered with x402, @0G_labs compute, @canva drawing, @okx Onchain OS and @etherscan V2 API`;
 
     if (isFarcasterMini) {
       await (sdk as any).actions.composeCast({
@@ -1270,6 +1522,49 @@ async function generateWorldCupProphecy() {
     setWcImageBlob(null);
     setWcImageB64(null);
     setWcPinCid(null);
+
+    if (shouldUseX402Prophecy) {
+      if (!address || !walletClient || !selectedX402Chain) {
+        throw new Error('Connect wallet before paid x402 prophecy.');
+      }
+
+      const paid = await callCookieverseX402Prophecy({
+        walletClient,
+        wallet: address,
+        chain: selectedX402Chain,
+        homeTeam: normalizedHomeTeam,
+        awayTeam: normalizedAwayTeam,
+        matchDate: wcMatchDate,
+      });
+
+      if (!paid.prophecy) {
+        throw new Error('x402 prophecy response did not include prophecy data.');
+      }
+
+      setWcStage('scoring');
+      setWcProphecy(paid.prophecy);
+      setWcStage('rendering');
+
+      if (!paid.image?.gatewayUrl) {
+        throw new Error('x402 prophecy response did not include rendered image.');
+      }
+
+      const imgRes = await fetch(paid.image.gatewayUrl, { cache: 'no-store' });
+      if (!imgRes.ok) {
+        throw new Error(`Failed to fetch x402 prophecy image: HTTP ${imgRes.status}`);
+      }
+
+      const blob = await imgRes.blob();
+      const url = URL.createObjectURL(blob);
+      const b64 = await blobToBase64(blob);
+
+      setWcImageBlob(blob);
+      setWcImageUrl(url);
+      setWcImageB64(b64);
+      setWcPinCid(paid.image.cid || null);
+      setWcStage('ready');
+      return;
+    }
 
     const prophecyRes = await fetch('/api/xcup/prophecy', {
       method: 'POST',
@@ -1507,7 +1802,32 @@ React.useEffect(() => {
       typeof (receipt as any)?.transactionHash === 'string' &&
       (receipt as any).transactionHash.toLowerCase() === txHash.toLowerCase();
 
-    if (!ok || !sameTx || lastProcessedTx === txHash) return;
+    if (!sameTx) return;
+
+    if (lastProcessedTx === txHash) {
+      setPendingMintType(null);
+      setTxHash(undefined);
+      setMintBusy(false);
+      setMintImgBusy(false);
+      setWcMintBusy(false);
+      setWalletRoastMintStage('idle');
+      return;
+    }
+
+    const mintedType = pendingMintType;
+
+    setLastProcessedTx(txHash);
+    setPendingMintType(null);
+    setTxHash(undefined);
+    setMintBusy(false);
+    setMintImgBusy(false);
+    setWcMintBusy(false);
+    setWalletRoastMintStage('idle');
+
+    if (!ok) {
+      setUiError('Mint transaction failed.');
+      return;
+    }
 
     let foundTokenId: number | null = null;
 
@@ -1561,27 +1881,41 @@ React.useEffect(() => {
       } catch {}
     }
 
-    if (pendingMintType) {
-      (async () => {
+    const username = fcUsername.trim();
+
+    if (mintedType && username) {
+      void (async () => {
         try {
           await fetch('/api/mgid-upsert', {
             method: 'POST',
-            headers: { 'content-type': 'application/json', 'x-farcaster-username': fcUsername },
+            headers: { 'content-type': 'application/json', 'x-farcaster-username': username },
             body: JSON.stringify({ address }),
           });
         } catch (e) {
           console.error('mgid-upsert failed', e);
-        } finally {
-          setLastProcessedTx(txHash);
-          setPendingMintType(null);
-          setTxHash(undefined);
         }
       })();
     }
 
     qc.invalidateQueries({ queryKey: ['lastMinted', address, chain?.id] });
     qc.invalidateQueries({ queryKey: ['holdings', address, chain?.id] });
-  }, [isConfirmed, receipt, address, qc, chain?.id, txHash, pendingMintType, lastProcessedTx]);
+  }, [isConfirmed, receipt, address, qc, chain?.id, txHash, pendingMintType, lastProcessedTx, fcUsername]);
+
+  React.useEffect(() => {
+    if (!confirmError || !txHash) return;
+
+    setUiError(
+      confirmError instanceof Error
+        ? confirmError.message
+        : 'Mint transaction confirmation failed.',
+    );
+    setPendingMintType(null);
+    setTxHash(undefined);
+    setMintBusy(false);
+    setMintImgBusy(false);
+    setWcMintBusy(false);
+    setWalletRoastMintStage('idle');
+  }, [confirmError, txHash]);
   
 /*
                   <button
@@ -1856,114 +2190,57 @@ React.useEffect(() => {
 
   const content = (
     <main className="page">
-      {worldCupIsLoading ? (
+      {walletRoastIsLoading ? (
         <div
+          className={`cook-panel cook-panel--wallet cook-panel--wallet-${selectedChainKey}`}
           role="status"
           aria-live="polite"
-          style={{
-            position: 'fixed',
-            left: '50%',
-            bottom: 18,
-            transform: 'translateX(-50%)',
-            width: 'min(520px, calc(100vw - 28px))',
-            zIndex: 9998,
-            padding: 14,
-            borderRadius: 18,
-            border: '1px solid rgba(250,204,21,0.55)',
-            background:
-              'radial-gradient(circle at top left, rgba(250,204,21,0.22), transparent 34%), radial-gradient(circle at bottom right, rgba(124,58,237,0.20), transparent 42%), rgba(2,6,23,0.94)',
-            boxShadow:
-              '0 24px 70px rgba(0,0,0,0.58), 0 0 32px rgba(250,204,21,0.18)',
-            backdropFilter: 'blur(14px)',
-          }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              marginBottom: 10,
-            }}
-          >
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 9,
-                color: '#fde68a',
-                fontWeight: 950,
-                fontSize: 12,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-              }}
-            >
-              <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 999,
-                  background: '#facc15',
-                  boxShadow: '0 0 18px rgba(250,204,21,0.9)',
-                  display: 'inline-block',
-                  animation: 'cookieversePulse 1.1s ease-in-out infinite',
-                }}
-              />
-              AI is cooking Match Prophecy
+          <div className="cook-panel__head">
+            <div className="cook-panel__title">
+              <span className="cook-panel__dot" />
+              AI is cooking Wallet Roast on {walletRoastNetworkLabel}
             </div>
-
-            <div
-              style={{
-                color: '#fde68a',
-                fontSize: 11,
-                fontWeight: 900,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {wcElapsedSec}s
-            </div>
+            <div className="cook-panel__time">{walletRoastElapsedSec}s</div>
           </div>
 
-          <div
-            style={{
-              color: '#e5e7eb',
-              fontSize: 12,
-              lineHeight: 1.35,
-              marginBottom: 10,
-            }}
-          >
+          <div className="cook-panel__copy">
+            {walletRoastStageLabel(walletRoastStage)}
+          </div>
+
+          <div className="cook-panel__bar">
+            <span style={{ width: `${walletRoastStagePercent(walletRoastStage)}%` }} />
+          </div>
+
+          <div className="cook-panel__hint">
+            Keep this page open. First the payment is confirmed, then Cookieverse renders the card preview.
+          </div>
+        </div>
+      ) : null}
+
+      {worldCupIsLoading ? (
+        <div
+          className="cook-panel cook-panel--world-cup"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="cook-panel__head">
+            <div className="cook-panel__title">
+              <span className="cook-panel__dot" />
+              AI is cooking Match Prophecy
+            </div>
+            <div className="cook-panel__time">{wcElapsedSec}s</div>
+          </div>
+
+          <div className="cook-panel__copy">
             {worldCupStageLabel(wcStage)}
           </div>
 
-          <div
-            style={{
-              height: 8,
-              borderRadius: 999,
-              background: 'rgba(250,204,21,0.12)',
-              overflow: 'hidden',
-              border: '1px solid rgba(250,204,21,0.18)',
-            }}
-          >
-            <div
-              style={{
-                width: `${worldCupStagePercent(wcStage)}%`,
-                height: '100%',
-                borderRadius: 999,
-                background: 'linear-gradient(90deg,#facc15,#f97316,#a855f7)',
-                boxShadow: '0 0 18px rgba(250,204,21,0.42)',
-                transition: 'width 420ms ease',
-              }}
-            />
+          <div className="cook-panel__bar">
+            <span style={{ width: `${worldCupStagePercent(wcStage)}%` }} />
           </div>
 
-          <div
-            style={{
-              marginTop: 9,
-              color: '#9ca3af',
-              fontSize: 11,
-              lineHeight: 1.35,
-            }}
-          >
+          <div className="cook-panel__hint">
             Do not close this page. First AI researches the match, then Cookieverse renders the card.
           </div>
         </div>
@@ -2119,7 +2396,11 @@ React.useEffect(() => {
                     minWidth: 210,
                   }}
                 >
-                  {worldCupIsLoading ? 'AI is creating prophecy…' : 'Create Match Prophecy'}
+                  {worldCupIsLoading
+                    ? 'AI is creating prophecy…'
+                    : shouldUseX402Prophecy
+                      ? 'x402 Create Match Prophecy'
+                      : 'Create Match Prophecy'}
                 </button>
               </div>
 
@@ -2307,61 +2588,110 @@ React.useEffect(() => {
         </section>
 
         {/* Wallet Roast */}
-        <section className="card card--image card--wallet-roast">
-          <h2 className="card__title card__title--blue">Wallet Roast (based only 🟦)</h2>
+        <section className={walletRoastCardClass}>
+          <div className="wallet-roast-head">
+            <div>
+              <div className="wallet-roast-kicker">
+                <span className="wallet-roast-kicker__dot" />
+                Onchain Identity Lab
+              </div>
 
-          <p className="hint" style={{ marginBottom: 12 }}>
-            Paste any wallet address or use your connected address. Generate a roast card, preview it, share it, copy it, download it, and mint it.
-          </p>
+              <h2 className="wallet-roast-title">
+                x402 Wallet Roast
+                <span>on {walletRoastNetworkLabel}</span>
+              </h2>
 
-          <div className="row">
-            <div className="col">
-              <label className="label">Wallet Address</label>
-              <input
-                className="input"
-                value={roastWallet}
-                onChange={(e) => setRoastWallet(e.target.value)}
-                placeholder={address || '0x...'}
-              />
+              <p className="wallet-roast-copy">
+                Drop a wallet, let Cookieverse scan the chain, then render a collectible roast card built for sharing and minting.
+              </p>
+            </div>
+          </div>
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <div className="wallet-roast-shell">
+            <div className="wallet-roast-control">
+              <label className="label wallet-roast-label">Wallet Address</label>
+              <div className="wallet-roast-input-wrap">
+                <input
+                  className="input wallet-roast-input"
+                  value={roastWallet}
+                  onChange={(e) => setRoastWallet(e.target.value)}
+                  placeholder={address || '0x...'}
+                />
+              </div>
+
+              <div className="wallet-roast-actions wallet-roast-actions--primary">
                 {shouldUseX402Roast ? (
                   <button
-                    className="btn btn--accent"
+                    className="btn wallet-roast-main-btn"
                     onClick={() => generateWalletRoastViaX402("identity-roast")}
-                    disabled={roastBusy || roastRenderBusy || !!x402RoastBusy || !connected}
-                    title={`Pay with x402 via ${x402Provider}`}
+                    disabled={
+                      roastBusy ||
+                      roastRenderBusy ||
+                      !!x402RoastBusy ||
+                      !connected ||
+                      walletRoastRequiresNetworkSwitch
+                    }
+                    title={`Pay with x402 via ${selectedX402Provider}`}
                   >
                     {x402RoastBusy === "identity-roast"
-                      ? "Paying x402…"
-                      : "x402 Wallet Roast"}
+                      ? "Paying x402..."
+                      : "Create Wallet Roast"}
                   </button>
                 ) : (
                   <button
-                    className="btn btn--primary"
+                    className="btn wallet-roast-main-btn"
                     onClick={generateWalletRoast}
-                    disabled={roastBusy || roastRenderBusy || !!x402RoastBusy}
+                    disabled={
+                      roastBusy ||
+                      roastRenderBusy ||
+                      !!x402RoastBusy ||
+                      walletRoastRequiresNetworkSwitch
+                    }
                   >
-                    {roastBusy || roastRenderBusy ? "Generating Roast…" : "Wallet Roast"}
+                    {walletRoastRequiresNetworkSwitch
+                      ? "Switch network"
+                      : roastBusy || roastRenderBusy
+                        ? "Generating Roast..."
+                        : "Wallet Roast"}
                   </button>
                 )}
-            </div>
+              </div>
 
-              {roastData ? (
-                <>
-                  <div className="hint" style={{ marginTop: 10 }}>
-                    Archetype: <strong>{roastData.classification?.archetype}</strong>
-                  </div>
-
-                  <div className="hint" style={{ marginTop: 6 }}>
-                    Roast: {roastData.roast_text?.headline}
-                  </div>
-                </>
+              {walletRoastRequiresNetworkSwitch ? (
+                <div className="wallet-roast-network-alert" role="note">
+                  {walletRoastSwitchMessage}
+                </div>
               ) : null}
 
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <div className="wallet-roast-stats" aria-live="polite">
+                <div>
+                  <span>Archetype</span>
+                  <strong>{roastData?.classification?.archetype || 'Awaiting scan'}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong>
+                    {walletRoastIsLoading
+                      ? walletRoastStatusLabel(walletRoastStage)
+                      : roastImageBlob
+                        ? 'Card ready'
+                        : roastData
+                          ? 'Render ready'
+                          : walletRoastStatusLabel(walletRoastStage)}
+                  </strong>
+                </div>
+              </div>
+
+              {roastData ? (
+                <div className="wallet-roast-result">
+                  <span>Roast line</span>
+                  <strong>{roastData.roast_text?.headline || 'Roast ready'}</strong>
+                </div>
+              ) : null}
+
+              <div className="wallet-roast-actions wallet-roast-actions--secondary">
                 <button
-                  className="btn btn--primary"
+                  className="btn wallet-roast-tool-btn"
                   onClick={onDownloadWalletRoast}
                   disabled={!roastImageBlob}
                 >
@@ -2369,7 +2699,7 @@ React.useEffect(() => {
                 </button>
 
                 <button
-                  className="btn btn--primary"
+                  className="btn wallet-roast-tool-btn"
                   onClick={onCopyWalletRoast}
                   disabled={!roastImageBlob}
                 >
@@ -2377,73 +2707,98 @@ React.useEffect(() => {
                 </button>
 
                 <button
-                  className="btn btn--primary"
+                  className="btn wallet-roast-tool-btn"
                   onClick={onShareWalletRoast}
                   disabled={!roastData}
                 >
-                  {isFarcasterMini ? 'Share on Farcaster' : 'Share on X'}
+                  {isFarcasterMini ? 'Farcaster' : 'Share on X'}
                 </button>
               </div>
             </div>
 
-            <div className="col" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label className="label">Preview</label>
+            <div className="wallet-roast-preview-col">
+              <div className="wallet-roast-preview-head">
+                <span>Preview</span>
+                <strong>{roastImageUrl ? 'Open full size' : 'PNG renderer'}</strong>
+              </div>
 
               <div
+                className={`wallet-roast-preview ${roastImageUrl ? 'wallet-roast-preview--ready' : ''}`}
                 onClick={() => {
                   if (roastImageUrl) openPreviewLightbox(roastImageUrl, 'Wallet Roast preview');
                 }}
                 title={roastImageUrl ? 'Click to open full preview' : undefined}
-                style={{
-                  border: '1px solid rgba(63,63,70,0.7)',
-                  borderRadius: 12,
-                  padding: 8,
-                  minHeight: 340,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(24,24,28,0.5)',
-                  cursor: roastImageUrl ? 'zoom-in' : 'default',
-                  overflow: 'hidden',
-                }}
               >
                 {roastImageUrl ? (
                   <img
                     src={roastImageUrl}
                     alt="Wallet Roast preview"
                     draggable={false}
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: 340,
-                      borderRadius: 8,
-                      display: 'block',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                    }}
+                    className="wallet-roast-preview__image"
                   />
-                ) : roastData ? (
-                  <div className="muted" style={{ textAlign: 'center' }}>
-                    <div>{roastData.roast_text?.headline || 'Roast ready'}</div>
-                    <div style={{ marginTop: 8 }}>
-                      {roastData.classification?.archetype || 'Archetype pending'}
+                ) : walletRoastIsLoading ? (
+                  <div className="wallet-roast-loader" role="status" aria-live="polite">
+                    <span className="wallet-roast-loader__eyebrow">
+                      AI is cooking Wallet Roast on {walletRoastNetworkLabel}
+                    </span>
+                    <span className="wallet-roast-loader__orb" />
+                    <strong>{walletRoastStatusLabel(walletRoastStage)}</strong>
+                    <span className="wallet-roast-loader__copy">
+                      {walletRoastStageLabel(walletRoastStage)}
+                    </span>
+                    <div className="wallet-roast-loader__bar">
+                      <span style={{ width: `${walletRoastStagePercent(walletRoastStage)}%` }} />
+                    </div>
+                    <div className="wallet-roast-steps">
+                      {WALLET_ROAST_PROGRESS_STEPS.map((step, index) => {
+                        const activeIndex = walletRoastStepIndex(walletRoastStage);
+                        const done =
+                          walletRoastStage === 'ready' ||
+                          (activeIndex >= 0 && index < activeIndex);
+                        const active = activeIndex === index && walletRoastStage !== 'ready';
+
+                        return (
+                          <span
+                            key={step.stage}
+                            className={[
+                              'wallet-roast-step',
+                              done ? 'wallet-roast-step--done' : '',
+                              active ? 'wallet-roast-step--active' : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                          >
+                            <i />
+                            {step.label}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
+                ) : roastData ? (
+                  <div className="wallet-roast-empty wallet-roast-empty--ready">
+                    <strong>{roastData.roast_text?.headline || 'Roast ready'}</strong>
+                    <span>{roastData.classification?.archetype || 'Archetype pending'}</span>
+                  </div>
                 ) : (
-                  <span className="muted">No roast yet</span>
+                  <div className="wallet-roast-empty">
+                    <strong>Ready to roast</strong>
+                    <span>Paste a wallet or use your connected address.</span>
+                  </div>
                 )}
               </div>
 
               <button
-                className="btn btn--accent"
+                className="btn wallet-roast-mint-btn"
                 onClick={onMintWalletRoast}
                 disabled={!roastImageB64 || walletRoastMintStage !== 'idle' || pinBusy || mintImgBusy || isConfirming || !connected}
               >
                 {walletRoastMintStage === 'pinning'
-                  ? 'Saving to Pinata…'
+                  ? 'Saving to Pinata...'
                   : walletRoastMintStage === 'minting' || mintImgBusy
-                    ? 'Waiting for wallet…'
+                    ? 'Waiting for wallet...'
                     : isConfirming
-                      ? 'Confirming…'
+                      ? 'Confirming...'
                       : 'Mint this Roast'}
               </button>
             </div>
@@ -2658,15 +3013,141 @@ React.useEffect(() => {
         }
         .grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 1fr;
           gap: 12px;
         }
         @media (min-width: 900px) {
-          .card--status { grid-column: 3; order: 3; }
+          .grid {
+            grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.25fr);
+          }
+          .card--status { grid-column: 1 / -1; order: 3; }
           .card--image { grid-column: 1; order: 1; }
           .card--world-cup { grid-column: 2; order: 2; }
         }
+        @media (min-width: 1180px) {
+          .grid {
+            grid-template-columns:
+              minmax(360px, 0.95fr)
+              minmax(420px, 1.25fr)
+              minmax(300px, 0.9fr);
+          }
+          .card--status { grid-column: 3; }
+        }
 
+        .cook-panel {
+          position: fixed;
+          left: 50%;
+          bottom: 18px;
+          transform: translateX(-50%);
+          width: min(520px, calc(100vw - 28px));
+          z-index: 9998;
+          padding: 14px;
+          border-radius: 8px;
+          border: 1px solid var(--cook-border);
+          background:
+            radial-gradient(circle at top left, var(--cook-glow-a), transparent 34%),
+            radial-gradient(circle at bottom right, var(--cook-glow-b), transparent 42%),
+            rgba(2, 6, 23, 0.95);
+          box-shadow:
+            0 24px 70px rgba(0, 0, 0, 0.58),
+            0 0 32px var(--cook-shadow);
+          backdrop-filter: blur(14px);
+        }
+        .cook-panel--wallet {
+          --cook-accent: var(--wr-accent, #38bdf8);
+          --cook-accent-2: var(--wr-accent-2, #6366f1);
+          --cook-border: color-mix(in srgb, var(--cook-accent) 58%, transparent);
+          --cook-glow-a: color-mix(in srgb, var(--cook-accent) 24%, transparent);
+          --cook-glow-b: color-mix(in srgb, var(--cook-accent-2) 22%, transparent);
+          --cook-shadow: color-mix(in srgb, var(--cook-accent) 22%, transparent);
+        }
+        .cook-panel--wallet-base {
+          --cook-accent: #2dd4ff;
+          --cook-accent-2: #4f46e5;
+        }
+        .cook-panel--wallet-mantle {
+          --cook-accent: #22c55e;
+          --cook-accent-2: #f59e0b;
+        }
+        .cook-panel--wallet-xlayer {
+          --cook-accent: #bfff00;
+          --cook-accent-2: #06b6d4;
+        }
+        .cook-panel--world-cup {
+          --cook-accent: #facc15;
+          --cook-accent-2: #a855f7;
+          --cook-border: rgba(250, 204, 21, 0.55);
+          --cook-glow-a: rgba(250, 204, 21, 0.22);
+          --cook-glow-b: rgba(124, 58, 237, 0.2);
+          --cook-shadow: rgba(250, 204, 21, 0.18);
+        }
+        .cook-panel--wallet + .cook-panel--world-cup {
+          bottom: 134px;
+        }
+        .cook-panel__head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 10px;
+        }
+        .cook-panel__title {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          min-width: 0;
+          color: color-mix(in srgb, var(--cook-accent) 64%, #ffffff);
+          font-weight: 950;
+          font-size: 12px;
+          letter-spacing: 0.08em;
+          line-height: 1.25;
+          text-transform: uppercase;
+          overflow-wrap: anywhere;
+        }
+        .cook-panel__dot {
+          width: 10px;
+          height: 10px;
+          flex: 0 0 auto;
+          border-radius: 999px;
+          background: var(--cook-accent);
+          box-shadow: 0 0 18px color-mix(in srgb, var(--cook-accent) 82%, transparent);
+          animation: cookieversePulse 1.1s ease-in-out infinite;
+        }
+        .cook-panel__time {
+          flex: 0 0 auto;
+          color: color-mix(in srgb, var(--cook-accent) 64%, #ffffff);
+          font-size: 11px;
+          font-weight: 900;
+          font-variant-numeric: tabular-nums;
+        }
+        .cook-panel__copy {
+          color: #e5e7eb;
+          font-size: 12px;
+          line-height: 1.35;
+          margin-bottom: 10px;
+        }
+        .cook-panel__bar {
+          height: 8px;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--cook-accent) 13%, rgba(2, 6, 23, 0.85));
+          overflow: hidden;
+          border: 1px solid color-mix(in srgb, var(--cook-accent) 18%, transparent);
+        }
+        .cook-panel__bar span {
+          display: block;
+          width: 0;
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, var(--cook-accent), var(--cook-accent-2));
+          box-shadow: 0 0 18px color-mix(in srgb, var(--cook-accent) 42%, transparent);
+          transition: width 420ms ease;
+        }
+        .cook-panel__hint {
+          margin-top: 9px;
+          color: #9ca3af;
+          font-size: 11px;
+          line-height: 1.35;
+        }
         .col { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
         .card {
           background: rgba(24, 24, 28, 0.82);
@@ -2675,11 +3156,439 @@ React.useEffect(() => {
           padding: 18px;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
+        .card--world-cup {
+          border-radius: 8px;
+          overflow: visible;
+        }
+        .card--world-cup .btn {
+          border-radius: 8px;
+          min-width: 0;
+        }
+        .card--world-cup .btn--primary {
+          background: linear-gradient(135deg, #fef08a, #f59e0b);
+          color: #171717;
+          box-shadow: 0 12px 28px rgba(250, 204, 21, 0.22);
+        }
+        .card--world-cup .btn--accent {
+          background: linear-gradient(135deg, #6d5dfc, #8b5cf6);
+          color: #ffffff;
+        }
         .card--wallet-roast {
-          border: 1px solid rgba(59, 130, 246, 0.55);
+          --wr-accent: #38bdf8;
+          --wr-accent-2: #facc15;
+          --wr-accent-3: #a855f7;
+          --wr-ink: #f8fafc;
+          --wr-soft: rgba(56, 189, 248, 0.14);
+          position: relative;
+          overflow: hidden;
+          border-radius: 8px;
+          font-family: Inter, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+          border: 1px solid color-mix(in srgb, var(--wr-accent) 42%, transparent);
+          background:
+            radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--wr-accent) 22%, transparent), transparent 34%),
+            radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--wr-accent-2) 18%, transparent), transparent 32%),
+            linear-gradient(135deg, rgba(8, 13, 24, 0.96), rgba(19, 18, 31, 0.94));
           box-shadow:
-            0 0 0 1px rgba(59, 130, 246, 0.12),
-            0 12px 34px rgba(29, 78, 216, 0.18);
+            0 24px 72px rgba(0, 0, 0, 0.36),
+            0 0 34px color-mix(in srgb, var(--wr-accent) 15%, transparent);
+        }
+        .card--wallet-roast-base {
+          --wr-accent: #2dd4ff;
+          --wr-accent-2: #4f46e5;
+          --wr-accent-3: #facc15;
+        }
+        .card--wallet-roast-mantle {
+          --wr-accent: #22c55e;
+          --wr-accent-2: #f59e0b;
+          --wr-accent-3: #38bdf8;
+        }
+        .card--wallet-roast-xlayer {
+          --wr-accent: #bfff00;
+          --wr-accent-2: #06b6d4;
+          --wr-accent-3: #f97316;
+        }
+        .card--wallet-roast-linea {
+          --wr-accent: #61d394;
+          --wr-accent-2: #60a5fa;
+          --wr-accent-3: #facc15;
+        }
+        .card--wallet-roast-mitosis {
+          --wr-accent: #f472b6;
+          --wr-accent-2: #22d3ee;
+          --wr-accent-3: #facc15;
+        }
+        .card--wallet-roast-og {
+          --wr-accent: #facc15;
+          --wr-accent-2: #fb7185;
+          --wr-accent-3: #22c55e;
+        }
+        .wallet-roast-head {
+          position: relative;
+          display: block;
+          margin-bottom: 16px;
+        }
+        .wallet-roast-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 5px 10px;
+          border-radius: 999px;
+          border: 1px solid color-mix(in srgb, var(--wr-accent) 42%, transparent);
+          background: rgba(2, 6, 23, 0.68);
+          color: color-mix(in srgb, var(--wr-accent) 78%, #ffffff);
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          margin-bottom: 10px;
+        }
+        .wallet-roast-kicker__dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: var(--wr-accent);
+          box-shadow: 0 0 18px color-mix(in srgb, var(--wr-accent) 80%, transparent);
+          animation: cookieversePulse 1.15s ease-in-out infinite;
+        }
+        .wallet-roast-title {
+          margin: 0;
+          color: var(--wr-ink);
+          font-size: 28px;
+          line-height: 1;
+          font-weight: 950;
+          font-family: "Arial Black", Inter, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+          letter-spacing: 0;
+          text-transform: uppercase;
+          text-shadow: 0 0 22px color-mix(in srgb, var(--wr-accent) 18%, transparent);
+        }
+        .wallet-roast-title span {
+          display: block;
+          margin-top: 6px;
+          color: color-mix(in srgb, var(--wr-accent) 72%, #ffffff);
+          font-size: 13px;
+          line-height: 1.2;
+          letter-spacing: 0.12em;
+        }
+        .wallet-roast-copy {
+          max-width: 100%;
+          margin: 10px 0 0;
+          color: #cbd5e1;
+          font-size: 13px;
+          line-height: 1.45;
+        }
+        .wallet-roast-result span,
+        .wallet-roast-stats span,
+        .wallet-roast-preview-head span {
+          display: block;
+          color: #94a3b8;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        .wallet-roast-result strong,
+        .wallet-roast-stats strong,
+        .wallet-roast-preview-head strong {
+          display: block;
+          color: #f8fafc;
+          font-size: 12px;
+          line-height: 1.25;
+          margin-top: 4px;
+        }
+        .wallet-roast-shell {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+        .wallet-roast-control,
+        .wallet-roast-preview-col {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .wallet-roast-label {
+          color: color-mix(in srgb, var(--wr-accent) 65%, #ffffff);
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .wallet-roast-input-wrap {
+          position: relative;
+          width: 100%;
+        }
+        .wallet-roast-input {
+          width: 100%;
+          max-width: 100%;
+          height: 46px;
+          box-sizing: border-box;
+          padding-right: 12px;
+          border-radius: 8px;
+          border: 1px solid color-mix(in srgb, var(--wr-accent) 38%, rgba(82, 82, 91, 0.6));
+          background:
+            radial-gradient(circle at right, color-mix(in srgb, var(--wr-accent) 14%, transparent), transparent 38%),
+            linear-gradient(135deg, rgba(3, 7, 18, 0.94), rgba(17, 24, 39, 0.82));
+          color: #ffffff;
+          font-weight: 800;
+          letter-spacing: 0;
+        }
+        .wallet-roast-input:hover,
+        .wallet-roast-input:focus {
+          border-color: color-mix(in srgb, var(--wr-accent) 74%, #ffffff);
+          box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--wr-accent) 18%, transparent),
+            0 0 18px color-mix(in srgb, var(--wr-accent) 16%, transparent);
+        }
+        .wallet-roast-actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .wallet-roast-main-btn,
+        .wallet-roast-mint-btn {
+          width: 100%;
+          min-width: 0;
+          border-radius: 8px;
+          color: #07111f;
+          background: linear-gradient(135deg, var(--wr-accent), var(--wr-accent-2));
+          box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.06),
+            0 12px 28px color-mix(in srgb, var(--wr-accent) 22%, transparent);
+        }
+        .wallet-roast-main-btn:hover,
+        .wallet-roast-mint-btn:hover {
+          filter: brightness(1.08);
+        }
+        .wallet-roast-main-btn:disabled,
+        .wallet-roast-mint-btn:disabled {
+          cursor: not-allowed;
+          filter: grayscale(0.35);
+          opacity: 0.52;
+        }
+        .wallet-roast-tool-btn {
+          flex: 1 1 92px;
+          min-width: 0;
+          border-radius: 8px;
+          border: 1px solid color-mix(in srgb, var(--wr-accent) 40%, transparent);
+          background:
+            linear-gradient(135deg, color-mix(in srgb, var(--wr-accent) 22%, rgba(15, 23, 42, 0.92)), rgba(17, 24, 39, 0.9));
+          color: #f8fafc;
+          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
+        }
+        .wallet-roast-tool-btn:hover {
+          border-color: color-mix(in srgb, var(--wr-accent) 58%, transparent);
+          background:
+            linear-gradient(135deg, color-mix(in srgb, var(--wr-accent) 34%, rgba(15, 23, 42, 0.92)), rgba(17, 24, 39, 0.94));
+        }
+        .wallet-roast-tool-btn:disabled {
+          cursor: not-allowed;
+          color: #d1d5db;
+          opacity: 0.78;
+          filter: grayscale(0.18);
+          background: rgba(30, 41, 59, 0.74);
+          border-color: rgba(148, 163, 184, 0.22);
+          box-shadow: none;
+        }
+        .wallet-roast-network-alert {
+          border-radius: 8px;
+          border: 1px solid color-mix(in srgb, var(--wr-accent) 42%, transparent);
+          background:
+            linear-gradient(135deg, color-mix(in srgb, var(--wr-accent) 15%, rgba(2, 6, 23, 0.86)), rgba(15, 23, 42, 0.72));
+          color: #e5e7eb;
+          font-size: 12px;
+          font-weight: 800;
+          line-height: 1.35;
+          padding: 10px 11px;
+        }
+        .wallet-roast-stats {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 8px;
+        }
+        .wallet-roast-stats div,
+        .wallet-roast-result {
+          border-radius: 8px;
+          border: 1px solid rgba(148, 163, 184, 0.16);
+          background: rgba(2, 6, 23, 0.44);
+          padding: 11px;
+          min-width: 0;
+        }
+        .wallet-roast-stats strong,
+        .wallet-roast-result strong {
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        .wallet-roast-preview-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .wallet-roast-preview {
+          min-height: 300px;
+          aspect-ratio: 1 / 1;
+          border-radius: 8px;
+          border: 1px solid color-mix(in srgb, var(--wr-accent) 30%, rgba(63, 63, 70, 0.7));
+          background:
+            linear-gradient(135deg, rgba(2, 6, 23, 0.80), rgba(15, 23, 42, 0.58)),
+            repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 13px);
+          box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+            0 0 24px color-mix(in srgb, var(--wr-accent) 10%, transparent);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px;
+          overflow: hidden;
+          cursor: default;
+        }
+        .wallet-roast-preview--ready {
+          cursor: zoom-in;
+        }
+        .wallet-roast-preview__image {
+          max-width: 100%;
+          max-height: 100%;
+          border-radius: 8px;
+          display: block;
+          user-select: none;
+          -webkit-user-select: none;
+          box-shadow: 0 18px 52px rgba(0, 0, 0, 0.34);
+        }
+        .wallet-roast-empty,
+        .wallet-roast-loader {
+          width: min(320px, 100%);
+          text-align: center;
+          color: #cbd5e1;
+        }
+        .wallet-roast-empty strong,
+        .wallet-roast-loader strong {
+          display: block;
+          color: #f8fafc;
+          font-size: 16px;
+          line-height: 1.2;
+          margin-bottom: 8px;
+        }
+        .wallet-roast-empty span {
+          display: block;
+          color: #94a3b8;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+        .wallet-roast-loader__eyebrow {
+          display: block;
+          margin-bottom: 12px;
+          color: color-mix(in srgb, var(--wr-accent) 74%, #ffffff);
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.1em;
+          line-height: 1.25;
+          text-transform: uppercase;
+          overflow-wrap: anywhere;
+        }
+        .wallet-roast-loader__copy {
+          display: block;
+          min-height: 32px;
+          color: #cbd5e1;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1.35;
+          overflow-wrap: anywhere;
+        }
+        .wallet-roast-empty--ready strong {
+          color: color-mix(in srgb, var(--wr-accent) 70%, #ffffff);
+        }
+        .wallet-roast-loader__orb {
+          display: block;
+          width: 38px;
+          height: 38px;
+          margin: 0 auto 12px;
+          border-radius: 999px;
+          background:
+            radial-gradient(circle at 34% 28%, #ffffff, transparent 20%),
+            linear-gradient(135deg, var(--wr-accent), var(--wr-accent-2), var(--wr-accent-3));
+          box-shadow: 0 0 30px color-mix(in srgb, var(--wr-accent) 38%, transparent);
+          animation: cookieverseSpin 1.2s linear infinite;
+        }
+        .wallet-roast-loader__bar {
+          height: 8px;
+          margin-top: 12px;
+          border-radius: 999px;
+          overflow: hidden;
+          background: rgba(148, 163, 184, 0.14);
+          border: 1px solid rgba(148, 163, 184, 0.14);
+        }
+        .wallet-roast-loader__bar span {
+          display: block;
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, var(--wr-accent), var(--wr-accent-2), var(--wr-accent-3));
+          box-shadow: 0 0 18px color-mix(in srgb, var(--wr-accent) 34%, transparent);
+          transition: width 420ms ease;
+        }
+        .wallet-roast-steps {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 7px;
+          margin-top: 12px;
+          text-align: left;
+        }
+        .wallet-roast-step {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          min-width: 0;
+          border-radius: 8px;
+          border: 1px solid rgba(148, 163, 184, 0.16);
+          background: rgba(2, 6, 23, 0.46);
+          color: #94a3b8;
+          font-size: 10px;
+          font-weight: 900;
+          line-height: 1.2;
+          padding: 8px;
+          overflow-wrap: anywhere;
+        }
+        .wallet-roast-step i {
+          width: 8px;
+          height: 8px;
+          flex: 0 0 auto;
+          border-radius: 999px;
+          background: rgba(148, 163, 184, 0.5);
+        }
+        .wallet-roast-step--active {
+          border-color: color-mix(in srgb, var(--wr-accent) 44%, transparent);
+          color: #f8fafc;
+          background: color-mix(in srgb, var(--wr-accent) 13%, rgba(2, 6, 23, 0.54));
+        }
+        .wallet-roast-step--active i {
+          background: var(--wr-accent);
+          box-shadow: 0 0 16px color-mix(in srgb, var(--wr-accent) 70%, transparent);
+        }
+        .wallet-roast-step--done {
+          color: color-mix(in srgb, var(--wr-accent) 70%, #ffffff);
+        }
+        .wallet-roast-step--done i {
+          background: linear-gradient(135deg, var(--wr-accent), var(--wr-accent-2));
+        }
+        @media (max-width: 860px) {
+          .wallet-roast-preview {
+            min-height: 300px;
+          }
+        }
+        @media (max-width: 520px) {
+          .wallet-roast-title {
+            font-size: 25px;
+          }
+
+          .wallet-roast-stats {
+            grid-template-columns: 1fr;
+          }
+
+          .wallet-roast-main-btn,
+          .wallet-roast-mint-btn,
+          .wallet-roast-tool-btn {
+            width: 100%;
+            min-width: 0;
+          }
         }
         .card__title {
           font-size: 14px;
