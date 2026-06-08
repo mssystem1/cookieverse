@@ -21,6 +21,7 @@
     "@0glabs/0g-serving-broker": "^0.7.5",
     "@coinbase/onchainkit": "^1.1.2",
     "@coinbase/x402": "2.1.0",
+    "@farcaster/miniapp-sdk": "0.2.3",
     "@farcaster/miniapp-wagmi-connector": "^1.1.0",
     "@metamask/delegation-toolkit": "^0.13.0",
     "@napi-rs/canvas": "^0.1.99",

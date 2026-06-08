@@ -2,6 +2,34 @@
 const fs = require('fs');
 const path = require('path');
 
+function ensureNodeModulesTsconfigBase() {
+  const nodeModulesDir = path.join(process.cwd(), 'node_modules');
+  const viemTsconfig = path.join(nodeModulesDir, 'viem', 'tsconfig.json');
+  const target = path.join(nodeModulesDir, 'tsconfig.base.json');
+
+  if (!fs.existsSync(viemTsconfig) || fs.existsSync(target)) return;
+
+  const body = `${JSON.stringify(
+    {
+      compilerOptions: {
+        target: 'ES2022',
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        strict: true,
+        skipLibCheck: true,
+        noEmit: true,
+      },
+    },
+    null,
+    2
+  )}\n`;
+
+  fs.writeFileSync(target, body);
+  console.log('[patch-ox] added node_modules/tsconfig.base.json for viem IDE diagnostics.');
+}
+
+ensureNodeModulesTsconfigBase();
+
 // Find installed "ox" package root
 let oxPkgPath;
 try {
