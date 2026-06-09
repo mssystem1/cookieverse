@@ -1,31 +1,18 @@
 
 import { createPublicClient, http, type PublicClient } from 'viem';
-import { CHAINS } from '../chain';
+import {
+  CHAINS,
+  defaultAppChain,
+  defaultChainKey as appDefaultChainKey,
+} from '../chain';
 import { createBundlerClient } from 'viem/account-abstraction';
-
-// Determine default chain from env
-const DEFAULT_CHAIN_KEY = (process.env.NEXT_PUBLIC_DEFAULT_CHAIN || 'monad').toLowerCase();
-
-// Mapping of env chain key → chainId
-const CHAIN_IDS: Record<string, number> = {
-  monad: 143,
-  base: 8453,
-  mantle: 5000,
-  linea: 59144,  
-  mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
-  og: 16661,
-  xlayer: 196,
-};
-
-// Pick chain object
-const chain = (() => {
-  const id = CHAIN_IDS[DEFAULT_CHAIN_KEY] ?? 143;
-  return CHAINS.find(c => c.id === id)!;
-})();
 
 // Export default AA chain + key so other modules (SA provider, status card)
 // can know which RPC / symbol to use at runtime.
 export type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | "og" | "xlayer";
+
+const DEFAULT_CHAIN_KEY = appDefaultChainKey as ChainKey;
+const chain = defaultAppChain;
 
 export const defaultChainKey = DEFAULT_CHAIN_KEY as ChainKey;
 export const defaultChain = chain;

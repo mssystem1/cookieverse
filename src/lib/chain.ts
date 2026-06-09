@@ -86,3 +86,54 @@ export const CHAINS = [
   ogMainnet,
   xLayerMainnet,
 ];
+
+export type AppChainKey =
+  | 'monad'
+  | 'base'
+  | 'mantle'
+  | 'linea'
+  | 'mitosis'
+  | 'og'
+  | 'xlayer';
+
+type DefaultChainInputKey =
+  | AppChainKey
+  | '0g'
+  | 'x-layer'
+  | 'x_layer';
+
+export const CHAIN_BY_DEFAULT_KEY: Record<DefaultChainInputKey, (typeof CHAINS)[number]> = {
+  monad: monadTestnet,
+  base: baseMainnet,
+  mantle: mantleMainnet,
+  linea: lineaMainnet,
+  mitosis: mitosisMainnet,
+  og: ogMainnet,
+  '0g': ogMainnet,
+  xlayer: xLayerMainnet,
+  'x-layer': xLayerMainnet,
+  x_layer: xLayerMainnet,
+} as const;
+
+export function normalizeDefaultChainKey(value?: string | null) {
+  const key = String(value || 'monad').trim().toLowerCase();
+
+  if (key === '0g') return 'og';
+  if (key === 'x-layer' || key === 'x_layer') return 'xlayer';
+  if (key in CHAIN_BY_DEFAULT_KEY) return key as AppChainKey;
+
+  return 'monad';
+}
+
+export const defaultChainKey = normalizeDefaultChainKey(
+  process.env.NEXT_PUBLIC_DEFAULT_CHAIN
+);
+
+export const defaultAppChain =
+  CHAIN_BY_DEFAULT_KEY[defaultChainKey as keyof typeof CHAIN_BY_DEFAULT_KEY] ??
+  monadTestnet;
+
+export const CHAINS_WITH_DEFAULT_FIRST = [
+  defaultAppChain,
+  ...CHAINS.filter((chain) => chain.id !== defaultAppChain.id),
+] as const;
