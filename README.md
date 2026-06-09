@@ -27,7 +27,7 @@
 
 ---
 
-## Overview
+## Cookieverse Overview
 
 Cookieverse is a consumer crypto app that makes onchain activity fun, visual, collectible, and shareable.
 
