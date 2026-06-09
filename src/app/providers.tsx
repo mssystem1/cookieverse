@@ -59,8 +59,8 @@ export default function Providers({ children }: { children: ReactNode }) {
 
   return (
     <WagmiProvider config={wagmiConfig }>
-      <DefaultChainSwitcher />
       <QueryClientProvider client={queryClient}>
+        <DefaultChainSwitcher />
         <RainbowKitProvider theme={darkTheme()} initialChain={initialChain}>
           {children}
         </RainbowKitProvider>
