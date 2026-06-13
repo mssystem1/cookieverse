@@ -19,8 +19,13 @@ export async function POST(req: Request) {
         return Response.json({ rows: [] });
       }
 
-      const rows = await getPlayersMany(addresses);
-      return Response.json({ rows });
+      const rows = await getPlayersMany(addresses, {
+        preferHistory: Boolean(payload.preferHistory || payload.strict),
+      });
+      return Response.json(
+        { rows },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     // Mode B: manual upsert single player.
@@ -66,6 +71,17 @@ export async function POST(req: Request) {
       totalTransactions_xlayer: n(payload.totalTransactions_xlayer),
       totalImages_xlayer: n(payload.totalImages_xlayer),      
 
+      totalX402_base: n(payload.totalX402_base),
+      totalX402_mantle: n(payload.totalX402_mantle),
+      totalX402_xlayer: n(payload.totalX402_xlayer),
+
+      totalX402Score_base: n(payload.totalX402Score_base ?? payload.totalX402_base),
+      totalX402Score_mantle: n(payload.totalX402Score_mantle ?? payload.totalX402_mantle),
+      totalX402Score_xlayer: n(payload.totalX402Score_xlayer ?? payload.totalX402_xlayer),
+
+      totalX402: n(payload.totalX402),
+      totalX402Score: n(payload.totalX402Score ?? payload.totalX402),
+
       totalScore: n(payload.totalScore),
       totalTransactions: n(payload.totalTransactions),
       totalImages: n(payload.totalImages),
@@ -82,15 +98,27 @@ export async function POST(req: Request) {
       dailyKey: payload.dailyKey,
       dailyBaselineCookies: n(payload.dailyBaselineCookies),
       dailyBaselineBridges: n(payload.dailyBaselineBridges),
+      dailyBaselineX402: n(payload.dailyBaselineX402),
       dailyMintDone: payload.dailyMintDone,
       dailyBridgeDone: payload.dailyBridgeDone,
+      dailyX402Done: payload.dailyX402Done,
 
       weeklyKey: payload.weeklyKey,
       weeklyBaselineCookies: n(payload.weeklyBaselineCookies),
       weeklyBaselineBridges: n(payload.weeklyBaselineBridges),
+      weeklyBaselineX402: n(payload.weeklyBaselineX402),
       weeklyMintDone: payload.weeklyMintDone,
       weeklyBridgeDone: payload.weeklyBridgeDone,
+      weeklyX402Done: payload.weeklyX402Done,
     };
+
+    row.totalX402 = row.totalX402 || (
+      row.totalX402_base + row.totalX402_mantle + row.totalX402_xlayer
+    );
+
+    row.totalX402Score = row.totalX402Score || (
+      row.totalX402Score_base + row.totalX402Score_mantle + row.totalX402Score_xlayer
+    );
 
     // If caller did not send global totals, derive them from per-chain fields.
     row.totalScore = row.totalScore || (

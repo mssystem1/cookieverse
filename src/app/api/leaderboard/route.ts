@@ -3,7 +3,11 @@ import { createPublicClient, http, parseAbi } from "viem";
 import { monadTestnet } from "../../../lib/chain";
 
 //import type { Abi } from 'viem';
-import { getPublicClientByKey, type ChainKey } from '../../../lib/aa/clients';
+import {
+  defaultServerChainKey as fallbackChainKey,
+  getServerPublicClientByKey,
+} from '../../../lib/aa/serverClients';
+import type { ChainKey } from '../../../lib/aa/clients';
 import FortuneABI from '../../../abi/FortuneCookiesAI.json';
 
 
@@ -15,7 +19,7 @@ import FortuneABI from '../../../abi/FortuneCookiesAI.json';
  * 3) Short server caches + real bypass on fresh=1.
  */
 
-let SELECTED_KEY: ChainKey = "monad"; // default
+let SELECTED_KEY: ChainKey = fallbackChainKey;
 
 function cookieAddressForKey(key: ChainKey): `0x${string}` {
   if (key === 'base')    return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_BASE as `0x${string}`;
@@ -38,7 +42,7 @@ function keyFromChainId(id?: number): ChainKey {
   const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777);
   if (id === mitosisId) return 'mitosis';
 
-  return 'monad';
+  return fallbackChainKey;
 }
 
 export const dynamic = "force-dynamic";
@@ -106,7 +110,7 @@ const now = Date.now();
 
   holdersInflight = (async () => {
     // use shared client + selected chain’s cookie address
-    const client  = getPublicClientByKey(SELECTED_KEY);
+    const client  = getServerPublicClientByKey(SELECTED_KEY);
     const COOKIE  = cookieAddressForKey(SELECTED_KEY);
 
     // read all mints once
@@ -159,7 +163,7 @@ async function fetchHolders(
 
     for (const key of KEYS) {
       try {
-        const client = getPublicClientByKey(key);
+        const client = getServerPublicClientByKey(key);
         const COOKIE = cookieAddressForKey(key);
 
         const all = await client.readContract({
@@ -212,7 +216,7 @@ async function fetchYouHoldingsCount(
     if (cached && now - cached.at < YOU_TTL_MS) return cached.count;
   }
 
-  const client  = getPublicClientByKey(SELECTED_KEY);
+  const client  = getServerPublicClientByKey(SELECTED_KEY);
   const COOKIE  = cookieAddressForKey(SELECTED_KEY);
 
   const all = await client.readContract({
@@ -239,7 +243,7 @@ export async function GET(req: Request) {
     const chainIdQ   = url.searchParams.get("chainId");
     const chainQ     = url.searchParams.get("chain"); // 'monad'|'base'|'mantle'|'mitosis'
     SELECTED_KEY = chainQ
-      ? (["monad","base","mantle","linea","mitosis", "og", "xlayer"].includes(chainQ) ? (chainQ as ChainKey) : "monad")
+      ? (["monad","base","mantle","linea","mitosis", "og", "xlayer"].includes(chainQ) ? (chainQ as ChainKey) : fallbackChainKey)
       : keyFromChainId(chainIdHdr ? Number(chainIdHdr) : chainIdQ ? Number(chainIdQ) : undefined);
 
     // optional: "you" can be "0xEOA,0xSA"
@@ -285,7 +289,7 @@ export async function GET(req: Request) {
     let textCounts  = new Map<string, number>();   // cookies
     let imageCounts = new Map<string, number>();   // images
     try {
-      const client = getPublicClientByKey(SELECTED_KEY);
+      const client = getServerPublicClientByKey(SELECTED_KEY);
       const all = await client.readContract({
         address: contract as `0x${string}`,
         abi: FortuneABI,
@@ -311,7 +315,7 @@ export async function GET(req: Request) {
     const KEYS = ['monad','base','mantle','linea','mitosis','og','xlayer'] as ChainKey[];
     for (const key of KEYS) {
       try {
-        const client = getPublicClientByKey(key);
+        const client = getServerPublicClientByKey(key);
         const cookie = cookieAddressForKey(key);
         const all = await client.readContract({
           address: cookie as `0x${string}`,

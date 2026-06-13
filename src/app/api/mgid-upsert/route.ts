@@ -159,6 +159,30 @@ type AdapterSendsByChain = {
   xlayer: { count: number; ok: boolean };  
 };
 
+type X402SupportedChain = 'base' | 'mantle' | 'xlayer';
+
+type X402StatsByChain = Record<X402SupportedChain, {
+  count: number;
+  score: number;
+  ok: boolean;
+}>;
+
+type X402Stats = {
+  byChain: X402StatsByChain;
+  totalCount: number;
+  totalScore: number;
+};
+
+const EMPTY_X402_STATS: X402Stats = {
+  byChain: {
+    base: { count: 0, score: 0, ok: false },
+    mantle: { count: 0, score: 0, ok: false },
+    xlayer: { count: 0, score: 0, ok: false },
+  },
+  totalCount: 0,
+  totalScore: 0,
+};
+
 async function loadAdapterSends(address: `0x${string}`, origin: string): Promise<AdapterSendsByChain> {
 //  const baseUrl = getBaseUrl();
   const url = new URL('/api/adapter-sends', origin);
@@ -343,6 +367,7 @@ const headerFcUsername =
 
   // 5) Compose per-chain scores (mints + bridge events + boosts)
   const boostFlags = await loadBoosts(address, origin);
+  const x402Stats = await loadX402Stats(address, origin);
 
     // ── RAW components per chain ─────────────────────────────
     /*
@@ -412,6 +437,45 @@ const headerFcUsername =
   const img_og      = imagesByChain.og;
   const img_xlayer  = imagesByChain.xlayer;  
 
+  const existingX402_base = (existing as any)?.totalX402_base ?? 0;
+  const existingX402_mantle = (existing as any)?.totalX402_mantle ?? 0;
+  const existingX402_xlayer = (existing as any)?.totalX402_xlayer ?? 0;
+
+  const existingX402Score_base = (existing as any)?.totalX402Score_base ?? existingX402_base;
+  const existingX402Score_mantle = (existing as any)?.totalX402Score_mantle ?? existingX402_mantle;
+  const existingX402Score_xlayer = (existing as any)?.totalX402Score_xlayer ?? existingX402_xlayer;
+
+  const x402_base_raw = x402Stats.byChain.base.ok
+    ? x402Stats.byChain.base.count
+    : existingX402_base;
+  const x402_mantle_raw = x402Stats.byChain.mantle.ok
+    ? x402Stats.byChain.mantle.count
+    : existingX402_mantle;
+  const x402_xlayer_raw = x402Stats.byChain.xlayer.ok
+    ? x402Stats.byChain.xlayer.count
+    : existingX402_xlayer;
+
+  const x402Score_base_raw = x402Stats.byChain.base.ok
+    ? x402Stats.byChain.base.score
+    : existingX402Score_base;
+  const x402Score_mantle_raw = x402Stats.byChain.mantle.ok
+    ? x402Stats.byChain.mantle.score
+    : existingX402Score_mantle;
+  const x402Score_xlayer_raw = x402Stats.byChain.xlayer.ok
+    ? x402Stats.byChain.xlayer.score
+    : existingX402Score_xlayer;
+
+  const x402_base = existing ? Math.max(existingX402_base, x402_base_raw) : x402_base_raw;
+  const x402_mantle = existing ? Math.max(existingX402_mantle, x402_mantle_raw) : x402_mantle_raw;
+  const x402_xlayer = existing ? Math.max(existingX402_xlayer, x402_xlayer_raw) : x402_xlayer_raw;
+
+  const x402Score_base = existing ? Math.max(existingX402Score_base, x402Score_base_raw) : x402Score_base_raw;
+  const x402Score_mantle = existing ? Math.max(existingX402Score_mantle, x402Score_mantle_raw) : x402Score_mantle_raw;
+  const x402Score_xlayer = existing ? Math.max(existingX402Score_xlayer, x402Score_xlayer_raw) : x402Score_xlayer_raw;
+
+  const totalX402 = x402_base + x402_mantle + x402_xlayer;
+  const totalX402Score = x402Score_base + x402Score_mantle + x402Score_xlayer;
+
     // ── Fresh TX (mints + bridges, NO boost) ─────────────────
   const freshTx_monad   = mints_monad   + bridges_monad;
   const freshTx_base    = mints_base    + bridges_base;
@@ -446,12 +510,12 @@ const headerFcUsername =
 
   // ── Fresh SCORE (mints + bridges + boost) ────────────────
   const freshScore_monad   = mints_monad   + bridges_monad   + boost_monad_effective;
-  const freshScore_base    = mints_base    + bridges_base    + boost_base_effective;
-  const freshScore_mantle  = mints_mantle  + bridges_mantle  + boost_mantle_effective;
+  const freshScore_base    = mints_base    + bridges_base    + boost_base_effective + x402Score_base;
+  const freshScore_mantle  = mints_mantle  + bridges_mantle  + boost_mantle_effective + x402Score_mantle;
   const freshScore_linea   = mints_linea   + bridges_linea   + boost_linea_effective;
   const freshScore_mitosis = mints_mitosis + bridges_mitosis + boost_mitosis_effective;
   const freshScore_og      = mints_og + bridges_og + boost_og_effective;
-  const freshScore_xlayer  = mints_xlayer + bridges_xlayer + boost_xlayer_effective;  
+  const freshScore_xlayer  = mints_xlayer + bridges_xlayer + boost_xlayer_effective + x402Score_xlayer;  
 
   // Never decrease SCORE vs existing snapshot
   const score_monad =
@@ -502,6 +566,10 @@ const headerFcUsername =
   const totalBridgesCurrent =
     bridges_monad + bridges_base + bridges_mantle + bridges_linea + bridges_mitosis + bridges_og + bridges_og + bridges_xlayer;
 
+  const totalX402Current = totalX402;
+  const dailyX402Target = Math.max(1, Number(process.env.MGID_DAILY_X402_TARGET || 1));
+  const weeklyX402Target = Math.max(1, Number(process.env.MGID_WEEKLY_X402_TARGET || 5));
+
   const now = new Date();
   const dayKey = getUtcDayKey(now);
   const weekKey = getUtcIsoWeekKey(now);
@@ -512,6 +580,7 @@ const headerFcUsername =
   // force numbers even if old rows stored strings
   let dailyBaselineCookies = Number(existing?.dailyBaselineCookies ?? 0);
   let dailyBaselineBridges = Number(existing?.dailyBaselineBridges ?? 0);
+  let dailyBaselineX402 = Number((existing as any)?.dailyBaselineX402 ?? 0);
 
   // normalize to real booleans (handle "true"/"false", 1/0, etc.)
   const normalizeBool = (v: any): boolean => {
@@ -527,6 +596,7 @@ const headerFcUsername =
 
   let dailyMintDone = normalizeBool(existing?.dailyMintDone);
   let dailyBridgeDone = normalizeBool(existing?.dailyBridgeDone);
+  let dailyX402Done = normalizeBool((existing as any)?.dailyX402Done);
 
   const isSameDay = dailyKey === dayKey;
 
@@ -535,8 +605,10 @@ const headerFcUsername =
     dailyKey = dayKey;
     dailyBaselineCookies = totalCookiesCurrent;
     dailyBaselineBridges = totalBridgesCurrent;
+    dailyBaselineX402 = totalX402Current;
     dailyMintDone = false;
     dailyBridgeDone = false;
+    dailyX402Done = false;
   }
 
   // SAFETY: if we already had the same day in storage AND mint was done,
@@ -557,6 +629,13 @@ const headerFcUsername =
     }
   }
 
+  if (existing && existing.dailyKey === dayKey && normalizeBool((existing as any).dailyX402Done)) {
+    dailyX402Done = true;
+    if (typeof (existing as any).dailyBaselineX402 !== "undefined") {
+      dailyBaselineX402 = Number((existing as any).dailyBaselineX402);
+    }
+  }
+
   // Daily Mint – “Mint at least 2 COOKIEs on any chain”
   const dailyMintDiff = totalCookiesCurrent - dailyBaselineCookies;
   if (!dailyMintDone && totalCookiesCurrent > 0 && dailyMintDiff >= 2) {
@@ -569,15 +648,22 @@ const headerFcUsername =
     dailyBridgeDone = true;
   }
 
+  const dailyX402Diff = totalX402Current - dailyBaselineX402;
+  if (!dailyX402Done && dailyX402Diff >= dailyX402Target) {
+    dailyX402Done = true;
+  }
+
   // ===== WEEKLY TASKS =====
   // ===== WEEKLY TASKS =====
   let weeklyKey = existing?.weeklyKey ?? null;
 
   let weeklyBaselineCookies = Number(existing?.weeklyBaselineCookies ?? 0);
   let weeklyBaselineBridges = Number(existing?.weeklyBaselineBridges ?? 0);
+  let weeklyBaselineX402 = Number((existing as any)?.weeklyBaselineX402 ?? 0);
 
   let weeklyMintDone = normalizeBool(existing?.weeklyMintDone);
   let weeklyBridgeDone = normalizeBool(existing?.weeklyBridgeDone);
+  let weeklyX402Done = normalizeBool((existing as any)?.weeklyX402Done);
 
   const isSameWeek = weeklyKey === weekKey;
 
@@ -586,8 +672,10 @@ const headerFcUsername =
     weeklyKey = weekKey;
     weeklyBaselineCookies = totalCookiesCurrent;
     weeklyBaselineBridges = totalBridgesCurrent;
+    weeklyBaselineX402 = totalX402Current;
     weeklyMintDone = false;
     weeklyBridgeDone = false;
+    weeklyX402Done = false;
   }
 
   // SAFETY: if for this week we already stored weeklyMintDone = true,
@@ -607,8 +695,16 @@ const headerFcUsername =
     }
   }
 
+  if (existing && existing.weeklyKey === weekKey && normalizeBool((existing as any).weeklyX402Done)) {
+    weeklyX402Done = true;
+    if (typeof (existing as any).weeklyBaselineX402 !== "undefined") {
+      weeklyBaselineX402 = Number((existing as any).weeklyBaselineX402);
+    }
+  }
+
   const weeklyMintDiff   = totalCookiesCurrent - weeklyBaselineCookies;
   const weeklyBridgeDiff = totalBridgesCurrent - weeklyBaselineBridges;
+  const weeklyX402Diff = totalX402Current - weeklyBaselineX402;
 
   // “Mint 8+ cookies this week”
   if (!weeklyMintDone && weeklyMintDiff >= 8) {
@@ -618,6 +714,10 @@ const headerFcUsername =
   // “Bridge 8+ times this week”
   if (!weeklyBridgeDone && weeklyBridgeDiff >= 8) {
     weeklyBridgeDone = true;
+  }
+
+  if (!weeklyX402Done && weeklyX402Diff >= weeklyX402Target) {
+    weeklyX402Done = true;
   }
 
   /*
@@ -651,6 +751,16 @@ const headerFcUsername =
       ((existing as any).totalScore_0g ?? 0) === score_og &&
       ((existing as any).totalScore_xlayer ?? 0) === score_xlayer;
 
+    const noX402Change =
+      ((existing as any).totalX402_base ?? 0) === x402_base &&
+      ((existing as any).totalX402_mantle ?? 0) === x402_mantle &&
+      ((existing as any).totalX402_xlayer ?? 0) === x402_xlayer &&
+      ((existing as any).totalX402Score_base ?? ((existing as any).totalX402_base ?? 0)) === x402Score_base &&
+      ((existing as any).totalX402Score_mantle ?? ((existing as any).totalX402_mantle ?? 0)) === x402Score_mantle &&
+      ((existing as any).totalX402Score_xlayer ?? ((existing as any).totalX402_xlayer ?? 0)) === x402Score_xlayer &&
+      ((existing as any).totalX402 ?? 0) === totalX402 &&
+      ((existing as any).totalX402Score ?? ((existing as any).totalX402 ?? 0)) === totalX402Score;
+
     const noBridgeChange =
       (existing.totalBridges_monad ?? 0) === bridges_monad &&
       (existing.totalBridges_base ?? 0) === bridges_base &&
@@ -664,17 +774,21 @@ const headerFcUsername =
       (existing.dailyKey ?? null) === (dailyKey ?? null) &&
       (existing.dailyBaselineCookies ?? 0) === (dailyBaselineCookies ?? 0) &&
       (existing.dailyBaselineBridges ?? 0) === (dailyBaselineBridges ?? 0) &&
+      ((existing as any).dailyBaselineX402 ?? 0) === (dailyBaselineX402 ?? 0) &&
       normalizeBool(existing.dailyMintDone) === dailyMintDone &&
-      normalizeBool(existing.dailyBridgeDone) === dailyBridgeDone;
+      normalizeBool(existing.dailyBridgeDone) === dailyBridgeDone &&
+      normalizeBool((existing as any).dailyX402Done) === dailyX402Done;
 
     const noWeeklyChange =
       (existing.weeklyKey ?? null) === (weeklyKey ?? null) &&
       (existing.weeklyBaselineCookies ?? 0) === (weeklyBaselineCookies ?? 0) &&
       (existing.weeklyBaselineBridges ?? 0) === (weeklyBaselineBridges ?? 0) &&
+      ((existing as any).weeklyBaselineX402 ?? 0) === (weeklyBaselineX402 ?? 0) &&
       normalizeBool(existing.weeklyMintDone) === weeklyMintDone &&
-      normalizeBool(existing.weeklyBridgeDone) === weeklyBridgeDone;
+      normalizeBool(existing.weeklyBridgeDone) === weeklyBridgeDone &&
+      normalizeBool((existing as any).weeklyX402Done) === weeklyX402Done;
 
-    if (noScoreChange && noBridgeChange && noDailyChange && noWeeklyChange) { //  
+    if (noScoreChange && noBridgeChange && noX402Change && noDailyChange && noWeeklyChange) { //  
       // truly nothing changed → safe no-op
       return NextResponse.json({ ok: true, changed: false }); // row: existing, 
     }
@@ -736,6 +850,17 @@ const headerFcUsername =
     totalTransactions_xlayer: tx_xlayer,
     totalImages_xlayer: img_xlayer,
 
+    totalX402_base: x402_base,
+    totalX402_mantle: x402_mantle,
+    totalX402_xlayer: x402_xlayer,
+
+    totalX402Score_base: x402Score_base,
+    totalX402Score_mantle: x402Score_mantle,
+    totalX402Score_xlayer: x402Score_xlayer,
+
+    totalX402,
+    totalX402Score,
+
     totalScore,
     totalTransactions,
     totalImages,
@@ -756,17 +881,62 @@ const headerFcUsername =
     dailyKey,
     dailyBaselineCookies,
     dailyBaselineBridges,
+    dailyBaselineX402,
     dailyMintDone,
     dailyBridgeDone,
+    dailyX402Done,
 
     weeklyKey,
     weeklyBaselineCookies,
     weeklyBaselineBridges,
+    weeklyBaselineX402,
     weeklyMintDone,
     weeklyBridgeDone,
+    weeklyX402Done,
 
   };
 
   await upsertPlayer(row);
   return NextResponse.json({ ok: true, changed: true }); // row, 
+}
+
+async function loadX402Stats(address: `0x${string}`, origin: string): Promise<X402Stats> {
+  const url = new URL('/api/x402-score', origin);
+  url.searchParams.set('address', address);
+
+  try {
+    const res = await fetch(url.toString(), { cache: 'no-store' });
+    if (!res.ok) {
+      console.error('[mgid-upsert] /api/x402-score HTTP error', res.status);
+      return EMPTY_X402_STATS;
+    }
+
+    const data: any = await res.json().catch(() => null);
+    const byChain = data?.byChain ?? {};
+
+    return {
+      byChain: {
+        base: {
+          count: Number(byChain.base?.count ?? 0),
+          score: Number(byChain.base?.score ?? 0),
+          ok: Boolean(byChain.base?.ok ?? false),
+        },
+        mantle: {
+          count: Number(byChain.mantle?.count ?? 0),
+          score: Number(byChain.mantle?.score ?? 0),
+          ok: Boolean(byChain.mantle?.ok ?? false),
+        },
+        xlayer: {
+          count: Number(byChain.xlayer?.count ?? 0),
+          score: Number(byChain.xlayer?.score ?? 0),
+          ok: Boolean(byChain.xlayer?.ok ?? false),
+        },
+      },
+      totalCount: Number(data?.totalCount ?? 0),
+      totalScore: Number(data?.totalScore ?? 0),
+    };
+  } catch (e) {
+    console.error('[mgid-upsert] /api/x402-score failed', e);
+    return EMPTY_X402_STATS;
+  }
 }

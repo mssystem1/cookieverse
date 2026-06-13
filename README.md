@@ -131,8 +131,8 @@ docs/mantle-x402-facilitator-guide.md
 | 🌉 LayerZero Bridge | Bridges COOKIE NFTs across supported networks, including the focused X Layer → Base route. |
 | 🔵 Base App | Mobile-first compact Cookieverse shell for Base App users. |
 | 🟣 Farcaster Mini App | Dedicated `/mini` routes for Farcaster Mini App contexts. |
-| 🏆 Leaderboard | Ranks users by Cookieverse activity. |
-| 📊 Dashboard | Tracks holdings, image mints, quests, boosts, and activity. |
+| 🏆 Leaderboard | Ranks users by Cookieverse activity: mints, x402 payments, bridges. |
+| 📊 Dashboard | Tracks holdings, image mints, x402 payments, quests, boosts, and activity. |
 | 🐦 X Sharing | Lets users share generated cards, mints, and roast content on X. |
 | 💳 Paid HTTP 402 / x402 Products | Supports paid Wallet Roast and World Cup Prophecy across Coinbase/CDP x402 on Base, Cookieverse native MNT HTTP 402 on Mantle, and OKX x402 on X Layer. |
 | 🏦 Coinbase x402 | Cookieverse acts as the x402 seller for Base paid routes protected by `src/proxy.ts`. |

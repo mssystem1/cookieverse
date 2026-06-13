@@ -635,7 +635,7 @@ export default function Page() {
 
   const holdingsQ = useQuery({
     queryKey: ['holdings', address, chain?.id],
-    enabled: !!address && !!COOKIE_ADDRESS,
+    enabled: !!address && !!COOKIE_ADDRESS && !!chain?.id,
     staleTime: 60_000,
     queryFn: async () => {
       const r = await fetch(
@@ -744,6 +744,28 @@ export default function Page() {
       clearInterval(id);
     };
   }, [connected, address, fcUsername]);
+
+  const refreshMgidAfterX402 = React.useCallback(
+    async (reason: string) => {
+      if (!address) return;
+
+      const username = fcUsername.trim();
+
+      try {
+        await fetch('/api/mgid-upsert', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...(username ? { 'x-farcaster-username': username } : {}),
+          },
+          body: JSON.stringify({ address }),
+        });
+      } catch (e) {
+        console.error(`mgid-upsert after ${reason} failed`, e);
+      }
+    },
+    [address, fcUsername]
+  );
 
   const totalTransactions_current = totalScore_current;
 
@@ -1182,6 +1204,8 @@ const generateWalletRoastViaX402 = async (product: CookieverseX402Product) => {
       onPaidRequest: startPaidProcessingStages,
     });
 
+    await refreshMgidAfterX402('x402 wallet roast');
+
     if (roastImageUrl) {
       URL.revokeObjectURL(roastImageUrl);
     }
@@ -1536,6 +1560,8 @@ async function generateWorldCupProphecy() {
         awayTeam: normalizedAwayTeam,
         matchDate: wcMatchDate,
       });
+
+      await refreshMgidAfterX402('x402 match prophecy');
 
       if (!paid.prophecy) {
         throw new Error('x402 prophecy response did not include prophecy data.');

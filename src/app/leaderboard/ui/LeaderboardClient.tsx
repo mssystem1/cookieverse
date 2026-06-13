@@ -19,6 +19,7 @@ type Row = {
   TotalMints?: number;
   totalScore?: number;      // ← NEW: MGID total score from BLOB
   localScore?: number;   // SCORE on {localchain}, depends on connected chain
+  x402LocalScore?: number;
 };
 
 type Api = {
@@ -101,8 +102,15 @@ export default function LeaderboardClient({ mode = 'default' }: LeaderboardClien
               .filter(Boolean)
           : [];
 
-        // fetch BLOB profiles once
+        // Fetch top-50 profiles from the fast latest cache, then override the
+        // connected wallet from append-only history so recent x402 writes show up immediately.
         const profiles = await fetchProfilesFor(addrs);
+        if (youList.length) {
+          const freshProfiles = await fetchProfilesFor(youList, true);
+          for (const [wallet, profile] of freshProfiles.entries()) {
+            profiles.set(wallet, profile);
+          }
+        }
 
         // enrich rows: attach Xusername / FarcasterUsername if EOAWallet matches address
         if (Array.isArray(j?.top50)) {
@@ -113,18 +121,22 @@ export default function LeaderboardClient({ mode = 'default' }: LeaderboardClien
             const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || '0');
 
             let profileLocalScore = 0;
+            let profileX402LocalScore: number | null = null;
 
             if (p) {
               if (chainId === 8453) {
                 profileLocalScore = n(p.totalScore_base);
+                profileX402LocalScore = n(p.totalX402Score_base ?? p.totalX402_base);
               } else if (chainId === 5000) {
                 profileLocalScore = n(p.totalScore_mantle);
+                profileX402LocalScore = n(p.totalX402Score_mantle ?? p.totalX402_mantle);
               } else if (chainId === 59144) {
                 profileLocalScore = n(p.totalScore_linea);
               } else if (mitosisId && chainId === mitosisId) {
                 profileLocalScore = n(p.totalScore_mitosis);
               } else if (chainId === 196) {
                 profileLocalScore = n(p.totalScore_xlayer);
+                profileX402LocalScore = n(p.totalX402Score_xlayer ?? p.totalX402_xlayer);
               } else {
                 profileLocalScore = n(p.totalScore_monad);
               }
@@ -153,6 +165,7 @@ export default function LeaderboardClient({ mode = 'default' }: LeaderboardClien
               FarcasterUsername: p?.usernamefarcaster ?? r.FarcasterUsername ?? '',
               totalScore,
               localScore,
+              x402LocalScore: profileX402LocalScore ?? undefined,
             };
           });
 
@@ -214,19 +227,6 @@ export default function LeaderboardClient({ mode = 'default' }: LeaderboardClien
     fetchData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, chainId]); // saAddress
-
-  // Refetch fresh when window gains focus or tab becomes visible (switching tabs)
-  useEffect(() => {
-    const onFocus = () => fetchData(true);
-    const onVisible = () => { if (!document.hidden) onFocus(); };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, chainId]); // saAddress,
 
   //const lower = address?.toLowerCase();
 
@@ -409,6 +409,8 @@ function Table({
     return 'monad';
   }, [chainId]);
 
+  const x402ChainSupported = chainId === 8453 || chainId === 5000 || chainId === 196;
+
   // address explorer href for the WALLET link
   const makeExplorerAddressUrl = React.useCallback((addr: string) => {
     const mitosisBase =
@@ -474,7 +476,7 @@ function renderUsernameCell(r: Row, isPlaceholder: boolean) {
         className={compact ? "leaderboard-table leaderboard-table--compact" : "leaderboard-table"}
         style={{
           width: "100%",
-          minWidth: compact ? 368 : 680,
+          minWidth: compact ? 430 : 760,
           borderCollapse: "separate",
           borderSpacing: 0,
           tableLayout: "fixed",
@@ -494,15 +496,17 @@ function renderUsernameCell(r: Row, isPlaceholder: boolean) {
                 <col style={{ width: "92px" }} />
                 <col style={{ width: "62px" }} />
                 <col style={{ width: "62px" }} />
+                <col style={{ width: "62px" }} />
               </>
             ) : (
             <>
-              <col style={{ width: "18%" }} />
-              <col style={{ width: "40%" }} />
-              <col style={{ width: "56%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "26%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "21%" }} />
+              <col style={{ width: "23%" }} />
+              <col style={{ width: "20%" }} />
+              <col style={{ width: "16%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "16%" }} />
             </>
           )}
         </colgroup>
@@ -583,6 +587,18 @@ function renderUsernameCell(r: Row, isPlaceholder: boolean) {
               }}
             >
               SCORE on {chainLabel}
+            </Th>
+
+            <Th
+              compact={compact}
+              style={{
+                textAlign: 'right',
+                paddingRight: compact ? 10 : 18,
+                background: '#14141a',
+                borderBottom: '1px solid #1f1f26',
+              }}
+            >
+              X402 on {chainLabel}
             </Th>
 
             <Th
@@ -695,6 +711,14 @@ function renderUsernameCell(r: Row, isPlaceholder: boolean) {
 
                 <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18 }}>
                   {isPlaceholder ? <span style={{ color: "#6b7280" }}>—</span> : <span style={pillStyle(r.rank)}>{/*r.mints*/}{pickPositive(r.localScore)}</span>}
+                </Td>
+
+                <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18 }}>
+                  {isPlaceholder || !x402ChainSupported ? (
+                    <span style={{ color: "#6b7280" }}>-</span>
+                  ) : (
+                    <span style={pillStyle(r.rank)}>{n(r.x402LocalScore)}</span>
+                  )}
                 </Td>
 
                 <Td compact={compact} style={{ textAlign: "right", paddingRight: compact ? 10 : 18 }}>
@@ -837,9 +861,15 @@ type ProfileMeta = {
   totalScore_mitosis?: number;
   totalScore_og?: number;  
   totalScore_xlayer?: number;  
+  totalX402_base?: number;
+  totalX402_mantle?: number;
+  totalX402_xlayer?: number;
+  totalX402Score_base?: number;
+  totalX402Score_mantle?: number;
+  totalX402Score_xlayer?: number;
 };
 
-async function fetchProfilesFor(addresses: string[]) {
+async function fetchProfilesFor(addresses: string[], preferHistory = false) {
   const uniq = Array.from(new Set(addresses.map((a) => a.toLowerCase()).filter(Boolean)));
   if (!uniq.length) return new Map<string, ProfileMeta>();
 
@@ -848,7 +878,7 @@ async function fetchProfilesFor(addresses: string[]) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
-    body: JSON.stringify({ op: 'readMany', addresses: uniq }),
+    body: JSON.stringify({ op: 'readMany', addresses: uniq, preferHistory }),
   });
 
   if (!res.ok) return new Map();
@@ -871,6 +901,12 @@ async function fetchProfilesFor(addresses: string[]) {
       totalScore_mitosis: Number(r?.totalScore_mitosis ?? 0),
       totalScore_og: Number(r?.totalScore_og ?? 0), 
       totalScore_xlayer: Number(r?.totalScore_xlayer ?? 0),           
+      totalX402_base: Number(r?.totalX402_base ?? 0),
+      totalX402_mantle: Number(r?.totalX402_mantle ?? 0),
+      totalX402_xlayer: Number(r?.totalX402_xlayer ?? 0),
+      totalX402Score_base: Number(r?.totalX402Score_base ?? r?.totalX402_base ?? 0),
+      totalX402Score_mantle: Number(r?.totalX402Score_mantle ?? r?.totalX402_mantle ?? 0),
+      totalX402Score_xlayer: Number(r?.totalX402Score_xlayer ?? r?.totalX402_xlayer ?? 0),
     });
   }
   return out;

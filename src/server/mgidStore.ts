@@ -45,6 +45,17 @@ export type MgidRow = {
   totalTransactions_xlayer: number;
   totalImages_xlayer: number;  
 
+  totalX402_base: number;
+  totalX402_mantle: number;
+  totalX402_xlayer: number;
+
+  totalX402Score_base: number;
+  totalX402Score_mantle: number;
+  totalX402Score_xlayer: number;
+
+  totalX402: number;
+  totalX402Score: number;
+
   totalScore: number;
   totalTransactions: number;
   totalImages: number;
@@ -62,14 +73,18 @@ export type MgidRow = {
   dailyKey?: string;
   dailyBaselineCookies?: number;
   dailyBaselineBridges?: number;
+  dailyBaselineX402?: number;
   dailyMintDone?: boolean;
   dailyBridgeDone?: boolean;
+  dailyX402Done?: boolean;
 
   weeklyKey?: string;
   weeklyBaselineCookies?: number;
   weeklyBaselineBridges?: number;
+  weeklyBaselineX402?: number;
   weeklyMintDone?: boolean;
   weeklyBridgeDone?: boolean;
+  weeklyX402Done?: boolean;
 };
 
 // ---------- Legacy snapshot (read/migrate only) ----------
@@ -164,8 +179,44 @@ async function readLegacySnapshot(): Promise<LegacySnapshot> {
 }
 
 // ---------- V2 read: get latest row for one address ----------
-async function readV2Best(addr: string): Promise<MgidRow | null> {
+async function readV2HistoryBest(addr: string): Promise<MgidRow | null> {
   const a = normAddr(addr);
+  const prefix = `${V2_PREFIX}${a}/v/`;
+
+  if (!TOKEN) return null;
+
+  const { blobs } = await listAll({ prefix });
+  let best: { updatedAt: number; url: string } | null = null;
+
+  for (const b of blobs) {
+    const m = String(b.pathname).match(/\/v\/(\d+)\.json$/);
+    if (!m) continue;
+    const ts = Number(m[1]);
+    if (!Number.isFinite(ts)) continue;
+    if (!best || ts > best.updatedAt) best = { updatedAt: ts, url: b.url };
+  }
+
+  if (!best) return null;
+  return (await fetchJson<MgidRow>(best.url)) ?? null;
+}
+
+async function readV2Best(
+  addr: string,
+  opts: { preferHistory?: boolean } = {}
+): Promise<MgidRow | null> {
+  const a = normAddr(addr);
+
+  if (opts.preferHistory) {
+    try {
+      const history = await readV2HistoryBest(a);
+      if (history) return history;
+    } catch (error) {
+      console.error('[mgidStore] history read failed, falling back to latest', {
+        address: a,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   // 1) try latest.json (fast path)
   if (!TOKEN) {
@@ -185,27 +236,13 @@ async function readV2Best(addr: string): Promise<MgidRow | null> {
   }
 
   // 2) scan history and pick max updatedAt (authoritative)
-  const prefix = `${V2_PREFIX}${a}/v/`;
 
   if (!TOKEN) {
     // local: scan files (best effort)
     return null;
   }
 
-  const { blobs } = await listAll({ prefix });
-  let best: { updatedAt: number; url: string } | null = null;
-
-  for (const b of blobs) {
-    // pathname ends with ".../<updatedAt>.json"
-    const m = String(b.pathname).match(/\/v\/(\d+)\.json$/);
-    if (!m) continue;
-    const ts = Number(m[1]);
-    if (!Number.isFinite(ts)) continue;
-    if (!best || ts > best.updatedAt) best = { updatedAt: ts, url: b.url };
-  }
-
-  if (!best) return null;
-  return (await fetchJson<MgidRow>(best.url)) ?? null;
+  return readV2HistoryBest(a);
 }
 
 // ---------- V2 write: bullet-proof upsert ----------
@@ -270,9 +307,12 @@ export async function upsertPlayer(row: MgidRow) {
 }
 
 // ---------- Public reads ----------
-export async function getPlayer(EOAWallet: `0x${string}`) {
+export async function getPlayer(
+  EOAWallet: `0x${string}`,
+  opts: { preferHistory?: boolean } = {}
+) {
   // Prefer V2; if not found, fall back to legacy snapshot
-  const v2 = await readV2Best(EOAWallet);
+  const v2 = await readV2Best(EOAWallet, opts);
   if (v2) return v2;
 
  // const legacy = await readLegacySnapshot();
@@ -327,10 +367,29 @@ export async function topPlayers(limit = 50): Promise<MgidRow[]> {
   return all.slice(0, limit);
 }
 
-export async function getPlayersMany(addresses: string[]): Promise<MgidRow[]> {
+export async function getPlayersMany(
+  addresses: string[],
+  opts: { preferHistory?: boolean } = {}
+): Promise<MgidRow[]> {
   const uniq = Array.from(new Set(addresses.map((a) => a?.toLowerCase()).filter(Boolean) as string[]));
-  const rows = await Promise.all(uniq.map((a) => getPlayer(a as any)));
-  return rows.filter(Boolean) as MgidRow[];
+  const settled = await Promise.allSettled(
+    uniq.map(async (a) => ({ address: a, row: await getPlayer(a as any, opts) }))
+  );
+
+  const rows: MgidRow[] = [];
+
+  for (const result of settled) {
+    if (result.status === 'fulfilled') {
+      if (result.value.row) rows.push(result.value.row);
+      continue;
+    }
+
+    console.error('[mgidStore] getPlayersMany row read failed', {
+      error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+    });
+  }
+
+  return rows;
 }
 
 // ---------- Migration: snapshot.json -> V2 per-player ----------

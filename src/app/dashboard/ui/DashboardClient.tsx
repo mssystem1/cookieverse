@@ -37,6 +37,17 @@ type MgidRowClient = {
   totalTransactions_xlayer?: number;
   totalImages_xlayer?: number;  
 
+  totalX402_base?: number;
+  totalX402_mantle?: number;
+  totalX402_xlayer?: number;
+
+  totalX402Score_base?: number;
+  totalX402Score_mantle?: number;
+  totalX402Score_xlayer?: number;
+
+  totalX402?: number;
+  totalX402Score?: number;
+
   totalBridges_monad?: number;
   totalBridges_base?: number;
   totalBridges_mantle?: number;
@@ -49,14 +60,18 @@ type MgidRowClient = {
   dailyKey?: string;
   dailyBaselineCookies?: number;
   dailyBaselineBridges?: number;
+  dailyBaselineX402?: number;
   dailyMintDone?: boolean;
   dailyBridgeDone?: boolean;
+  dailyX402Done?: boolean;
 
   weeklyKey?: string;
   weeklyBaselineCookies?: number;
   weeklyBaselineBridges?: number;
+  weeklyBaselineX402?: number;
   weeklyMintDone?: boolean;
   weeklyBridgeDone?: boolean;
+  weeklyX402Done?: boolean;
 };
 
 type ChainStats = {
@@ -67,6 +82,8 @@ type ChainStats = {
   images: number;
   bridges: number;
   bridgeSupported: boolean;
+  x402: number;
+  x402Supported: boolean;
   score: number;
 };
 
@@ -77,10 +94,14 @@ type TasksDerived = {
   dailyBridgeDone: boolean;
   weeklyMintDone: boolean;
   weeklyBridgeDone: boolean;
+  dailyX402Done: boolean;
+  weeklyX402Done: boolean;
   dailyMintProgress: number;
   dailyBridgeProgress: number;
+  dailyX402Progress: number;
   weeklyMintProgress: number;
   weeklyBridgeProgress: number;
+  weeklyX402Progress: number;
 };
 
 const CHAINS_META: { key: ChainKey; label: string; accent: string }[] = [
@@ -104,9 +125,22 @@ const CHAIN_IDS: Record<ChainKey, number> = {
 };
 
 const BRIDGE_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "linea", "monad", "xlayer"]);
+const X402_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "xlayer"]);
 
 function isBridgeSupported(key: ChainKey): boolean {
   return BRIDGE_ENABLED_CHAINS.has(key);
+}
+
+function isX402Supported(key: ChainKey): boolean {
+  return X402_ENABLED_CHAINS.has(key);
+}
+
+function getX402ScoreForChain(mgid: MgidRowClient | null, key: ChainKey): number {
+  if (!mgid || !isX402Supported(key)) return 0;
+  if (key === "base") return Number(mgid.totalX402Score_base ?? mgid.totalX402_base ?? 0);
+  if (key === "mantle") return Number(mgid.totalX402Score_mantle ?? mgid.totalX402_mantle ?? 0);
+  if (key === "xlayer") return Number(mgid.totalX402Score_xlayer ?? mgid.totalX402_xlayer ?? 0);
+  return 0;
 }
 
 function getBridgeCountForChain(
@@ -158,6 +192,7 @@ export default function DashboardClient() {
   const [chainsStats, setChainsStats] = React.useState<ChainStats[]>([]);
   const [totalCookies, setTotalCookies] = React.useState(0);
   const [totalBridges, setTotalBridges] = React.useState(0);
+  const [totalX402, setTotalX402] = React.useState(0);
   const [totalScore, setTotalScore] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -196,6 +231,7 @@ export default function DashboardClient() {
       setChainsStats([]);
       setTotalCookies(0);
       setTotalBridges(0);
+      setTotalX402(0);
       setTotalScore(0);
       setError(null);
       return;
@@ -264,9 +300,14 @@ export default function DashboardClient() {
           // Use the visible per-chain score total so disabled bridge routes cannot
           // keep inflating the dashboard through old stored totals.
           const scoreTotal = stats.reduce((acc, s) => acc + s.score, 0);
+          const x402Total = stats.reduce(
+            (acc, s) => acc + (s.x402Supported ? s.x402 : 0),
+            0
+          );
 
           setTotalCookies(cookiesSum);
           setTotalBridges(bridgesSum);
+          setTotalX402(x402Total);
           setTotalScore(scoreTotal);
         }
       } catch (e: any) {
@@ -308,7 +349,7 @@ export default function DashboardClient() {
     );
   }
 
-  const tasks = deriveTasksFromMgid(mgid, totalCookies, totalBridges);
+  const tasks = deriveTasksFromMgid(mgid, totalCookies, totalBridges, totalX402);
   const chainsEngaged = chainsStats.filter(
     (s) => s.cookies > 0 || s.images > 0 || (s.bridgeSupported && s.bridges > 0)
   ).length;
@@ -319,6 +360,7 @@ export default function DashboardClient() {
         address={address}
         totalCookies={totalCookies}
         totalBridges={totalBridges}
+        totalX402={totalX402}
         totalScore={totalScore}
         mgid={mgid}
       />
@@ -329,6 +371,7 @@ export default function DashboardClient() {
         tasks={tasks}
         totalCookies={totalCookies}
         totalBridges={totalBridges}
+        totalX402={totalX402}
         chainsEngaged={chainsEngaged}
       />
     </div>
@@ -351,6 +394,8 @@ function computeChainStats(
 
     const bridgeSupported = isBridgeSupported(key);
     const bridges = getBridgeCountForChain(mgid, key);
+    const x402Supported = isX402Supported(key);
+    const x402 = getX402ScoreForChain(mgid, key);
 
     let storedScore = 0;
     if (mgid) {
@@ -369,7 +414,11 @@ function computeChainStats(
      * - Bridge points count only on Base, Mantle and Linea.
      * - Monad, Mitosis and 0G bridges are intentionally excluded.
      */
-    const liveScore = cookies + images + (bridgeSupported ? bridges : 0);
+    const liveScore =
+      cookies +
+      images +
+      (bridgeSupported ? bridges : 0) +
+      (x402Supported ? x402 : 0);
     const score = bridgeSupported ? Math.max(storedScore, liveScore) : liveScore;
 
     return {
@@ -380,6 +429,8 @@ function computeChainStats(
       images,
       bridges,
       bridgeSupported,
+      x402,
+      x402Supported,
       score,
     };
   });
@@ -388,7 +439,8 @@ function computeChainStats(
 function deriveTasksFromMgid(
   mgid: MgidRowClient | null,
   totalCookiesCurrent: number,
-  totalBridgesCurrent: number
+  totalBridgesCurrent: number,
+  totalX402Current: number
 ): TasksDerived {
   const now = new Date();
   const todayKey = getUtcDayKey(now);
@@ -405,6 +457,10 @@ function deriveTasksFromMgid(
     dailyActive && typeof mgid?.dailyBaselineBridges === "number"
       ? mgid!.dailyBaselineBridges!
       : totalBridgesCurrent;
+  const dailyBaselineX402 =
+    dailyActive && typeof mgid?.dailyBaselineX402 === "number"
+      ? mgid!.dailyBaselineX402!
+      : totalX402Current;
 
   const weeklyBaselineCookies =
     weeklyActive && typeof mgid?.weeklyBaselineCookies === "number"
@@ -414,6 +470,10 @@ function deriveTasksFromMgid(
     weeklyActive && typeof mgid?.weeklyBaselineBridges === "number"
       ? mgid!.weeklyBaselineBridges!
       : totalBridgesCurrent;
+  const weeklyBaselineX402 =
+    weeklyActive && typeof mgid?.weeklyBaselineX402 === "number"
+      ? mgid!.weeklyBaselineX402!
+      : totalX402Current;
 
   const dailyMintProgress = Math.max(
     0,
@@ -423,6 +483,10 @@ function deriveTasksFromMgid(
     0,
     totalBridgesCurrent - dailyBaselineBridges
   );
+  const dailyX402Progress = Math.max(
+    0,
+    totalX402Current - dailyBaselineX402
+  );
   const weeklyMintProgress = Math.max(
     0,
     totalCookiesCurrent - weeklyBaselineCookies
@@ -431,18 +495,26 @@ function deriveTasksFromMgid(
     0,
     totalBridgesCurrent - weeklyBaselineBridges
   );
+  const weeklyX402Progress = Math.max(
+    0,
+    totalX402Current - weeklyBaselineX402
+  );
 
   return {
     todayKey,
     weekKey,
     dailyMintDone: dailyActive ? Boolean(mgid?.dailyMintDone) : false,
     dailyBridgeDone: dailyActive ? Boolean(mgid?.dailyBridgeDone) : false,
+    dailyX402Done: dailyActive ? Boolean(mgid?.dailyX402Done) : false,
     weeklyMintDone: weeklyActive ? Boolean(mgid?.weeklyMintDone) : false,
     weeklyBridgeDone: weeklyActive ? Boolean(mgid?.weeklyBridgeDone) : false,
+    weeklyX402Done: weeklyActive ? Boolean(mgid?.weeklyX402Done) : false,
     dailyMintProgress,
     dailyBridgeProgress,
+    dailyX402Progress,
     weeklyMintProgress,
     weeklyBridgeProgress,
+    weeklyX402Progress,
   };
 }
 
@@ -454,10 +526,11 @@ function SummaryCard(props: {
   address: string;
   totalCookies: number;
   totalBridges: number;
+  totalX402: number;
   totalScore: number;
   mgid: MgidRowClient | null;
 }) {
-  const { address, totalCookies, totalBridges, totalScore, mgid } = props;
+  const { address, totalCookies, totalBridges, totalX402, totalScore, mgid } = props;
 
   const rankLabel = getRankLabel(totalScore);
   const rankColors = getRankColors(totalScore);
@@ -513,6 +586,7 @@ function SummaryCard(props: {
           <Pill label="TOTAL SCORE" value={totalScore.toString()} />
           <Pill label="COOKIES" value={totalCookies.toString()} />
           <Pill label="BRIDGES" value={totalBridges.toString()} />
+          <Pill label="X402" value={totalX402.toString()} />
         </div>
 
         <div style={{ fontSize: 13, color: "#9ca3af" }}>
@@ -676,6 +750,12 @@ function ChainGrid(props: {
           {(() => {
             const showBridges =
               c.key === "base" || c.key === "mantle" || c.key === "linea" || c.key === "xlayer" || c.key === "monad";
+            const showX402 = c.x402Supported;
+            const statColumns = showBridges && showX402
+              ? "repeat(4,1fr)"
+              : showBridges || showX402
+                ? "repeat(3,1fr)"
+                : "repeat(2,1fr)";
 
             return (
               <>
@@ -686,7 +766,7 @@ function ChainGrid(props: {
                     marginBottom: 10,
                   }}
                 >
-                  {c.cookies > 0 || c.images > 0 || (showBridges && c.bridges > 0)
+                  {c.cookies > 0 || c.images > 0 || (showBridges && c.bridges > 0) || (showX402 && c.x402 > 0)
                     ? "You’ve unlocked this chain. Keep farming!"
                     : showBridges
                       ? "No cookies here yet. Mint or bridge to awaken it ⚡️"
@@ -696,13 +776,14 @@ function ChainGrid(props: {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: showBridges ? "repeat(3,1fr)" : "repeat(2,1fr)",
+                    gridTemplateColumns: statColumns,
                     gap: 6,
                     fontSize: 12,
                   }}
                 >
                   <StatMini label="Cookies" value={c.cookies} />
                   {showBridges && <StatMini label="Bridges" value={c.bridges} />}
+                  {showX402 && <StatMini label="x402" value={c.x402} />}
                   <StatMini label="Images" value={c.images} />
                 </div>
               </>
@@ -749,9 +830,10 @@ function TasksSection(props: {
   tasks: TasksDerived;
   totalCookies: number;
   totalBridges: number;
+  totalX402: number;
   chainsEngaged: number;
 }) {
-  const { tasks, totalCookies, totalBridges, chainsEngaged } = props;
+  const { tasks, totalCookies, totalBridges, totalX402, chainsEngaged } = props;
 
   const dailyTasks = [
     {
@@ -769,6 +851,14 @@ function TasksSection(props: {
       done: tasks.dailyBridgeDone,
       progress: Math.min(tasks.dailyBridgeProgress, 2),
       target: 2,
+    },
+    {
+      key: "dailyX402" as const,
+      title: "Daily x402",
+      desc: "Use x402 once on Base, Mantle or X Layer.",
+      done: tasks.dailyX402Done,
+      progress: Math.min(tasks.dailyX402Progress, 1),
+      target: 1,
     },
   ];
 
@@ -788,6 +878,14 @@ function TasksSection(props: {
       done: tasks.weeklyBridgeDone,
       progress: Math.min(tasks.weeklyBridgeProgress, 8),
       target: 8,
+    },
+    {
+      key: "weeklyX402" as const,
+      title: "Weekly x402",
+      desc: "Use x402 5 times this week on Base, Mantle or X Layer.",
+      done: tasks.weeklyX402Done,
+      progress: Math.min(tasks.weeklyX402Progress, 5),
+      target: 5,
     },
   ];
 
@@ -832,7 +930,8 @@ function TasksSection(props: {
           Chains touched:{" "}
           <span style={{ color: "#e5e7eb" }}>{chainsEngaged}</span> · Cookies:{" "}
           <span style={{ color: "#e5e7eb" }}>{totalCookies}</span> · Bridges:{" "}
-          <span style={{ color: "#e5e7eb" }}>{totalBridges}</span>
+          <span style={{ color: "#e5e7eb" }}>{totalBridges}</span> В· x402:{" "}
+          <span style={{ color: "#e5e7eb" }}>{totalX402}</span>
         </div>
       </div>
 
