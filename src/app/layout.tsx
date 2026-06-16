@@ -18,6 +18,7 @@ import TopUpMenu from '../components/TopUpMenu';
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "../lib/auth"; // we'll create this in step 2
+import { isXAuthRequired } from "../lib/xAuthMode";
 import XAuthButton from "../components/XAuthButton";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -65,9 +66,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const session = await getServerSession(authOptions);
 
-  const isLoggedIn = !!session?.twitter_username;
+  const isLoggedIn = !!(session as any)?.twitter_username;
+  const requireXLogin = isXAuthRequired();
 
-    const twitterUsername =
+  const twitterUsername =
     (session as any)?.twitter_username as string | undefined;
   const twitterImage =
     (session as any)?.twitter_image as string | undefined;
@@ -233,7 +235,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
         {/* === NON-MINI (default app) === */}
         <MainChrome>
-  {!isLoggedIn ? (
+          {requireXLogin && !isLoggedIn ? (
           // X login splash screen
           <div
             style={{
@@ -461,7 +463,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   justifySelf: "end",
                 }}
               >
-                {twitterUsername && (
+                {twitterUsername ? (
                   <a
                     href={`https://x.com/${twitterUsername}`}
                     target="_blank"
@@ -507,6 +509,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       @{twitterUsername}
                     </span>
                   </a>
+                ) : (
+                  <XAuthButton callbackUrl="/" compact variant="nav" />
                 )}
               </div>
             </div>
@@ -564,7 +568,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
         {/* === BASE APP / COMPACT WEB === */}
         <BaseAppOnly>
-          {!isLoggedIn ? (
+          {requireXLogin && !isLoggedIn ? (
             <div className="base-app-login">
               <div className="base-app-login__card">
                 <div className="base-app-login__brand">

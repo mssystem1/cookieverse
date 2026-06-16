@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 
+const projectRoot = __dirname;
+
 const nextConfig = {
+  outputFileTracingRoot: projectRoot,
+
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   
   // ✅ Make sure Next writes to a folder, not a file

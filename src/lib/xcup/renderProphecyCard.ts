@@ -149,21 +149,21 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
     },
 
     prophecyStyle: {
-      startSizePx: 23,
-      minSizePx: 13,
-      lineHeight: 1.25,
+      startSizePx: 22,
+      minSizePx: 14,
+      lineHeight: 1.14,
       weight: 800,
-      fill: '#2b1d05',
+      fill: '#3d2908',
       stroke: 'rgba(255,255,255,0.14)',
       strokeWidth: 1,
-      maxLines: 5,
-      paddingX: 34,
+      maxLines: 7,
+      paddingX: 28,
     },
 
     reasoningStyle: {
       startSizePx: 21,
       minSizePx: 16,
-      lineHeight: 1.18,
+      lineHeight: 1.16,
       weight: 700,
       fill: '#5a3b11',
       stroke: 'rgba(255,255,255,0.14)',
@@ -219,6 +219,136 @@ function scaleRect(rect: RectPx, layout: ThemeLayout): RectPx {
 
 function cleanText(value: unknown, fallback = '') {
   return String(value || fallback).replace(/\s+/g, ' ').trim();
+}
+
+function cleanDisplayText(value: unknown, fallback = '') {
+  return String(value || fallback)
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function smartTruncate(value: unknown, max = 390) {
+  const text = cleanText(value);
+  if (text.length <= max) return text;
+
+  const sliced = text.slice(0, max - 3).trim();
+  const lastSpace = sliced.lastIndexOf(' ');
+
+  if (lastSpace > Math.floor(max * 0.7)) {
+    return `${sliced.slice(0, lastSpace).trim()}...`;
+  }
+
+  return `${sliced}...`;
+}
+
+function stripInlineRiskSection(value: unknown) {
+  const text = cleanText(value);
+  const index = text.toLowerCase().indexOf('risks:');
+
+  return index >= 0 ? text.slice(0, index).trim() : text;
+}
+
+function normalizeRiskLevel(value: unknown) {
+  const text = cleanText(value).toLowerCase();
+
+  if (text === 'low' || text === 'l') return 'Low';
+  if (text === 'medium' || text === 'm') return 'Medium';
+  if (text === 'high' || text === 'h') return 'High';
+  if (
+    text === 'low-medium' ||
+    text === 'low/medium' ||
+    text === 'low medium' ||
+    text === 'lm'
+  ) {
+    return 'Low-Medium';
+  }
+  if (
+    text === 'medium-high' ||
+    text === 'medium/high' ||
+    text === 'medium high' ||
+    text === 'mh'
+  ) {
+    return 'Medium-High';
+  }
+
+  return '';
+}
+
+function buildInlineRiskText(input: WorldCupProphecyCardInput) {
+  const pick = cleanText(input.pick, 'the favorite');
+  const cleanSheetTarget = pick && pick.toLowerCase() !== 'draw' ? pick : 'the favorite';
+
+  const risks: Array<{
+    label: string;
+    value: unknown;
+    explanation: string;
+  }> = [
+    {
+      label: 'Draw Risk',
+      value: input.drawRisk,
+      explanation: 'match can finish level',
+    },
+    {
+      label: 'Counter Risk',
+      value: input.counterAttackRisk,
+      explanation: 'fast breaks are dangerous',
+    },
+    {
+      label: 'Clean Sheet Risk',
+      value: input.cleanSheetRisk,
+      explanation: `${cleanSheetTarget} may concede`,
+    },
+    {
+      label: 'Set Piece Risk',
+      value: input.setPieceRisk,
+      explanation: 'corners or free kicks can decide it',
+    },
+    {
+      label: 'Upset Risk',
+      value: input.upsetRisk,
+      explanation: 'the underdog can still surprise',
+    },
+    {
+      label: 'Late Goal Risk',
+      value: input.lateGoalRisk,
+      explanation: 'late pressure can change it',
+    },
+    {
+      label: 'Heat/Fatigue Risk',
+      value: input.heatFatigueRisk,
+      explanation: 'weather can slow legs',
+    },
+    {
+      label: 'Travel Risk',
+      value: input.travelDisruptionRisk,
+      explanation: 'delays can hurt rhythm',
+    },
+  ];
+
+  const parts = risks
+    .map((risk) => {
+      const level = normalizeRiskLevel(risk.value);
+      if (!level) return '';
+
+      return `${risk.label}: ${level} - ${risk.explanation}.`;
+    })
+    .filter(Boolean)
+    .slice(0, 3);
+
+  return parts.length ? `Risks: ${parts.join(' ')}` : '';
+}
+
+function buildDisplayProphecy(input: WorldCupProphecyCardInput) {
+  const mainProphecy = cleanDisplayText(stripInlineRiskSection(input.prophecy));
+  const inlineRiskText = cleanText(buildInlineRiskText(input));
+
+  if (!inlineRiskText) return mainProphecy;
+
+  return cleanDisplayText(`${mainProphecy}\n\n${inlineRiskText}`);
 }
 
 function shortAddress(address?: string) {
@@ -470,15 +600,25 @@ function wrapLines(
   maxWidth: number,
   maxLines = 999,
 ) {
-  const paragraphs = String(text || '').split(/\n+/g);
+  const paragraphs = String(text || '').split('\n');
   const lines: string[] = [];
+  let truncated = false;
+
+  const pushLine = (line: string) => {
+    if (lines.length >= maxLines) {
+      truncated = true;
+      return false;
+    }
+
+    lines.push(line);
+    return true;
+  };
 
   for (const paragraph of paragraphs) {
     const words = paragraph.trim().split(/\s+/).filter(Boolean);
 
     if (!words.length) {
-      lines.push('');
-      if (lines.length >= maxLines) break;
+      if (!pushLine('')) break;
       continue;
     }
 
@@ -491,17 +631,34 @@ function wrapLines(
       if (width <= maxWidth) {
         line = next;
       } else {
-        lines.push(line);
-        if (lines.length >= maxLines) return lines.slice(0, maxLines);
+        if (!pushLine(line)) break;
         line = words[i];
       }
     }
 
-    lines.push(line);
-    if (lines.length >= maxLines) return lines.slice(0, maxLines);
+    if (truncated || !pushLine(line)) break;
   }
 
-  return lines.slice(0, maxLines);
+  return { lines, truncated };
+}
+
+function addEllipsisToLastLine(
+  ctx: SKRSContext2D,
+  lines: string[],
+  maxWidth: number,
+) {
+  if (!lines.length) return lines;
+
+  const next = [...lines];
+  let last = next[next.length - 1].trimEnd();
+
+  while (last.length > 1 && ctx.measureText(`${last}...`).width > maxWidth) {
+    last = last.slice(0, -1).trimEnd();
+  }
+
+  next[next.length - 1] = `${last}...`;
+
+  return next;
 }
 
 function drawTextBox(
@@ -511,7 +668,7 @@ function drawTextBox(
   style: TextStyle,
   _canvasWidth: number,
 ) {
-  const text = cleanText(rawText);
+  const text = cleanDisplayText(rawText);
   if (!text) return;
 
   const box = rect;
@@ -520,19 +677,26 @@ function drawTextBox(
   const maxWidth = Math.max(10, box.w - paddingX * 2);
 
   let sizePx = style.startSizePx;
-  let px = setFont(ctx, style, sizePx);
-  let lines = wrapLines(ctx, text, maxWidth, maxLines);
+  let px = sizePx;
+  let wrapped = { lines: [] as string[], truncated: false };
+  let lines: string[] = [];
 
-  while (sizePx > style.minSizePx) {
+  while (true) {
     px = setFont(ctx, style, sizePx);
-    lines = wrapLines(ctx, text, maxWidth, maxLines);
+    wrapped = wrapLines(ctx, text, maxWidth, maxLines);
+    lines = wrapped.lines;
 
     const tooTall = lines.length * px * style.lineHeight > box.h;
     const tooWide = lines.some((line) => ctx.measureText(line).width > maxWidth);
 
-    if (!tooTall && !tooWide) break;
+    if (!wrapped.truncated && !tooTall && !tooWide) break;
+    if (sizePx <= style.minSizePx) break;
 
     sizePx -= 1;
+  }
+
+  if (wrapped.truncated) {
+    lines = addEllipsisToLastLine(ctx, lines, maxWidth);
   }
 
   ctx.save();
@@ -809,19 +973,22 @@ export async function renderWorldCupProphecyCard(
 
   const safeScoreline = compactScoreline || scoreline;
 
-  const summary = `PICK: ${pick}  •  SCORE: ${safeScoreline}  •  CONFIDENCE: ${confidence}%`;
+  const summaryLong = `PICK: ${pick}  -  SCORE: ${safeScoreline}  -  CONFIDENCE: ${confidence}%`;
+  const summaryCompact = `PICK ${pick} - SCORE ${safeScoreline} - CONF ${confidence}%`;
+  const summary = summaryLong.length <= 90 ? summaryLong : summaryCompact;
+  const displayProphecy = buildDisplayProphecy(input);
 
   const reasoningLines = Array.isArray(input.reasoning)
     ? input.reasoning
         .map((x) => cleanText(x))
         .filter(Boolean)
         .slice(0, 2)
-        .map((x) => (x.length > 82 ? `${x.slice(0, 79).trim()}…` : x))
+        .map((x) => smartTruncate(x, 70))
     : [];
 
   const reasoning = reasoningLines.length
-    ? reasoningLines.join(' • ')
-    : 'Form edge • Momentum signal • Big-match mentality';
+    ? reasoningLines.join('\n')
+    : 'Form edge drives the pick.\nMomentum pressure keeps it tight.';
 
   const criteria = [
     ['FORM', input.criteria.form],
@@ -854,7 +1021,7 @@ await drawTeamBoxWithFlag(ctx, away, scaleRect(layout.awayTeamBox, layout), layo
 
   drawTextBox(
     ctx,
-    input.prophecy,
+    displayProphecy,
     scaleRect(layout.prophecyBox, layout),
     layout.prophecyStyle,
     canvas.width,

@@ -27,6 +27,25 @@ function cleanSlug(value: string) {
     .slice(0, 64);
 }
 
+function prophecyRiskSummary(prophecy: WorldCupProphecyResult) {
+  const items = [
+    ["Draw Risk", prophecy.drawRisk],
+    ["Counter Risk", prophecy.counterAttackRisk],
+    ["Clean Sheet Risk", prophecy.cleanSheetRisk],
+    ["Set Piece Risk", prophecy.setPieceRisk],
+    ["Upset Risk", prophecy.upsetRisk],
+    ["Late Goal Risk", prophecy.lateGoalRisk],
+    ["Heat/Fatigue Risk", prophecy.heatFatigueRisk],
+    ["Travel Risk", prophecy.travelDisruptionRisk],
+  ] as const;
+
+  return items
+    .map(([label, value]) => (value ? `${label}: ${value}` : ""))
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" | ");
+}
+
 function buildMetadata(params: {
   prophecy: WorldCupProphecyResult;
   imageUri?: string;
@@ -34,11 +53,13 @@ function buildMetadata(params: {
   payerWallet: string;
 }) {
   const { prophecy, imageUri, chain, payerWallet } = params;
+  const risks = prophecyRiskSummary(prophecy);
 
   return {
     name: `Cookieverse World Cup Prophecy: ${prophecy.homeTeam} vs ${prophecy.awayTeam}`,
     description:
       `${prophecy.prophecy}\n\n` +
+      (risks ? `Risks: ${risks}\n\n` : "") +
       `A paid Cookieverse x402 World Cup prophecy generated and rendered as a collectible match card.`,
     image: imageUri,
     external_url: "https://www.cookieverse.tech/app",
@@ -51,6 +72,7 @@ function buildMetadata(params: {
       { trait_type: "Pick", value: prophecy.pick },
       { trait_type: "Scoreline", value: prophecy.scoreline },
       { trait_type: "Confidence", value: prophecy.confidence },
+      ...(risks ? [{ trait_type: "Inline Risks", value: risks }] : []),
     ],
     cookieverse: {
       version: "1.0",

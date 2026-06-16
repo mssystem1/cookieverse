@@ -303,13 +303,9 @@ const hasMiniAppHeader =
 
 const session = await getServerSession(authOptions);
 
-// ✅ Allow ANY of:
-//  - NextAuth session (desktop / X)
-//  - Bearer token (Quick Auth)
-//  - Mini app header (x-farcaster-username)
-if (!session && !hasBearer && !hasMiniAppHeader) {
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-}
+// Trusted identity requests may attach/update usernames. Wallet-only requests
+// are allowed, but only refresh public chain-derived stats.
+const hasTrustedIdentity = Boolean(session || hasBearer || hasMiniAppHeader);
 
 const sessionTwitter =
   (session as any)?.twitter_username ||
@@ -349,10 +345,18 @@ const headerFcUsername =
   let effectiveFarcasterUsername =
     sessionFarcaster ?? existing?.usernamefarcaster ?? '';
 
-  if (!effectiveFarcasterUsername && headerFcUsername) {
+  if (!effectiveFarcasterUsername && hasTrustedIdentity && headerFcUsername) {
     // only allow setting from mini app header when we don't have anything yet
     effectiveFarcasterUsername = headerFcUsername;
   }
+
+  const nextUsernameX = sessionTwitter ?? existing?.usernameX ?? '';
+  const nextUsernameFarcaster = effectiveFarcasterUsername ?? existing?.usernamefarcaster ?? '';
+  const nextSAWallet =
+    existing?.SAWallet ??
+    (hasTrustedIdentity && payload.SAWallet && /^0x[0-9a-fA-F]{40}$/.test(payload.SAWallet)
+      ? payload.SAWallet
+      : ('' as `0x${string}`));
 
   const origin = new URL(req.url).origin;
 
@@ -788,7 +792,12 @@ const headerFcUsername =
       normalizeBool(existing.weeklyBridgeDone) === weeklyBridgeDone &&
       normalizeBool((existing as any).weeklyX402Done) === weeklyX402Done;
 
-    if (noScoreChange && noBridgeChange && noX402Change && noDailyChange && noWeeklyChange) { //  
+    const noIdentityChange =
+      (existing.usernameX ?? '') === nextUsernameX &&
+      (existing.usernamefarcaster ?? '') === nextUsernameFarcaster &&
+      (existing.SAWallet ?? '') === nextSAWallet;
+
+    if (noScoreChange && noBridgeChange && noX402Change && noDailyChange && noWeeklyChange && noIdentityChange) { //  
       // truly nothing changed → safe no-op
       return NextResponse.json({ ok: true, changed: false }); // row: existing, 
     }
@@ -803,17 +812,13 @@ const headerFcUsername =
 
   const row: MgidRow = {
     // 🔒 Usernames come from session / existing, not from client body
-    usernameX: sessionTwitter ?? existing?.usernameX ?? '',
-    usernamefarcaster: effectiveFarcasterUsername ?? existing?.usernamefarcaster ?? '',
+    usernameX: nextUsernameX,
+    usernamefarcaster: nextUsernameFarcaster,
 
     EOAWallet: address,
 
     // 🔒 SAWallet: cannot overwrite once stored
-    SAWallet:
-      existing?.SAWallet ??
-      (payload.SAWallet && /^0x[0-9a-fA-F]{40}$/.test(payload.SAWallet)
-        ? payload.SAWallet
-        : ('' as `0x${string}`)),
+    SAWallet: nextSAWallet,
 
     // 🔥 Boosts now come strictly from on-chain holdings
     MonadBoost: boostFlags.monad,

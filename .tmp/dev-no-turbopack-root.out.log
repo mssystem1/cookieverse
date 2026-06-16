@@ -1,0 +1,29 @@
+
+> monad-fortune-cookie@1.0.0 dev
+> next dev -H 127.0.0.1
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+- Environments: .env.local
+✓ Ready in 818ms
+>> next.config.js loaded
+Creating turbopack project {
+  dir: 'C:\\Users\\maksim.shishkov\\monad-fortune-cookie',
+  testMode: true
+}
+
+ GET / 200 in 2.5s (next.js: 536ms, application-code: 2.0s)
+ HEAD / 200 in 163ms (next.js: 11ms, application-code: 152ms)
+ GET /api/holdings?address=0xAcefeF5eD13c2d4d0F38970e5C15B926a9CBCc70 200 in 1114ms (next.js: 416ms, application-code: 698ms)
+ GET /api/auth/session 200 in 3.9s (next.js: 3.9s, application-code: 55ms)
+ GET /api/auth/providers 200 in 371ms (next.js: 309ms, application-code: 62ms)
+ GET /api/holdings?address=0xAcefeF5eD13c2d4d0F38970e5C15B926a9CBCc70 200 in 1194ms (next.js: 358ms, application-code: 836ms)
+ GET /leaderboard 200 in 184ms (next.js: 123ms, application-code: 61ms)
+ GET /api/leaderboard?you=0xAcefeF5eD13c2d4d0F38970e5C15B926a9CBCc70&fresh=1&chainId=5000 200 in 33.1s (next.js: 82ms, application-code: 33.0s)
+ POST /api/mgid-downsert 200 in 6.7s (next.js: 85ms, application-code: 6.6s)
+ POST /api/mgid-downsert 200 in 955ms (next.js: 5ms, application-code: 949ms)
+ GET /api/leaderboard?you=0xAcefeF5eD13c2d4d0F38970e5C15B926a9CBCc70&fresh=1&chainId=5000 200 in 43s (next.js: 64ms, application-code: 43s)
+ POST /api/mgid-downsert 200 in 27.0s (next.js: 6ms, application-code: 27.0s)
+ POST /api/mgid-downsert 200 in 1191ms (next.js: 3ms, application-code: 1188ms)
+[?25h

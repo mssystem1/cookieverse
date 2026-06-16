@@ -5,11 +5,27 @@ import OpenAI from 'openai';
 import type {
   WorldCupProphecyCriteria,
   WorldCupProphecyInput,
+  WorldCupRiskLevel,
   WorldCupProphecyResult,
 } from '../../../../lib/xcup/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const MAX_MAIN_PROPHECY = 260;
+const MAX_REASONING_LINE = 70;
+
+const PROPHECY_CARD_RULES = `
+
+Cookieverse public card readability rules:
+- Keep prophecy concise: 180-220 characters.
+- The prophecy should be one vivid football paragraph about the highly likely match flow and outcome.
+- Return risk levels as JSON fields using full words only: Low, Medium, High, Low-Medium, Medium-High.
+- Do not use risk abbreviations like L, M, H, LM, or MH.
+- Include these optional top-level JSON fields when relevant: drawRisk, upsetRisk, counterAttackRisk, setPieceRisk, cleanSheetRisk, lateGoalRisk, heatFatigueRisk, travelDisruptionRisk.
+- Reasoning must contain exactly 2 short lines, each under 70 characters.
+- Keep confidence visible and outcome-focused.
+`;
 
 function sanitizeKey(raw: string) {
   return (raw || '')
@@ -42,6 +58,27 @@ function cleanShortLine(value: unknown, fallback = '', max = 68) {
   }
 
   return `${sliced}…`;
+}
+
+function smartTruncate(value: unknown, max: number, fallback = '') {
+  const text = cleanText(value, fallback);
+  if (text.length <= max) return text;
+
+  const sliced = text.slice(0, max - 3).trim();
+  const lastSpace = sliced.lastIndexOf(' ');
+
+  if (lastSpace > Math.floor(max * 0.7)) {
+    return `${sliced.slice(0, lastSpace).trim()}...`;
+  }
+
+  return `${sliced}...`;
+}
+
+function stripInlineRiskSection(value: unknown, fallback = '') {
+  const text = cleanText(value, fallback);
+  const index = text.toLowerCase().indexOf('risks:');
+
+  return index >= 0 ? text.slice(0, index).trim() : text;
 }
 
 function normalizeReasoning(raw: any, fallback: string[]): [string, string] {
@@ -77,6 +114,36 @@ function normalizeCriteria(raw: any): WorldCupProphecyCriteria {
     fans: clampScore(raw?.fans, 84),
     confidenceSignal: clampScore(raw?.confidenceSignal, 90),
   };
+}
+
+function normalizeRiskLevel(value: unknown): WorldCupRiskLevel | undefined {
+  const text = cleanText(value, '').toLowerCase();
+
+  if (text === 'low' || text === 'l') return 'Low';
+  if (text === 'medium' || text === 'm') return 'Medium';
+  if (text === 'high' || text === 'h') return 'High';
+  if (
+    text === 'low-medium' ||
+    text === 'low/medium' ||
+    text === 'low medium' ||
+    text === 'lm'
+  ) {
+    return 'Low-Medium';
+  }
+  if (
+    text === 'medium-high' ||
+    text === 'medium/high' ||
+    text === 'medium high' ||
+    text === 'mh'
+  ) {
+    return 'Medium-High';
+  }
+
+  return undefined;
+}
+
+function getRiskField(raw: any, key: string) {
+  return raw?.[key] ?? raw?.risks?.[key];
 }
 
 function normalizeProphecyConfidence(params: {
@@ -162,6 +229,11 @@ function fallbackResult(input: WorldCupProphecyInput): WorldCupProphecyResult {
       sources: [],
     },
     criteria,
+    drawRisk: 'Medium',
+    upsetRisk: 'Medium',
+    counterAttackRisk: 'Medium',
+    setPieceRisk: 'Medium',
+    cleanSheetRisk: 'Medium',
   };
 }
 
@@ -223,7 +295,7 @@ function buildProphecyPrompt(input: WorldCupProphecyInput) {
     throw new Error('Missing XCUP_PROPHECY_PROMPT_SECRET');
   }
 
-  return replacePromptPlaceholders(template, input).trim();
+  return `${replacePromptPlaceholders(template, input).trim()}${PROPHECY_CARD_RULES}`.trim();
 }
 
 export async function POST(req: NextRequest) {
@@ -311,7 +383,11 @@ export async function POST(req: NextRequest) {
       pick: cleanShortLine(parsed.pick, fallback.pick, 24),
       scoreline: cleanShortLine(parsed.scoreline, fallback.scoreline, 32),
       confidence,
-      prophecy: cleanText(parsed.prophecy, fallback.prophecy).slice(0, 360),
+      prophecy: smartTruncate(
+        stripInlineRiskSection(parsed.prophecy, fallback.prophecy),
+        MAX_MAIN_PROPHECY,
+        fallback.prophecy,
+      ),
       reasoning: normalizeReasoning(parsed.reasoning, fallback.reasoning),
       research: {
         matchDate: input.matchDate,
@@ -325,9 +401,25 @@ export async function POST(req: NextRequest) {
         sources: [...new Set([...parsedSources, ...detectedSources])].slice(0, 8),
       },
       criteria,
+      drawRisk: normalizeRiskLevel(getRiskField(parsed, 'drawRisk')) ?? fallback.drawRisk,
+      upsetRisk: normalizeRiskLevel(getRiskField(parsed, 'upsetRisk')) ?? fallback.upsetRisk,
+      counterAttackRisk:
+        normalizeRiskLevel(getRiskField(parsed, 'counterAttackRisk')) ??
+        fallback.counterAttackRisk,
+      setPieceRisk:
+        normalizeRiskLevel(getRiskField(parsed, 'setPieceRisk')) ?? fallback.setPieceRisk,
+      cleanSheetRisk:
+        normalizeRiskLevel(getRiskField(parsed, 'cleanSheetRisk')) ??
+        fallback.cleanSheetRisk,
+      lateGoalRisk: normalizeRiskLevel(getRiskField(parsed, 'lateGoalRisk')),
+      heatFatigueRisk: normalizeRiskLevel(getRiskField(parsed, 'heatFatigueRisk')),
+      travelDisruptionRisk: normalizeRiskLevel(getRiskField(parsed, 'travelDisruptionRisk')),
     };
 
-    result.reasoning = normalizeReasoning(result.reasoning, fallback.reasoning);
+    result.reasoning = normalizeReasoning(
+      result.reasoning,
+      fallback.reasoning,
+    ).map((line) => smartTruncate(line, MAX_REASONING_LINE)) as [string, string];
 
     return NextResponse.json(result);
   } catch (error) {

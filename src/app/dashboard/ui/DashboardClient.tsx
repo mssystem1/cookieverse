@@ -196,21 +196,35 @@ export default function DashboardClient() {
   const [totalScore, setTotalScore] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const mgidFarcasterUsername = mgid?.usernamefarcaster?.trim() || "";
 
   // periodic mgid-upsert every 60s (like bridge page, simpler headers)
   React.useEffect(() => {
     if (!address) return;
 
     let cancelled = false;
+    let authRejected = false;
 
     const tick = async () => {
-      if (cancelled) return;
+      if (cancelled || authRejected) return;
       try {
-        await fetch("/api/mgid-upsert", {
+        const res = await fetch("/api/mgid-upsert", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            ...(mgidFarcasterUsername
+              ? { "x-farcaster-username": mgidFarcasterUsername }
+              : {}),
+          },
           body: JSON.stringify({ address }),
         });
+        if (res.status === 401) {
+          authRejected = true;
+          return;
+        }
+        if (!res.ok) {
+          console.error("periodic mgid-upsert (dashboard) HTTP error", res.status);
+        }
       } catch (e) {
         console.error("periodic mgid-upsert (dashboard) failed", e);
       }
@@ -222,7 +236,7 @@ export default function DashboardClient() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [address]);
+  }, [address, mgidFarcasterUsername]);
 
   React.useEffect(() => {
     if (!isConnected || !address) {

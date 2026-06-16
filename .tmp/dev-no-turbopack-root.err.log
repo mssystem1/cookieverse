@@ -1,0 +1,5 @@
+[next-auth][warn] DEBUG_ENABLED
+Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+[browser] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+[next-auth][warn] DEBUG_ENABLED
+[mgidStore] getPlayersMany row read failed { error: 'fetch failed' }

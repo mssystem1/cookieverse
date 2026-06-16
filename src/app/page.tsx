@@ -58,6 +58,43 @@ const CHAIN_IDS = {
 
 type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | 'og' | 'xlayer';
 
+const WORLD_CUP_RISK_LABELS: Array<{
+  key: keyof Pick<
+    WorldCupProphecyResult,
+    | 'drawRisk'
+    | 'upsetRisk'
+    | 'counterAttackRisk'
+    | 'setPieceRisk'
+    | 'cleanSheetRisk'
+    | 'lateGoalRisk'
+    | 'heatFatigueRisk'
+    | 'travelDisruptionRisk'
+  >;
+  label: string;
+}> = [
+  { key: 'drawRisk', label: 'Draw Risk' },
+  { key: 'counterAttackRisk', label: 'Counter Risk' },
+  { key: 'cleanSheetRisk', label: 'Clean Sheet Risk' },
+  { key: 'setPieceRisk', label: 'Set Piece Risk' },
+  { key: 'upsetRisk', label: 'Upset Risk' },
+  { key: 'lateGoalRisk', label: 'Late Goal Risk' },
+  { key: 'heatFatigueRisk', label: 'Heat/Fatigue Risk' },
+  { key: 'travelDisruptionRisk', label: 'Travel Risk' },
+];
+
+function worldCupRiskSummary(prophecy?: WorldCupProphecyResult | null) {
+  if (!prophecy) return '';
+
+  return WORLD_CUP_RISK_LABELS
+    .map((item) => {
+      const value = prophecy[item.key];
+      return value ? `${item.label}: ${value}` : '';
+    })
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(' | ');
+}
+
 type WalletRoastStage =
   | 'idle'
   | 'payment'
@@ -1707,7 +1744,9 @@ async function mintWorldCupProphecy() {
       `Pick: ${wcProphecy.pick}`,
       `Score: ${wcProphecy.scoreline}`,
       `Confidence: ${wcProphecy.confidence}%`,
+      worldCupRiskSummary(wcProphecy) ? `Risks: ${worldCupRiskSummary(wcProphecy)}` : '',
     ]
+      .filter(Boolean)
       .join(' | ')
       .slice(0, 220);
 
@@ -1763,12 +1802,15 @@ async function shareWorldCupProphecy() {
         ? `${window.location.origin}${isBaseAppRoute ? '/app' : '/'}`
         : 'https://www.cookieverse.tech/';
 
+    const riskText = worldCupRiskSummary(wcProphecy);
+
     const text =
       `World Cup prophecy just dropped ⚽🍪\n\n` +
       `${wcProphecy.homeTeam} vs ${wcProphecy.awayTeam}\n` +
       `Pick: ${wcProphecy.pick}\n` +
       `Score: ${wcProphecy.scoreline}\n` +
       `Confidence: ${wcProphecy.confidence}%\n\n` +
+      (riskText ? `Risks: ${riskText}\n\n` : '') +
       `Minted in Cookieverse by @MSSystemWEB3.`;
 
     if (isFarcasterMini) {
@@ -2469,6 +2511,11 @@ React.useEffect(() => {
                   <div className="hint">
                     Confidence: <strong>{wcProphecy.confidence}%</strong>
                   </div>
+                  {worldCupRiskSummary(wcProphecy) ? (
+                    <div className="hint" style={{ marginTop: 6 }}>
+                      Risks: <strong>{worldCupRiskSummary(wcProphecy)}</strong>
+                    </div>
+                  ) : null}
                   <div className="hint" style={{ marginTop: 8 }}>
                     AI criteria:{' '}
                     Form {wcProphecy.criteria.form} • Attack {wcProphecy.criteria.attack} • Defense{' '}

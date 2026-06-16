@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { signIn } from "next-auth/react";
 
 type XAuthButtonProps = {
   callbackUrl?: string;
   compact?: boolean;
+  variant?: "default" | "nav";
 };
 
 function currentPathFallback() {
@@ -47,9 +47,62 @@ function explainAuthError(error: string | null) {
   return `X sign in failed: ${error}`;
 }
 
+async function getXSignInUrl(callbackUrl: string) {
+  const csrfResponse = await fetch("/api/auth/csrf", {
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+
+  const csrfData = csrfResponse.ok ? await csrfResponse.json() : null;
+  const csrfToken = csrfData?.csrfToken;
+
+  if (!csrfResponse.ok || !csrfToken) {
+    throw new Error("Could not start X sign in.");
+  }
+
+  const body = new URLSearchParams({
+    callbackUrl,
+    csrfToken,
+    json: "true",
+    redirect: "false",
+  });
+
+  const signInResponse = await fetch("/api/auth/signin/twitter", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+
+  let data: any = null;
+  try {
+    data = await signInResponse.json();
+  } catch {
+    // NextAuth should return JSON when json=true is posted.
+  }
+
+  if (!signInResponse.ok) {
+    throw new Error(
+      explainAuthError(data?.error || null) ||
+        data?.error ||
+        "Could not start X sign in.",
+    );
+  }
+
+  if (!data?.url || typeof data.url !== "string") {
+    throw new Error("X did not return a sign in URL.");
+  }
+
+  return data.url;
+}
+
 export default function XAuthButton({
   callbackUrl,
   compact = false,
+  variant = "default",
 }: XAuthButtonProps) {
   const [username, setUsername] = useState<string | null>(null);
   const [twitterImage, setTwitterImage] = useState<string | null>(null);
@@ -91,24 +144,129 @@ export default function XAuthButton({
     };
   }, []);
 
+  async function refreshSession() {
+    const r = await fetch("/api/auth/session", { cache: "no-store" });
+    const data = r.ok ? await r.json() : null;
+
+    setUsername(data?.twitter_username || null);
+    setTwitterImage(data?.twitter_image || null);
+
+    return Boolean(data?.twitter_username);
+  }
+
   const startXSignIn = async () => {
     if (isSigningIn) return;
 
     setError(null);
     setIsSigningIn(true);
 
+    let popup: Window | null = null;
+
     try {
-      await signIn("twitter", {
-        callbackUrl: returnTo,
-        redirect: true,
-      });
+      popup =
+        typeof window !== "undefined"
+          ? window.open(
+              "",
+              "cookieverse-x-auth",
+              "popup=yes,width=520,height=720",
+            )
+          : null;
+
+      if (!popup) {
+        throw new Error("Could not open X sign in window.");
+      }
+
+      popup.document.write("<title>Opening X...</title>");
+
+      popup.location.href = await getXSignInUrl(returnTo);
+
+      const startedAt = Date.now();
+      const poll = window.setInterval(async () => {
+        try {
+          const signedIn = await refreshSession();
+
+          if (signedIn) {
+            window.clearInterval(poll);
+            setIsSigningIn(false);
+            try {
+              popup?.close();
+            } catch {
+              // The popup may be cross-origin while X is still open.
+            }
+            window.location.reload();
+          } else if (popup?.closed || Date.now() - startedAt > 120000) {
+            window.clearInterval(poll);
+            setIsSigningIn(false);
+          }
+        } catch {
+          if (popup?.closed || Date.now() - startedAt > 120000) {
+            window.clearInterval(poll);
+            setIsSigningIn(false);
+          }
+        }
+      }, 1500);
     } catch (e: any) {
+      try {
+        popup?.close();
+      } catch {
+        // ignore popup cleanup errors
+      }
       setIsSigningIn(false);
       setError(e?.message || "Failed to start X sign in.");
     }
   };
 
   if (username) {
+    if (variant === "nav") {
+      return (
+        <a
+          href={`https://x.com/${username}`}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            maxWidth: 150,
+            minWidth: 0,
+            padding: "5px 8px",
+            borderRadius: 999,
+            border: "1px solid #374151",
+            background: "linear-gradient(135deg, #111827 0%, #020617 100%)",
+            color: "#e5e7eb",
+            textDecoration: "none",
+            fontSize: 11,
+            fontWeight: 700,
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {twitterImage ? (
+            <img
+              src={twitterImage.replace("_normal", "_200x200")}
+              alt="X avatar"
+              width={22}
+              height={22}
+              style={{
+                borderRadius: 999,
+                border: "1px solid #1f2937",
+                flex: "0 0 auto",
+              }}
+            />
+          ) : null}
+          <span
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            @{username}
+          </span>
+        </a>
+      );
+    }
+
     return (
       <div
         style={{
@@ -197,6 +355,16 @@ export default function XAuthButton({
           justifyContent: "center",
           gap: 10,
           padding: compact ? "10px 18px" : "12px 22px",
+          ...(variant === "nav"
+            ? {
+                padding: "7px 10px",
+                minHeight: 34,
+                gap: 7,
+                fontSize: 11,
+                letterSpacing: 0,
+                textTransform: "none" as const,
+              }
+            : null),
           borderRadius: 9999,
           border: "1px solid rgba(148, 163, 184, 0.6)",
           background:
@@ -207,17 +375,26 @@ export default function XAuthButton({
           fontWeight: 600,
           letterSpacing: "0.04em",
           textTransform: "uppercase",
-          boxShadow: "0 18px 40px rgba(15, 23, 42, 0.9)",
+          boxShadow:
+            variant === "nav" ? "none" : "0 18px 40px rgba(15, 23, 42, 0.9)",
           transition:
             "transform 0.12s ease-out, box-shadow 0.12s ease-out, border-color 0.12s ease-out",
         }}
         onMouseEnter={(e) => {
           if (isSigningIn) return;
+          if (variant === "nav") {
+            e.currentTarget.style.borderColor = "#e5e7eb";
+            return;
+          }
           e.currentTarget.style.transform = "translateY(-1px) scale(1.01)";
           e.currentTarget.style.boxShadow = "0 22px 45px rgba(15,23,42,0.95)";
           e.currentTarget.style.borderColor = "#e5e7eb";
         }}
         onMouseLeave={(e) => {
+          if (variant === "nav") {
+            e.currentTarget.style.borderColor = "rgba(148,163,184,0.6)";
+            return;
+          }
           e.currentTarget.style.transform = "translateY(0) scale(1)";
           e.currentTarget.style.boxShadow = "0 18px 40px rgba(15, 23, 42, 0.9)";
           e.currentTarget.style.borderColor = "rgba(148,163,184,0.6)";
@@ -230,6 +407,13 @@ export default function XAuthButton({
             justifyContent: "center",
             width: compact ? 20 : 22,
             height: compact ? 20 : 22,
+            ...(variant === "nav"
+              ? {
+                  width: 18,
+                  height: 18,
+                  fontSize: 12,
+                }
+              : null),
             borderRadius: "50%",
             background: "#020617",
             border: "1px solid rgba(148,163,184,0.7)",
@@ -237,10 +421,10 @@ export default function XAuthButton({
             fontWeight: 700,
           }}
         >
-          𝕏
+          X
         </span>
 
-        <span>{isSigningIn ? "Opening X..." : "Sign in with X"}</span>
+        <span>{isSigningIn ? "Opening X..." : "Connect X"}</span>
       </button>
     </div>
   );

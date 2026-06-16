@@ -9,6 +9,24 @@ export type WorldCupProphecyCriteria = {
   confidenceSignal: number;
 };
 
+export type WorldCupRiskLevel =
+  | 'Low'
+  | 'Medium'
+  | 'High'
+  | 'Low-Medium'
+  | 'Medium-High';
+
+export type WorldCupProphecyRisks = {
+  drawRisk?: WorldCupRiskLevel;
+  upsetRisk?: WorldCupRiskLevel;
+  counterAttackRisk?: WorldCupRiskLevel;
+  setPieceRisk?: WorldCupRiskLevel;
+  cleanSheetRisk?: WorldCupRiskLevel;
+  lateGoalRisk?: WorldCupRiskLevel;
+  heatFatigueRisk?: WorldCupRiskLevel;
+  travelDisruptionRisk?: WorldCupRiskLevel;
+};
+
 export type WorldCupProphecyInput = {
   homeTeam: string;
   awayTeam: string;
@@ -42,7 +60,7 @@ export type WorldCupProphecyResult = {
 
   research: WorldCupResearchContext;
   criteria: WorldCupProphecyCriteria;
-};
+} & WorldCupProphecyRisks;
 
 export type WorldCupProphecyCardInput = WorldCupProphecyResult & {
   mintedBy?: string;

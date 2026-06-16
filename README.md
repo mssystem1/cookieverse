@@ -133,6 +133,7 @@ docs/mantle-x402-facilitator-guide.md
 | 🟣 Farcaster Mini App | Dedicated `/mini` routes for Farcaster Mini App contexts. |
 | 🏆 Leaderboard | Ranks users by Cookieverse activity: mints, x402 payments, bridges. |
 | 📊 Dashboard | Tracks holdings, image mints, x402 payments, quests, boosts, and activity. |
+| X Auth Modes | Supports popup-based Connect X in the nav plus configurable `XAUTH=V2`, `XAUTH=V1`, or `XAUTH=DISABLED` login gating. |
 | 🐦 X Sharing | Lets users share generated cards, mints, and roast content on X. |
 | 💳 Paid HTTP 402 / x402 Products | Supports paid Wallet Roast and World Cup Prophecy across Coinbase/CDP x402 on Base, Cookieverse native MNT HTTP 402 on Mantle, and OKX x402 on X Layer. |
 | 🏦 Coinbase x402 | Cookieverse acts as the x402 seller for Base paid routes protected by `src/proxy.ts`. |
@@ -371,6 +372,7 @@ Pick
 Score
 Confidence
 Prophecy text
+Inline risk explanations
 Short reasoning line
 Criteria scores
 ```
@@ -501,6 +503,9 @@ Output shape:
   "scoreline": "2-1",
   "confidence": 78,
   "prophecy": "Argentina edges a tense final with sharper control in key moments...",
+  "drawRisk": "Medium",
+  "counterAttackRisk": "Medium",
+  "cleanSheetRisk": "Medium",
   "reasoning": [
     "Form edge and transition balance shape the call.",
     "Momentum and big-match mentality decide the edge."
@@ -603,6 +608,16 @@ function replacePromptPlaceholders(template: string, input: WorldCupProphecyInpu
 }
 ```
 
+Cookieverse also appends public-card readability rules in the server route. The model should return a concise collectible prophecy, not sportsbook-style market output:
+
+```txt
+- Keep prophecy concise: 180-240 characters.
+- Return risk levels as top-level JSON fields using full words only: Low, Medium, High, Low-Medium, Medium-High.
+- Do not use abbreviations like L, M, H, LM, or MH on the public card.
+- Supported risk fields: drawRisk, upsetRisk, counterAttackRisk, setPieceRisk, cleanSheetRisk, lateGoalRisk, heatFatigueRisk, travelDisruptionRisk.
+- Reasoning must contain exactly 2 short lines, each under 70 characters.
+```
+
 For local `.env.local`, use one quoted value with `\n` escapes if multiline parsing causes only the first line to load.
 
 For Vercel, store the full prompt in the Environment Variables dashboard.
@@ -652,7 +667,7 @@ Rendering flow:
 WorldCupProphecyResult JSON
 → renderWorldCupProphecyCard()
 → load public/xcup/world-cup-prophecy-template.png
-→ draw teams, date, summary, prophecy, reasoning and criteria
+→ draw teams, date, summary, prophecy with inline risks, reasoning and criteria
 → add decorative divider lines
 → return image/png
 ```
@@ -663,7 +678,7 @@ The current card design includes:
 - Gold trophy visual language
 - Cookieverse footer
 - Team names aligned with the VS ribbon
-- Summary / prophecy / reasoning layered with decorative gold dividers
+- Summary / prophecy with inline risk explanations / reasoning layered with decorative gold dividers
 - Criteria boxes aligned under template icons
 - IPFS-ready PNG output
 
@@ -1122,6 +1137,8 @@ This provides bridge activity proof without expensive `eth_getLogs` scans.
 ### 8. Dashboard and Leaderboard
 
 Cookieverse tracks user activity across mints, image mints, holdings, quests, boosts, X Layer World Cup Prophecy NFTs, and ranking data.
+
+`/api/mgid-upsert` separates wallet activity refreshes from trusted identity writes. Wallet-only requests can refresh public onchain stats, while an X session, Quick Auth bearer token, or Mini App identity header is required before usernames or the stored smart-account wallet can be attached. Existing identity fields are preserved, and no-op updates return `{ ok: true, changed: false }` when score, bridge, x402, daily/weekly, and identity values are unchanged.
 
 Important app areas:
 
@@ -1611,7 +1628,7 @@ Wallet Roast metadata attributes
 | --- | --- |
 | Frontend | Next.js 16, React 19, TypeScript |
 | Wallets | Wagmi, Viem, RainbowKit |
-| Auth | NextAuth with X OAuth |
+| Auth | NextAuth with X OAuth v2, legacy Twitter OAuth v1 mode, and optional X-login gate |
 | Base App | Base App metadata and compact `/app` routes |
 | Farcaster | Farcaster Mini App SDK and `/mini` routes |
 | AI | OpenAI SDK, 0G Serving Broker |
@@ -1768,6 +1785,7 @@ src/
       types.ts
 
     auth.ts
+    xAuthMode.ts
     chain.ts
     share.ts
     wagmi.ts
@@ -1815,8 +1833,18 @@ NEXTAUTH_SECRET=...
 
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 
+# V2 is the default. V1 uses legacy Twitter OAuth 1.0a credentials.
+# DISABLED removes the blocking login splash, while Connect X can still be used
+# when credentials are configured.
+XAUTH=V2
+# XUATH is also accepted as a backwards-compatible alias.
+
 TWITTER_CLIENT_ID=...
 TWITTER_CLIENT_SECRET=...
+
+# Only needed for XAUTH=V1.
+TWITTER_CONSUMER_KEY=...
+TWITTER_CONSUMER_KEY_SECRET=...
 
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
 ```

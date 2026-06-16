@@ -882,15 +882,27 @@ export default function BridgePage() {
     if (!address) return;
 
     let cancelled = false;
+    let authRejected = false;
+    const username = fcUsername.trim();
 
     const tick = async () => {
-      if (cancelled) return;
+      if (cancelled || authRejected) return;
       try {
-        await fetch('/api/mgid-upsert', {
+        const res = await fetch('/api/mgid-upsert', {
           method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-farcaster-username': fcUsername },
+          headers: {
+            'content-type': 'application/json',
+            ...(username ? { 'x-farcaster-username': username } : {}),
+          },
           body: JSON.stringify({ address }),
         });
+        if (res.status === 401) {
+          authRejected = true;
+          return;
+        }
+        if (!res.ok) {
+          console.error('periodic mgid-upsert (bridge) HTTP error', res.status);
+        }
       } catch (e) {
         console.error('periodic mgid-upsert (bridge) failed', e);
       }
@@ -1223,14 +1235,18 @@ const onChangeDst = (next: ChainKey) => {
       });
 
       try {
-        await fetch('/api/mgid-upsert', {
+        const username = fcUsername.trim();
+        const res = await fetch('/api/mgid-upsert', {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            'x-farcaster-username': fcUsername,
+            ...(username ? { 'x-farcaster-username': username } : {}),
           },
           body: JSON.stringify({ address }),
         });
+        if (!res.ok) {
+          console.error('mgid-upsert HTTP error', res.status);
+        }
       } catch (e) {
         console.error('mgid-upsert failed', e);
       }

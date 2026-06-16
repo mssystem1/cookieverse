@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import XAuthButton from './XAuthButton';
 
 type BaseAppNavProps = {
   twitterUsername?: string;
@@ -67,7 +68,9 @@ export default function BaseAppNav({
             ) : null}
             <span>@{twitterUsername}</span>
           </a>
-        ) : null}
+        ) : (
+          <XAuthButton callbackUrl="/app" compact variant="nav" />
+        )}
       </div>
 
       {/* Wallet */}
