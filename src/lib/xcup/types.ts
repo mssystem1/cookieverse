@@ -25,6 +25,14 @@ export type WorldCupProphecyRisks = {
   lateGoalRisk?: WorldCupRiskLevel;
   heatFatigueRisk?: WorldCupRiskLevel;
   travelDisruptionRisk?: WorldCupRiskLevel;
+  drawRiskReason?: string;
+  upsetRiskReason?: string;
+  counterAttackRiskReason?: string;
+  setPieceRiskReason?: string;
+  cleanSheetRiskReason?: string;
+  lateGoalRiskReason?: string;
+  heatFatigueRiskReason?: string;
+  travelDisruptionRiskReason?: string;
 };
 
 export type WorldCupProphecyInput = {

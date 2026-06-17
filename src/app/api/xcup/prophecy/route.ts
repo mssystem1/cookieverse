@@ -12,19 +12,22 @@ import type {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MAX_MAIN_PROPHECY = 260;
 const MAX_REASONING_LINE = 70;
 
 const PROPHECY_CARD_RULES = `
 
 Cookieverse public card readability rules:
-- Keep prophecy concise: 180-220 characters.
-- The prophecy should be one vivid football paragraph about the highly likely match flow and outcome.
+- Keep the main prophecy concise: up to 260 characters.
+- The prophecy should be one vivid football paragraph about the likely match flow and outcome.
+- Do not include sportsbook-style fields in public card text.
 - Return risk levels as JSON fields using full words only: Low, Medium, High, Low-Medium, Medium-High.
 - Do not use risk abbreviations like L, M, H, LM, or MH.
-- Include these optional top-level JSON fields when relevant: drawRisk, upsetRisk, counterAttackRisk, setPieceRisk, cleanSheetRisk, lateGoalRisk, heatFatigueRisk, travelDisruptionRisk.
+- Include only relevant risk fields. Do not default every risk to Medium.
+- Include optional top-level JSON risk fields only when relevant: drawRisk, upsetRisk, counterAttackRisk, setPieceRisk, cleanSheetRisk, lateGoalRisk, heatFatigueRisk, travelDisruptionRisk.
+- Include matching optional top-level reason fields when they add match-specific context: drawRiskReason, upsetRiskReason, counterAttackRiskReason, setPieceRiskReason, cleanSheetRiskReason, lateGoalRiskReason, heatFatigueRiskReason, travelDisruptionRiskReason.
+- Risk reasons must be short public-card phrases, not full sentences.
 - Reasoning must contain exactly 2 short lines, each under 70 characters.
-- Keep confidence visible and outcome-focused.
+- Confidence must follow the risk profile. Medium draw/upset/clean-sheet risks usually mean 84-87, not 89+.
 `;
 
 function sanitizeKey(raw: string) {
@@ -146,34 +149,18 @@ function getRiskField(raw: any, key: string) {
   return raw?.[key] ?? raw?.risks?.[key];
 }
 
+function normalizeRiskReason(value: unknown): string | undefined {
+  const text = cleanShortLine(value, '', 64).replace(/[.!?]+$/g, '').trim();
+  return text || undefined;
+}
+
 function normalizeProphecyConfidence(params: {
   rawConfidence: unknown;
   criteria: WorldCupProphecyCriteria;
   pick: unknown;
 }): number {
-  const { rawConfidence, criteria, pick } = params;
-
-  const raw = clampScore(rawConfidence, 90);
-
-  const criteriaAvg = Math.round(
-    (
-      criteria.form +
-      criteria.attack +
-      criteria.defense +
-      criteria.momentum +
-      criteria.fans +
-      criteria.confidenceSignal
-    ) / 6,
-  );
-
-  const pickText = cleanText(pick, '').toLowerCase();
-
-  const maxConfidence = pickText === 'draw' ? 91 : 94;
-  const minConfidence = pickText === 'draw' ? 86 : 89;
-
-  const blended = Math.round(raw * 0.55 + criteriaAvg * 0.45);
-
-  return Math.max(minConfidence, Math.min(maxConfidence, blended));
+  const raw = clampScore(params.rawConfidence, 86);
+  return Math.max(78, Math.min(94, raw));
 }
 
 function extractJson(text: string): any | null {
@@ -372,7 +359,7 @@ export async function POST(req: NextRequest) {
       pick: parsed.pick,
     });
 
-    criteria.confidenceSignal = Math.max(criteria.confidenceSignal, confidence);
+    criteria.confidenceSignal = confidence;
 
     const result: WorldCupProphecyResult = {
       title: cleanText(parsed.title, 'World Cup Match Prophecy'),
@@ -383,9 +370,8 @@ export async function POST(req: NextRequest) {
       pick: cleanShortLine(parsed.pick, fallback.pick, 24),
       scoreline: cleanShortLine(parsed.scoreline, fallback.scoreline, 32),
       confidence,
-      prophecy: smartTruncate(
+      prophecy: cleanText(
         stripInlineRiskSection(parsed.prophecy, fallback.prophecy),
-        MAX_MAIN_PROPHECY,
         fallback.prophecy,
       ),
       reasoning: normalizeReasoning(parsed.reasoning, fallback.reasoning),
@@ -401,19 +387,30 @@ export async function POST(req: NextRequest) {
         sources: [...new Set([...parsedSources, ...detectedSources])].slice(0, 8),
       },
       criteria,
-      drawRisk: normalizeRiskLevel(getRiskField(parsed, 'drawRisk')) ?? fallback.drawRisk,
-      upsetRisk: normalizeRiskLevel(getRiskField(parsed, 'upsetRisk')) ?? fallback.upsetRisk,
-      counterAttackRisk:
-        normalizeRiskLevel(getRiskField(parsed, 'counterAttackRisk')) ??
-        fallback.counterAttackRisk,
-      setPieceRisk:
-        normalizeRiskLevel(getRiskField(parsed, 'setPieceRisk')) ?? fallback.setPieceRisk,
-      cleanSheetRisk:
-        normalizeRiskLevel(getRiskField(parsed, 'cleanSheetRisk')) ??
-        fallback.cleanSheetRisk,
+      drawRisk: normalizeRiskLevel(getRiskField(parsed, 'drawRisk')),
+      upsetRisk: normalizeRiskLevel(getRiskField(parsed, 'upsetRisk')),
+      counterAttackRisk: normalizeRiskLevel(getRiskField(parsed, 'counterAttackRisk')),
+      setPieceRisk: normalizeRiskLevel(getRiskField(parsed, 'setPieceRisk')),
+      cleanSheetRisk: normalizeRiskLevel(getRiskField(parsed, 'cleanSheetRisk')),
       lateGoalRisk: normalizeRiskLevel(getRiskField(parsed, 'lateGoalRisk')),
       heatFatigueRisk: normalizeRiskLevel(getRiskField(parsed, 'heatFatigueRisk')),
       travelDisruptionRisk: normalizeRiskLevel(getRiskField(parsed, 'travelDisruptionRisk')),
+      drawRiskReason: normalizeRiskReason(getRiskField(parsed, 'drawRiskReason')),
+      upsetRiskReason: normalizeRiskReason(getRiskField(parsed, 'upsetRiskReason')),
+      counterAttackRiskReason: normalizeRiskReason(
+        getRiskField(parsed, 'counterAttackRiskReason'),
+      ),
+      setPieceRiskReason: normalizeRiskReason(getRiskField(parsed, 'setPieceRiskReason')),
+      cleanSheetRiskReason: normalizeRiskReason(
+        getRiskField(parsed, 'cleanSheetRiskReason'),
+      ),
+      lateGoalRiskReason: normalizeRiskReason(getRiskField(parsed, 'lateGoalRiskReason')),
+      heatFatigueRiskReason: normalizeRiskReason(
+        getRiskField(parsed, 'heatFatigueRiskReason'),
+      ),
+      travelDisruptionRiskReason: normalizeRiskReason(
+        getRiskField(parsed, 'travelDisruptionRiskReason'),
+      ),
     };
 
     result.reasoning = normalizeReasoning(

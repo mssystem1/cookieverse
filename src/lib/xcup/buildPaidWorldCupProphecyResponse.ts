@@ -9,6 +9,7 @@ import {
 } from "../../server/x402UsageStore";
 
 type PaidProphecyChain = "base" | "mantle" | "xlayer";
+const MAX_METADATA_RISKS = 5;
 
 type Params = {
   input: WorldCupProphecyInput;
@@ -27,22 +28,75 @@ function cleanSlug(value: string) {
     .slice(0, 64);
 }
 
+function cleanText(value: unknown, fallback = "") {
+  return String(value || fallback).replace(/\s+/g, " ").trim();
+}
+
+function riskSeverityScore(level: string) {
+  if (level === "High") return 5;
+  if (level === "Medium-High") return 4;
+  if (level === "Medium") return 3;
+  if (level === "Low-Medium") return 2;
+  if (level === "Low") return 1;
+  return 0;
+}
+
+function riskSpecificityBonus(label: string) {
+  if (label === "Set Piece Risk") return 0.5;
+  if (label === "Heat/Fatigue Risk") return 0.5;
+  if (label === "Travel Risk") return 0.5;
+  if (label === "Late Goal Risk") return 0.35;
+  if (label === "Counter Risk") return 0.25;
+  return 0;
+}
+
+function formatMetadataRisk(label: string, value: unknown, reason?: unknown) {
+  const level = cleanText(value);
+  if (!level || level === "Low") return null;
+
+  const cleanReason = cleanText(reason).replace(/[.!?]+$/g, "");
+
+  return {
+    text: cleanReason
+      ? `${label}: ${level} - ${cleanReason}`
+      : `${label}: ${level}`,
+    score: riskSeverityScore(level) + riskSpecificityBonus(label),
+  };
+}
+
 function prophecyRiskSummary(prophecy: WorldCupProphecyResult) {
   const items = [
-    ["Draw Risk", prophecy.drawRisk],
-    ["Counter Risk", prophecy.counterAttackRisk],
-    ["Clean Sheet Risk", prophecy.cleanSheetRisk],
-    ["Set Piece Risk", prophecy.setPieceRisk],
-    ["Upset Risk", prophecy.upsetRisk],
-    ["Late Goal Risk", prophecy.lateGoalRisk],
-    ["Heat/Fatigue Risk", prophecy.heatFatigueRisk],
-    ["Travel Risk", prophecy.travelDisruptionRisk],
+    formatMetadataRisk("Draw Risk", prophecy.drawRisk, prophecy.drawRiskReason),
+    formatMetadataRisk(
+      "Counter Risk",
+      prophecy.counterAttackRisk,
+      prophecy.counterAttackRiskReason
+    ),
+    formatMetadataRisk(
+      "Clean Sheet Risk",
+      prophecy.cleanSheetRisk,
+      prophecy.cleanSheetRiskReason
+    ),
+    formatMetadataRisk("Set Piece Risk", prophecy.setPieceRisk, prophecy.setPieceRiskReason),
+    formatMetadataRisk("Upset Risk", prophecy.upsetRisk, prophecy.upsetRiskReason),
+    formatMetadataRisk("Late Goal Risk", prophecy.lateGoalRisk, prophecy.lateGoalRiskReason),
+    formatMetadataRisk(
+      "Heat/Fatigue Risk",
+      prophecy.heatFatigueRisk,
+      prophecy.heatFatigueRiskReason
+    ),
+    formatMetadataRisk(
+      "Travel Risk",
+      prophecy.travelDisruptionRisk,
+      prophecy.travelDisruptionRiskReason
+    ),
   ] as const;
 
   return items
-    .map(([label, value]) => (value ? `${label}: ${value}` : ""))
     .filter(Boolean)
-    .slice(0, 3)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_METADATA_RISKS)
+    .map((risk) => risk.text)
     .join(" | ");
 }
 

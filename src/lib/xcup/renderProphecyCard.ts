@@ -13,6 +13,7 @@ import {
 import type { WorldCupProphecyCardInput } from './types';
 
 const DEFAULT_FONT = 'Inter';
+const MAX_DISPLAY_RISKS = 5;
 
 let fontsRegistered = false;
 
@@ -156,7 +157,7 @@ const THEME_LAYOUTS: Record<string, ThemeLayout> = {
       fill: '#3d2908',
       stroke: 'rgba(255,255,255,0.14)',
       strokeWidth: 1,
-      maxLines: 7,
+      maxLines: 9,
       paddingX: 28,
     },
 
@@ -278,6 +279,29 @@ function normalizeRiskLevel(value: unknown) {
   return '';
 }
 
+function riskSeverityScore(level: string) {
+  if (level === 'High') return 5;
+  if (level === 'Medium-High') return 4;
+  if (level === 'Medium') return 3;
+  if (level === 'Low-Medium') return 2;
+  if (level === 'Low') return 1;
+  return 0;
+}
+
+function riskSpecificityBonus(label: string) {
+  if (label === 'Set Piece Risk') return 0.5;
+  if (label === 'Heat/Fatigue Risk') return 0.5;
+  if (label === 'Travel Risk') return 0.5;
+  if (label === 'Late Goal Risk') return 0.35;
+  if (label === 'Counter Risk') return 0.25;
+  return 0;
+}
+
+function cleanRiskExplanation(value: unknown, fallback: string) {
+  const text = cleanText(value, fallback).replace(/[.!?]+$/g, '').trim();
+  return text || fallback;
+}
+
 function buildInlineRiskText(input: WorldCupProphecyCardInput) {
   const pick = cleanText(input.pick, 'the favorite');
   const cleanSheetTarget = pick && pick.toLowerCase() !== 'draw' ? pick : 'the favorite';
@@ -290,54 +314,71 @@ function buildInlineRiskText(input: WorldCupProphecyCardInput) {
     {
       label: 'Draw Risk',
       value: input.drawRisk,
-      explanation: 'match can finish level',
+      explanation: cleanRiskExplanation(input.drawRiskReason, 'match can finish level'),
     },
     {
       label: 'Counter Risk',
       value: input.counterAttackRisk,
-      explanation: 'fast breaks are dangerous',
+      explanation: cleanRiskExplanation(
+        input.counterAttackRiskReason,
+        'fast breaks are dangerous',
+      ),
     },
     {
       label: 'Clean Sheet Risk',
       value: input.cleanSheetRisk,
-      explanation: `${cleanSheetTarget} may concede`,
+      explanation: cleanRiskExplanation(
+        input.cleanSheetRiskReason,
+        `${cleanSheetTarget} may concede`,
+      ),
     },
     {
       label: 'Set Piece Risk',
       value: input.setPieceRisk,
-      explanation: 'corners or free kicks can decide it',
+      explanation: cleanRiskExplanation(
+        input.setPieceRiskReason,
+        'corners or free kicks can decide it',
+      ),
     },
     {
       label: 'Upset Risk',
       value: input.upsetRisk,
-      explanation: 'the underdog can still surprise',
+      explanation: cleanRiskExplanation(
+        input.upsetRiskReason,
+        'the underdog can still surprise',
+      ),
     },
     {
       label: 'Late Goal Risk',
       value: input.lateGoalRisk,
-      explanation: 'late pressure can change it',
+      explanation: cleanRiskExplanation(input.lateGoalRiskReason, 'late pressure can change it'),
     },
     {
       label: 'Heat/Fatigue Risk',
       value: input.heatFatigueRisk,
-      explanation: 'weather can slow legs',
+      explanation: cleanRiskExplanation(input.heatFatigueRiskReason, 'weather can slow legs'),
     },
     {
       label: 'Travel Risk',
       value: input.travelDisruptionRisk,
-      explanation: 'delays can hurt rhythm',
+      explanation: cleanRiskExplanation(input.travelDisruptionRiskReason, 'delays can hurt rhythm'),
     },
   ];
 
   const parts = risks
     .map((risk) => {
       const level = normalizeRiskLevel(risk.value);
-      if (!level) return '';
+      if (!level || level === 'Low') return null;
 
-      return `${risk.label}: ${level} - ${risk.explanation}.`;
+      return {
+        text: `${risk.label}: ${level} - ${risk.explanation}.`,
+        score: riskSeverityScore(level) + riskSpecificityBonus(risk.label),
+      };
     })
     .filter(Boolean)
-    .slice(0, 3);
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_DISPLAY_RISKS)
+    .map((risk) => risk.text);
 
   return parts.length ? `Risks: ${parts.join(' ')}` : '';
 }
