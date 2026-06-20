@@ -5,7 +5,7 @@ import { getAddress, isAddress, type Address } from "viem";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type X402ScoreChain = "base" | "mantle" | "xlayer";
+type X402ScoreChain = "base" | "mantle" | "xlayer" | "arbitrum";
 
 type X402ScoreEvent = {
   chain: X402ScoreChain;
@@ -49,6 +49,7 @@ const FETCH_TIMEOUT_MS = Number(process.env.X402_SCORE_FETCH_TIMEOUT_MS || "1500
 const ETHERSCAN_PAGE_SIZE = Number(process.env.X402_SCORE_ETHERSCAN_PAGE_SIZE || "10000");
 
 const BASE_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+const ARBITRUM_USDC = "0xaf88d065e77c8cc2239327c5edb3a432268e5831";
 const XLAYER_USDT0 = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
 
 function isHexAddress(value: string | null): value is `0x${string}` {
@@ -68,7 +69,7 @@ function normalizeTokenSymbol(value: unknown) {
 
 function getPayTo(chain: X402ScoreChain): Address | null {
   const raw =
-    chain === "base"
+    chain === "base" || chain === "arbitrum"
       ? process.env.X402_PAY_TO
       : chain === "mantle"
         ? process.env.MANTLE_PAY_TO ||
@@ -133,6 +134,23 @@ function configuredBaseAllowedAmounts() {
     splitValues(
       process.env.X402_BASE_ALLOWED_AMOUNTS ||
         process.env.X402_BASE_ALLOWED_RAW_AMOUNTS,
+      fallback,
+    ),
+  );
+}
+
+function configuredArbitrumAllowedAmounts() {
+  const fallback = [
+    decimalToUnits(process.env.X402_BASE_WALLET_ROAST_PRICE_USD || "0.07", 6),
+    decimalToUnits(process.env.X402_BASE_XCUP_PROPHECY_PRICE_USD || "0.10", 6),
+    "70000",
+    "100000",
+  ].filter(Boolean);
+
+  return new Set(
+    splitValues(
+      process.env.X402_ARBITRUM_ALLOWED_AMOUNTS ||
+        process.env.X402_ARBITRUM_ALLOWED_RAW_AMOUNTS,
       fallback,
     ),
   );
@@ -276,8 +294,8 @@ function uniqueEvents(events: X402ScoreEvent[]) {
 }
 
 async function fetchEtherscanTokenPayments(params: {
-  chain: "base" | "mantle";
-  chainid: "8453" | "5000";
+  chain: "base" | "mantle" | "arbitrum";
+  chainid: "8453" | "5000" | "42161";
   user: Address;
   payTo: Address;
   tokenAddresses: string[];
@@ -628,6 +646,31 @@ async function fetchBaseResult(user: Address): Promise<ChainResult> {
   return resultFromEvents(events, "etherscan-token");
 }
 
+async function fetchArbitrumResult(user: Address): Promise<ChainResult> {
+  const payTo = getPayTo("arbitrum");
+  const tokens = splitAddresses(process.env.X402_ARBITRUM_TOKEN_ADDRESSES, [
+    process.env.X402_ARBITRUM_USDC_ADDRESS || ARBITRUM_USDC,
+  ]);
+
+  if (!payTo || !ETHERSCAN_API_KEY || !tokens.length) {
+    return {
+      ...ZERO_RESULT,
+      error: "Missing Arbitrum x402 score config.",
+    };
+  }
+
+  const events = await fetchEtherscanTokenPayments({
+    chain: "arbitrum",
+    chainid: "42161",
+    user,
+    payTo,
+    tokenAddresses: tokens,
+    allowedAmounts: configuredArbitrumAllowedAmounts(),
+  });
+
+  return resultFromEvents(events, "etherscan-token");
+}
+
 async function fetchMantleResult(user: Address): Promise<ChainResult> {
   const payTo = getPayTo("mantle");
   if (!payTo || !ETHERSCAN_API_KEY) {
@@ -688,27 +731,30 @@ export async function GET(req: Request) {
   }
 
   const user = getAddress(address);
-  const [base, mantle, xlayer] = await Promise.all([
+  const [base, mantle, xlayer, arbitrum] = await Promise.all([
     safeChainResult(() => fetchBaseResult(user)),
     safeChainResult(() => fetchMantleResult(user)),
     safeChainResult(() => fetchXLayerResult(user)),
+    safeChainResult(() => fetchArbitrumResult(user)),
   ]);
 
-  const totalCount = base.count + mantle.count + xlayer.count;
-  const totalScore = base.score + mantle.score + xlayer.score;
+  const totalCount = base.count + mantle.count + xlayer.count + arbitrum.count;
+  const totalScore = base.score + mantle.score + xlayer.score + arbitrum.score;
 
   return NextResponse.json({
-    ok: base.ok || mantle.ok || xlayer.ok,
+    ok: base.ok || mantle.ok || xlayer.ok || arbitrum.ok,
     wallet: user.toLowerCase(),
     payoutWallet: {
       base: getPayTo("base")?.toLowerCase() || null,
       mantle: getPayTo("mantle")?.toLowerCase() || null,
       xlayer: getPayTo("xlayer")?.toLowerCase() || null,
+      arbitrum: getPayTo("arbitrum")?.toLowerCase() || null,
     },
     byChain: {
       base: maybeStripEvents(base, includeEvents),
       mantle: maybeStripEvents(mantle, includeEvents),
       xlayer: maybeStripEvents(xlayer, includeEvents),
+      arbitrum: maybeStripEvents(arbitrum, includeEvents),
     },
     totalCount,
     totalScore,

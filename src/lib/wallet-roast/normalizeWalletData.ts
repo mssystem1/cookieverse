@@ -60,6 +60,8 @@ const STABLECOIN_ADDRESSES = new Set([
   "0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9", // USDC on Mantle
   "0x74b7f16337b8972027f6196a17a631ac6de26d22", // USDC on X Layer
   "0x779ded0c9e1022225f8e0630b35a9b54be713736", // USDt0 on X Layer
+  "0xaf88d065e77c8cc2239327c5edb3a432268e5831", // native USDC on Arbitrum
+  "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8", // legacy USDC.e on Arbitrum
 ]);
 
 const WETH_LIKE_ADDRESSES = new Set([
@@ -70,6 +72,7 @@ const WETH_LIKE_ADDRESSES = new Set([
   "0x7c307e128efa31f540f2e2d976c995e0b65f51f6", // Aave Base weETH
   "0xdeaddeaddeaddeaddeaddeaddeaddeaddead1111", // WETH on Mantle
   "0x5a77f1443d16ee5761d310e38b62f77f726bc71c", // X Layer bridged WETH
+  "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // WETH on Arbitrum
 ]);
 
 function looksLikeSpamToken(name: string, symbol: string): boolean {
@@ -121,6 +124,7 @@ const MEME_TOKEN_HINTS: Record<WalletRoastChainKey, RegExp> = {
   base: /\b(brett|toshi|degen|keycat|doginme|higher|tybg|mfer|benji|miggles|based\s*bunny|bunny|normie|mochi)\b/i,
   mantle: /\b(mantle\s*inu|minu|beardy|beardy\s*dragon|puff|puff\s*the\s*dragon)\b/i,
   xlayer: /\b(xdog|x-dog|niuma|niu\s*ma)\b/i,
+  arbitrum: /\b(arbinu|aidoge|boop|arb doge)\b/i,
 };
 
 function isKnownMemeToken(

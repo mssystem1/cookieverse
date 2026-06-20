@@ -9,7 +9,7 @@ import { createBundlerClient } from 'viem/account-abstraction';
 
 // Export default AA chain + key so other modules (SA provider, status card)
 // can know which RPC / symbol to use at runtime.
-export type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | "og" | "xlayer";
+export type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | "og" | "xlayer" | "arbitrum";
 
 const DEFAULT_CHAIN_KEY = appDefaultChainKey as ChainKey;
 const chain = defaultAppChain;
@@ -40,6 +40,9 @@ switch (DEFAULT_CHAIN_KEY) {
   case 'linea':
     bundlerRpc = process.env.NEXT_PUBLIC_BUNDLER_RPC_URL_LINEA;
     break;    
+  case 'arbitrum':
+    bundlerRpc = process.env.NEXT_PUBLIC_BUNDLER_RPC_URL_ARBITRUM;
+    break;
   //case 'mitosis':
   //  bundlerRpc = process.env.NEXT_PUBLIC_BUNDLER_RPC_URL_MITOSIS;
   //  break;
@@ -64,6 +67,7 @@ export const bundlerClient = bundlerRpc
   mitosis: (process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS || '').toLowerCase(),
   og: (process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG || "").toLowerCase(),
   xlayer: (process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER || "").toLowerCase(),
+  arbitrum: (process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM || "").toLowerCase(),
 };
 
 
@@ -77,6 +81,7 @@ export function resolveChainKeyByContract(contract?: string): ChainKey | null {
   if (c === COOKIE_ADDRS.monad) return 'monad';
   if (c === COOKIE_ADDRS.og) return "og";
   if (c === COOKIE_ADDRS.xlayer) return "xlayer";
+  if (c === COOKIE_ADDRS.arbitrum) return "arbitrum";
   return null;
 }
 
@@ -89,6 +94,7 @@ const ID_MAP: Record<ChainKey, number> = {
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
   og: 16661,
   xlayer: 196,
+  arbitrum: 42161,
 };
 
 const CLIENTS: Record<ChainKey, PublicClient> = {
@@ -99,6 +105,7 @@ const CLIENTS: Record<ChainKey, PublicClient> = {
   mitosis: undefined as any,
   og: undefined as any,
   xlayer: undefined as any,
+  arbitrum: undefined as any,
 };
 
 for (const key of Object.keys(CLIENTS) as ChainKey[]) {

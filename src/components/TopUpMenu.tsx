@@ -15,6 +15,7 @@ export default function TopUpMenu() {
     { label: 'Mantle',        id: 5000 },
     { label: 'Linea',         id: 59144 },    
     { label: 'Mitosis',       id: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777) },
+    { label: 'Arbitrum',      id: 42161 },
   ], []);
 
   const current = items.find(i => i.id === chainId);

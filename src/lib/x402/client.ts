@@ -30,6 +30,7 @@ const x402NetworkByChain: Record<CookieverseX402Chain, X402Network> = {
   base: "eip155:8453",
   mantle: "eip155:5000",
   xlayer: "eip155:196",
+  arbitrum: "eip155:42161",
 };
 
 export type CookieverseX402Response = {
@@ -70,6 +71,11 @@ export type CookieverseX402ProphecyResponse = {
     gatewayUrl: string;
   };
   metadata?: unknown;
+  metadataPin?: {
+    cid: string;
+    ipfsUri: string;
+    gatewayUrl: string;
+  };
   error?: string;
 };
 
@@ -180,6 +186,99 @@ function createPaidRequestAwareFetch(onPaidRequest?: PaidRequestCallback): typeo
     }
 
     return safeBrowserFetch(input as any, init);
+  };
+}
+
+function chainLabel(chain: CookieverseX402Chain) {
+  if (chain === "base") return "Base";
+  if (chain === "arbitrum") return "Arbitrum";
+  if (chain === "mantle") return "Mantle";
+  return "X Layer";
+}
+
+async function assertPaymentAssetBalance(
+  walletClient: WalletClient,
+  response: Response,
+  chain: CookieverseX402Chain,
+) {
+  const paymentRequired = decodePaymentRequiredHeader(response.headers);
+  const requirement = Array.isArray(paymentRequired?.accepts)
+    ? paymentRequired.accepts[0]
+    : null;
+  const account = walletClient.account?.address;
+
+  if (
+    !requirement ||
+    !account ||
+    !/^0x[a-fA-F0-9]{40}$/.test(String(requirement.asset || "")) ||
+    !/^[0-9]+$/.test(String(requirement.amount || ""))
+  ) {
+    return;
+  }
+
+  const data = `0x70a08231${account.slice(2).padStart(64, "0")}` as `0x${string}`;
+  let result: unknown;
+  try {
+    result = await walletClient.request({
+      method: "eth_call",
+      params: [
+        {
+          to: requirement.asset as `0x${string}`,
+          data,
+        },
+        "latest",
+      ],
+    } as any);
+  } catch (error) {
+    console.warn(
+      "[cookieverse:x402-balance-preflight]",
+      error instanceof Error ? error.message : error,
+    );
+    return;
+  }
+  const balance = BigInt(String(result || "0x0"));
+  const required = BigInt(requirement.amount);
+
+  if (balance < required) {
+    const decimals = 6n;
+    const format = (value: bigint) => {
+      const whole = value / 10n ** decimals;
+      const fraction = (value % 10n ** decimals)
+        .toString()
+        .padStart(Number(decimals), "0")
+        .replace(/0+$/, "");
+      return fraction ? `${whole}.${fraction}` : whole.toString();
+    };
+
+    throw new Error(
+      `Insufficient USDC on ${chainLabel(chain)}. ` +
+        `Required ${format(required)} USDC; available ${format(balance)} USDC.`,
+    );
+  }
+}
+
+function createCoinbasePaymentFetch(params: {
+  walletClient: WalletClient;
+  chain: CookieverseX402Chain;
+  onPaidRequest?: PaidRequestCallback;
+}): typeof fetch {
+  const paidAwareFetch = createPaidRequestAwareFetch(params.onPaidRequest);
+
+  return async (input, init) => {
+    const inheritedHeaders =
+      init?.headers ||
+      (input instanceof Request ? input.headers : undefined);
+    const response = await paidAwareFetch(input, init);
+
+    if (response.status === 402 && !hasPaymentSignature(inheritedHeaders)) {
+      await assertPaymentAssetBalance(
+        params.walletClient,
+        response,
+        params.chain,
+      );
+    }
+
+    return response;
   };
 }
 
@@ -391,6 +490,15 @@ export async function callCookieverseX402Roast(params: {
   onPaidRequest?: PaidRequestCallback;
 }): Promise<CookieverseX402Response> {
   const chain = params.chain || "base";
+  if (chain === "arbitrum" && params.product !== "identity-roast") {
+    throw new Error(
+      "Arbitrum supports only the paid identity Wallet Roast product."
+    );
+  }
+
+  if (params.walletClient.chain?.id !== Number(x402NetworkByChain[chain].split(":")[1])) {
+    throw new Error(`Switch wallet to ${chain === "arbitrum" ? "Arbitrum" : chain} before paying.`);
+  }
   const endpoint = getX402Endpoint(params.product, chain);
   const provider = getX402ProviderForChain(chain);
 
@@ -480,7 +588,11 @@ export async function callCookieverseX402Roast(params: {
   });
 
   const fetchWithPayment = wrapFetchWithPayment(
-    createPaidRequestAwareFetch(params.onPaidRequest),
+    createCoinbasePaymentFetch({
+      walletClient: params.walletClient,
+      chain,
+      onPaidRequest: params.onPaidRequest,
+    }),
     client
   );
 
@@ -519,6 +631,17 @@ export async function callCookieverseX402Prophecy(params: {
   awayTeam: string;
   matchDate: string;
 }): Promise<CookieverseX402ProphecyResponse> {
+  if (
+    params.walletClient.chain?.id !==
+    Number(x402NetworkByChain[params.chain].split(":")[1])
+  ) {
+    throw new Error(
+      `Switch wallet to ${
+        params.chain === "arbitrum" ? "Arbitrum" : params.chain
+      } before paying.`
+    );
+  }
+
   const endpoint = getX402Endpoint("xcup-prophecy", params.chain);
 
   if (!endpoint) {
@@ -609,7 +732,13 @@ export async function callCookieverseX402Prophecy(params: {
     networks: [x402NetworkByChain[params.chain]],
   });
 
-  const fetchWithPayment = wrapFetchWithPayment(safeBrowserFetch, client);
+  const fetchWithPayment = wrapFetchWithPayment(
+    createCoinbasePaymentFetch({
+      walletClient: params.walletClient,
+      chain: params.chain,
+    }),
+    client,
+  );
 
   const response = await fetchWithPayment(endpoint, init);
 

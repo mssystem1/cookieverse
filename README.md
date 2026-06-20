@@ -49,6 +49,92 @@ The product goal is simple:
 
 ---
 
+## Arbitrum Support Update
+
+Arbitrum One is now integrated as a first-class Cookieverse chain.
+
+```txt
+Chain ID: 42161
+CAIP-2 network: eip155:42161
+Native token: ETH
+Explorer: https://arbiscan.io
+LayerZero endpoint ID: 30110
+```
+
+Implemented Arbitrum support includes:
+
+- Wallet connection, chain switching, RPC configuration, and explorer links.
+- COOKIE and image NFT minting through the configured Arbitrum collection.
+- Wallet Roast analysis through Etherscan API V2 with `chainid=42161`.
+- An Arbitrum-specific Wallet Roast card theme.
+- Coinbase CDP x402 payments using native Arbitrum USDC.
+- Paid Wallet Roast identity cards and World Cup Match Prophecy.
+- Pinata/IPFS image and NFT metadata output.
+- Dashboard holdings, images, bridge activity, x402 activity, and player score.
+- Global leaderboard participation with Arbitrum-local score and x402 columns.
+- Galxe mint, bridge, and x402 statistics.
+- A one-way LayerZero bridge from Arbitrum to Base.
+
+Arbitrum x402 intentionally supports only:
+
+```txt
+identity-roast
+xcup-prophecy
+```
+
+The fast `roast-json` product remains Base-only. World Cup Prophecy remains
+available on the existing supported networks; the Arbitrum version is the paid
+x402 path and does not replace the existing prophecy logic.
+
+Coinbase x402 on Arbitrum uses native USDC:
+
+```txt
+0xaf88d065e77c8cC2239327C5EDb3A432268e5831
+EIP-712 name: USD Coin
+EIP-712 version: 2
+```
+
+The browser checks the challenged USDC balance before signing and reports a
+clear insufficient-balance error when possible.
+
+Arbitrum COOKIE and canonical ERC-721 variables must point to the same
+collection:
+
+```env
+NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM=0x...
+NEXT_PUBLIC_CANONICAL_ERC721_ARBITRUM=0x...
+```
+
+The LayerZero adapter and the Base destination representation are separate
+contracts:
+
+```env
+NEXT_PUBLIC_ADAPTER_ARBITRUM=0x...
+NEXT_PUBLIC_ONFT_BASE4=0x...
+```
+
+`NEXT_PUBLIC_ONFT_BASE4` is the dedicated Base destination collection for the
+Arbitrum-to-Base route. The reverse Base-to-Arbitrum route is not enabled.
+
+Leaderboard behavior remains global: all wallets and users are kept in the
+roster. The connected chain changes only the local score, local x402 score, and
+connected-wallet chain mint breakdown. In particular, `SCORE on arbitrum`
+comes from `totalScore_arbitrum` and does not fall back to an all-chain mint
+total.
+
+World Cup Prophecy now returns and pins both the rendered image and NFT-ready
+metadata. Prediction Details are displayed above the prophecy card preview.
+The current product remains World Cup-only, while the generation and metadata
+pipeline can later be adapted to other football matches.
+
+Arbitrum implementation requirements and design notes are available in:
+
+```txt
+docs/arbitrum-support-requirements.md
+```
+
+---
+
 ## Mantle Turing Test Hackathon 2026 Focus
 
 Cookieverse is being prepared for the Mantle Turing Test Hackathon 2026 on DoraHacks:
@@ -121,22 +207,19 @@ docs/mantle-x402-facilitator-guide.md
 | 🌍 World Cup Team Selector | Team 1 / Team 2 inputs support searchable World Cup teams, aliases, real flag images, and manual custom typing. |
 | 🏳️ Real Flag Rendering | Uses real flag images in the UI and rendered cards instead of emoji flags, avoiding broken Windows / Node canvas flag rendering. |
 | 🖼️ Prophecy Card Renderer | Uses `@napi-rs/canvas` and World Cup templates to render premium match prophecy cards server-side. |
-| 🟣 X Layer Mainnet | Supports X Layer wallet connection, Wallet Roast, World Cup prophecy minting, NFT holdings, dashboard, leaderboard, bridge activity, and OKX x402 payments. |
-| 🟢 Mantle Mainnet | Supports Wallet Roast and World Cup Prophecy paid with native MNT through Cookieverse HTTP 402, plus COOKIE NFT support, holdings, dashboard, leaderboard and bridge activity. |
-| 🌉 X Layer → Base Bridge | Bridges COOKIE NFTs from X Layer to Base through LayerZero adapter / ONFT contracts. |
-| 🔥 Wallet Roast | Analyze Base, Mantle, or X Layer wallet activity and turn it into a funny AI identity roast card. Normal Wallet Roast remains available on Monad, Linea, Mitosis, and 0G. |
+| 🔥 Wallet Roast | Analyze Base, Mantle, or X Layer wallet activity and turn it into a funny AI identity roast card. Wallet Roast available on Base, Arbitrum, Mantle, and X layer. |
 | 🧠 Wallet Archetypes | Classify wallets as Bridge Tourist, Dust Farmer, Silent Whale, NFT Addict, DeFi Goblin, or Onchain Civilian. |
 | 🤖 AI Providers | Uses 0G Compute by default and can route Wallet Roast generation through OpenAI. |
 | ⛓️ 0G Mainnet | Supports Wallet Roast NFT minting on 0G Mainnet for product expansion and hackathon proof. |
-| 🌉 LayerZero Bridge | Bridges COOKIE NFTs across supported networks, including the focused X Layer → Base route. |
+| 🌉 LayerZero Bridge | Bridges COOKIE NFTs across supported networks: Arbitrum, 0G, Base, Monad, Linea and Monad. |
 | 🔵 Base App | Mobile-first compact Cookieverse shell for Base App users. |
 | 🟣 Farcaster Mini App | Dedicated `/mini` routes for Farcaster Mini App contexts. |
 | 🏆 Leaderboard | Ranks users by Cookieverse activity: mints, x402 payments, bridges. |
 | 📊 Dashboard | Tracks holdings, image mints, x402 payments, quests, boosts, and activity. |
 | X Auth Modes | Supports popup-based Connect X in the nav plus configurable `XAUTH=V2`, `XAUTH=V1`, or `XAUTH=DISABLED` login gating. |
 | 🐦 X Sharing | Lets users share generated cards, mints, and roast content on X. |
-| 💳 Paid HTTP 402 / x402 Products | Supports paid Wallet Roast and World Cup Prophecy across Coinbase/CDP x402 on Base, Cookieverse native MNT HTTP 402 on Mantle, and OKX x402 on X Layer. |
-| 🏦 Coinbase x402 | Cookieverse acts as the x402 seller for Base paid routes protected by `src/proxy.ts`. |
+| 💳 Paid HTTP 402 / x402 Products | Supports paid Wallet Roast and World Cup Prophecy across Coinbase/CDP x402 on Base and Arbitrum, Cookieverse native MNT HTTP 402 on Mantle, and OKX x402 on X Layer. |
+| 🏦 Coinbase CDP x402 | Cookieverse acts as the x402 seller for Base and Arbitrum paid routes protected by `src/proxy.ts`. |
 | 🟢 Mantle Native 402 | Cookieverse verifies native MNT payments on Mantle mainnet, locks tx hashes in Upstash Redis, and writes Blob audit/payment history. |
 | 🟣 OKX x402 | Cookieverse supports OKX x402 paid Wallet Roast and World Cup Prophecy on X Layer. |
 | 🤖 Bankr x402 | Bankr Cloud can act as an external seller and call Cookieverse paid backend after payment. |
@@ -218,23 +301,28 @@ flowchart TD
     FORTUNE_IMG --> PINATA1[Pinata / IPFS]
     PINATA1 --> COOKIE_NFT[FortuneCookiesAI NFT Contracts]
 
-    XCUP --> XCUP_MODE{Free or Paid Prophecy}
+    XCUP --> XCUP_MODE{Normal or Paid Prophecy}
     XCUP_MODE -->|free / normal| XCUP_UX[Generation UX<br/>button state + preview spinner<br/>bottom GPT-5.5 status overlay]
-    XCUP_MODE -->|paid on Base / Mantle / X Layer| PAID
-    XCUP_UX --> XCUP_AI[GPT-5.5 Match Research + Prophecy JSON]
-    XCUP_AI --> XCUP_CRITERIA[Prophecy Criteria<br/>form / attack / defense<br/>momentum / fans / confidence]
+    XCUP_MODE -->|paid on Base / Mantle / X Layer / Arbitrum| PAID
+    XCUP_UX --> XCUP_AI[GPT-5.5 Match Research<br/>web search + structured prophecy JSON]
+    XCUP_AI --> XCUP_VALIDATE[Strict Prophecy Validation<br/>pick / scoreline / pick confidence<br/>two reasoning lines + research fields]
+    XCUP_VALIDATE --> XCUP_DETAILS[Prediction Details<br/>scenario / scoring volume / top scorelines<br/>exact-score confidence + volatility]
+    XCUP_DETAILS --> XCUP_CRITERIA[Prophecy Criteria<br/>form / attack / defense<br/>momentum / fans / confidence]
     XCUP_CRITERIA --> XCUP_CARD[World Cup PNG Renderer<br/>@napi-rs/canvas]
-    XCUP_CARD --> XCUP_IPFS[Pinata / IPFS]
-    XCUP_IPFS --> PROPHECY_MINT[mintWithImage<br/>World Cup Prophecy COOKIE NFT]
+    XCUP_CARD --> XCUP_META[Shared Prophecy Metadata Builder<br/>NFT attributes + full Cookieverse payload]
+    XCUP_META --> XCUP_IPFS[Pinata / IPFS<br/>PNG image + JSON metadata]
+    XCUP_IPFS --> PROPHECY_MINT[mintWithImage<br/>image URI + metadata reference]
 
     ROAST --> ROAST_CHAIN{Selected Chain}
     ROAST_CHAIN -->|Base| BASE_DATA[Base Wallet Data<br/>Etherscan V2 + Basename]
     ROAST_CHAIN -->|Mantle| MANTLE_DATA[Mantle Wallet Data<br/>Etherscan V2 / Mantle RPC]
     ROAST_CHAIN -->|X Layer| XLAYER_DATA[X Layer Wallet Data<br/>OKX Onchain Data API]
+    ROAST_CHAIN -->|Arbitrum| ARBITRUM_DATA[Arbitrum Wallet Data<br/>Etherscan V2 chainid 42161]
     ROAST_CHAIN -->|Monad / Linea / Mitosis / 0G| NORMAL_ROAST[Normal Wallet Roast Context<br/>connected chain support]
     BASE_DATA --> WALLET_DATA[Normalized Wallet Data]
     MANTLE_DATA --> WALLET_DATA
     XLAYER_DATA --> WALLET_DATA
+    ARBITRUM_DATA --> WALLET_DATA
     NORMAL_ROAST --> WALLET_DATA
     WALLET_DATA --> METRICS[Wallet Metrics Engine<br/>Portfolio, DeFi, NFTs,<br/>Bridge Activity, Dust, Tx Count]
     METRICS --> ARCHETYPE[Archetype Classifier<br/>Bridge Tourist / Dust Farmer<br/>Silent Whale / NFT Addict<br/>DeFi Goblin / Onchain Civilian]
@@ -257,7 +345,7 @@ flowchart TD
     ROAST_OUTPUT -->|paid identity-roast| PAID
 
     PAID --> PAY_ROUTE{Provider by Chain}
-    PAY_ROUTE -->|Base| COINBASE_X402[Coinbase/CDP x402<br/>src/proxy.ts + @x402/next]
+    PAY_ROUTE -->|Base / Arbitrum| COINBASE_X402[Coinbase/CDP x402<br/>exact EVM on Base + Arbitrum USDC]
     PAY_ROUTE -->|Mantle| MANTLE_402[Cookieverse Mantle-native HTTP 402<br/>native MNT payment]
     PAY_ROUTE -->|X Layer| OKX_X402[OKX x402<br/>OKX x402 core + EVM exact]
     PAY_ROUTE -->|Optional Mantle| QUESTFLOW[Questflow Facilitator<br/>when enabled]
@@ -279,34 +367,40 @@ flowchart TD
     PAID_BUILDERS --> PAID_ROAST[buildPaidWalletRoastResponse]
     PAID_BUILDERS --> PAID_XCUP[buildPaidWorldCupProphecyResponse]
     PAID_ROAST --> X402USAGE[x402 Usage Store<br/>Vercel Blob]
+    PAID_XCUP --> XCUP_AI
     PAID_XCUP --> X402USAGE
     X402USAGE --> GALXE[Galxe REST Verification<br/>x402 / mint / bridge]
     CARD --> PINATA2[Pinata / IPFS]
     PINATA2 --> ROAST_MINT[Mint Wallet Roast NFT<br/>mintWithImage fortune + imageURI]
 
-    COOKIE_NFT --> CHAINS[Supported NFT Networks<br/>Monad / Base / Mantle / Linea / Mitosis / X Layer / 0G]
+    COOKIE_NFT --> CHAINS[Supported NFT Networks<br/>Monad / Base / Mantle / Linea / Mitosis / X Layer / 0G / Arbitrum]
     PROPHECY_MINT --> CHAINS
     PROPHECY_MINT --> XLAYER[X Layer Mainnet<br/>World Cup Prophecy NFTs]
     PROPHECY_MINT --> MANTLE[Mantle Mainnet<br/>Hackathon paid AI products]
+    PROPHECY_MINT --> ARBITRUM[Arbitrum One<br/>Coinbase x402 prophecy + COOKIE mint]
     ROAST_MINT --> OGCHAIN[0G Mainnet<br/>CookieverseWalletRoastOG ERC-721]
 
     BRIDGE --> LZ[LayerZero ONFT Bridge]
     LZ --> CHAINS
     LZ --> XLAYER_BASE[X Layer → Base Bridge<br/>Adapter on X Layer / ONFT on Base]
+    LZ --> ARBITRUM_BASE[Arbitrum → Base Bridge<br/>Arbitrum adapter / dedicated Base ONFT]
 
     DASH --> HOLDINGS[Holdings API]
     HOLDINGS --> CHAINS
     HOLDINGS --> XLAYER
     HOLDINGS --> MANTLE
     HOLDINGS --> OGCHAIN
+    HOLDINGS --> ARBITRUM
 
-    BOARD --> MGID[MGID / Ranking Storage<br/>Vercel Blob]
+    BOARD --> GLOBAL_ROSTER[Global all-chain wallet roster]
+    GLOBAL_ROSTER --> MGID[MGID / Ranking Storage<br/>chain-local score + x402 fields<br/>Vercel Blob]
 
     CARD --> SHARE[Share to X<br/>Copy / Download / Native Share]
     XCUP_CARD --> SHARE
 
     XLAYER --> OKXAPI[OKX / X Layer Onchain Data API<br/>Token IDs + adapter sends]
     MANTLE --> MANTLESCAN[Mantle RPC / Mantlescan-compatible data<br/>payments + wallet activity]
+    ARBITRUM --> ARBISCAN[Arbitrum RPC / Etherscan API V2<br/>holdings + roast + payment scoring]
     OGCHAIN --> OGEXPLORER[0G ChainScan<br/>Contract + Mint Transaction Proof]
 ```
 
@@ -337,9 +431,12 @@ src/abi/FortuneCookiesAI.json
 
 ---
 
-### 2. World Cup Match Prophecy on X Layer
+### 2. World Cup Match Prophecy
 
-World Cup Match Prophecy is the main X Layer Build X Hackathon-facing feature.
+World Cup Match Prophecy remains available through the existing network flows.
+Paid generation is supported on Base, Mantle, X Layer, and Arbitrum. Arbitrum
+uses Coinbase CDP x402 and does not replace or remove the existing prophecy
+logic on the other networks.
 
 It turns a simple match input into a collectible AI-powered NFT card. The feature is designed as a premium sports + AI + NFT flow: GPT-5.5 may take longer than a smaller model, so the UI clearly shows that research, criteria calculation, and card rendering are in progress.
 
@@ -348,16 +445,17 @@ User flow:
 ```txt
 Open Cookieverse
 → Connect wallet
-→ Switch to X Layer Mainnet
+→ Switch to the network where the prophecy will be created
 → Enter Team 1
 → Enter Team 2
 → Select match date
 → Click Create Match Prophecy
 → UI shows GPT-5.5 progress: button loading state, preview spinner and bottom status overlay
-→ AI generates match prophecy JSON
+→ AI generates and validates structured match prophecy JSON
 → Server renders World Cup prophecy card PNG
+→ Cookieverse builds NFT metadata and pins the PNG and metadata JSON to IPFS
 → User can download, copy, share on X, or mint
-→ Mint Prophecy uploads image to IPFS and calls mintWithImage()
+→ Mint Prophecy calls mintWithImage() with the image URI and stores the metadata reference in the fortune text
 ```
 
 The user does not manually write match context or choose criteria. The AI agent creates the context and criteria itself.
@@ -370,11 +468,16 @@ Team 2
 Match date
 Pick
 Score
-Confidence
+Pick confidence, separate from exact-score confidence
 Prophecy text
 Inline risk explanations
 Short reasoning line
 Criteria scores
+Dominant match scenario
+Scoring volume
+Top three scoreline candidates
+Confidence governor
+Exact-score volatility
 ```
 
 Prophecy criteria:
@@ -396,6 +499,8 @@ src/app/api/xcup/prophecy/route.ts
 src/app/api/xcup/render/route.ts
 src/lib/xcup/types.ts
 src/lib/xcup/renderProphecyCard.ts
+src/lib/xcup/buildProphecyMetadata.ts
+src/lib/xcup/buildPaidWorldCupProphecyResponse.ts
 
 public/xcup/world-cup-prophecy-template.png
 public/xcup/world-cup-header-desktop.png
@@ -403,6 +508,73 @@ public/xcup/world-cup-header-mobile.png
 ```
 
 The rendered card uses `@napi-rs/canvas`, local template assets, local fonts, and tunable layout boxes, following the same server-side image-rendering architecture as Wallet Roast.
+
+#### Latest Prophecy and Prophecy Card Updates
+
+The prophecy response now distinguishes the confidence in the selected outcome
+from the much narrower confidence in an exact score:
+
+```txt
+confidence / prophecyProbability:
+  confidence in the selected match outcome
+
+exactScoreConfidence:
+  separate probability signal for the exact scoreline
+
+trueMarketProbability:
+  optional structured market estimate, not public card copy
+```
+
+The API requires a pick, scoreline, pick confidence, prophecy text, and exactly
+two reasoning lines. Missing OpenAI configuration, invalid JSON, or incomplete
+required output now returns an explicit error instead of a generic fallback
+prophecy.
+
+Prediction Details are displayed above the prophecy card preview and can show:
+
+```txt
+Dominant scenario
+Scoring volume
+Exact-score confidence
+Top three scoreline candidates with short reasons
+Confidence governor
+Exact-score volatility
+```
+
+Structured research also supports player health, match fitness, public market
+context, game-state volatility, clean-sheet fragility, goalkeeper resistance,
+defensive block durability, shot quality versus shot volume, late-sub impact,
+physical mismatch, and set-piece threat.
+
+The risk model includes the existing match risks plus:
+
+```txt
+goalkeeperHeroRisk
+physicalMismatchRisk
+```
+
+The card renderer ranks relevant risks by severity and specificity and displays
+up to five. The summary uses `PICK CONF` so pick confidence is not confused
+with exact-score confidence.
+
+Both normal and paid generation use `buildWorldCupProphecyMetadata()`. The
+final media flow is:
+
+```txt
+Validated prophecy JSON
+→ rendered PNG
+→ image pinned to Pinata/IPFS
+→ NFT metadata built with the image ipfs:// URI
+→ metadata JSON pinned to Pinata/IPFS
+→ image CID and metadata CID returned to the UI
+→ mintWithImage() uses the PNG URI and stores the metadata reference
+```
+
+Paid x402 responses return the prophecy, image pin, metadata object, and
+metadata pin. Metadata preserves teams, date, pick, scoreline, pick confidence,
+optional exact-score and market values, dominant scenario, scoring volume, top
+scorelines, confidence governor, exact-score volatility, and the full prophecy
+payload.
 
 
 #### World Cup Prophecy Generation UX
@@ -1511,6 +1683,7 @@ Cookieverse currently supports or is designed around these networks:
 | Linea | COOKIE NFT support and bridge route. |
 | Mitosis | COOKIE NFT support. |
 | 0G Mainnet | Wallet Roast NFT minting and bridge route. |
+| Arbitrum One | Coinbase CDP x402 Wallet Roast and World Cup Prophecy, COOKIE minting, Etherscan V2 analysis, dashboard, global leaderboard participation, Galxe statistics, and one-way LayerZero bridging to Base. |
 
 ---
 
@@ -1861,6 +2034,7 @@ NEXT_PUBLIC_RPC_HTTP_MANTLE=https://rpc.mantle.xyz
 NEXT_PUBLIC_RPC_HTTP_LINEA=https://rpc.linea.build
 NEXT_PUBLIC_RPC_HTTP_MITOS=https://rpc.mitosis.org
 NEXT_PUBLIC_RPC_HTTP_OG=https://evmrpc.0g.ai
+NEXT_PUBLIC_RPC_HTTP_ARBITRUM=https://arb1.arbitrum.io/rpc
 
 NEXT_PUBLIC_MITOSIS_CHAIN_ID=777777
 NEXT_PUBLIC_MITOSIS_EXPLORER=https://explorer.mitosis.org
@@ -1876,6 +2050,7 @@ NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_LINEA=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS=0x...
 NEXT_PUBLIC_COOKIE_ADDRESS_OG=0x...
+NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM=0x...
 ```
 
 ### LayerZero Bridge
@@ -1886,18 +2061,22 @@ NEXT_PUBLIC_CANONICAL_ERC721_XLAYER=0x...
 NEXT_PUBLIC_CANONICAL_ERC721_MONAD=0x...
 NEXT_PUBLIC_CANONICAL_ERC721_MANTLE=0x...
 NEXT_PUBLIC_CANONICAL_ERC721_LINEA=0x...
+NEXT_PUBLIC_CANONICAL_ERC721_ARBITRUM=0x...
 
 NEXT_PUBLIC_ADAPTER_XLAYER=0x...
 NEXT_PUBLIC_ADAPTER_BASE=0x...
 NEXT_PUBLIC_ADAPTER_MANTLE=0x...
 NEXT_PUBLIC_ADAPTER_LINEA=0x...
 NEXT_PUBLIC_ADAPTER_MONAD=0x...
+NEXT_PUBLIC_ADAPTER_ARBITRUM=0x...
 
 NEXT_PUBLIC_ONFT_BASE=0x...
+NEXT_PUBLIC_ONFT_BASE4=0x...
 NEXT_PUBLIC_ONFT_MANTLE=0x...
 NEXT_PUBLIC_ONFT_LINEA=0x...
 NEXT_PUBLIC_ONFT_MONAD=0x...
 
+NEXT_PUBLIC_LZ_EID_ARBITRUM=30110
 NEXT_PUBLIC_EID_XLAYER=30274
 NEXT_PUBLIC_EID_BASE=30184
 NEXT_PUBLIC_EID_MANTLE=30181
@@ -1938,13 +2117,14 @@ WALLET_ROAST_DEBUG=false
 
 ETHERSCAN_API_KEY=...
 BASE_RPC_URL=https://mainnet.base.org
+ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
 ETHEREUM_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/...
 ENABLE_BASENAME_ENSIP19_FALLBACK=false
 ```
 
 ### Paid HTTP 402 / x402 Products
 
-Cookieverse supports paid Wallet Roast and World Cup Prophecy flows across Base, Mantle, and X Layer.
+Cookieverse supports paid Wallet Roast and World Cup Prophecy flows across Base, Mantle, X Layer, and Arbitrum.
 
 ```bash
 NEXT_PUBLIC_X402_PROVIDER=coinbase
@@ -1969,11 +2149,16 @@ Mantle:
 X Layer:
   NEXT_PUBLIC_X402_XLAYER_ENABLED=true
   provider is OKX x402
+
+Arbitrum:
+  NEXT_PUBLIC_X402_ARBITRUM_ENABLED=true
+  X402_SERVER_PROVIDER=coinbase
+  provider is Coinbase CDP
 ```
 
 #### Coinbase x402
 
-Cookieverse acts as the seller on Base. `src/proxy.ts` protects only Coinbase x402 routes.
+Cookieverse acts as the seller on Base and Arbitrum. `src/proxy.ts` protects the Coinbase x402 routes for both networks.
 
 ```bash
 X402_SERVER_PROVIDER=coinbase
@@ -1982,6 +2167,11 @@ X402_PAY_TO=0xYourTreasuryReceiverWallet
 
 CDP_API_KEY_ID=...
 CDP_API_KEY_SECRET=...
+
+NEXT_PUBLIC_X402_ARBITRUM_ENABLED=true
+X402_ARBITRUM_USDC_ADDRESS=0xaf88d065e77c8cC2239327C5EDb3A432268e5831
+X402_ARBITRUM_USDC_NAME=USD Coin
+X402_ARBITRUM_USDC_VERSION=2
 ```
 
 Local development note:
@@ -1999,6 +2189,8 @@ Coinbase protected routes:
 /api/x402/coinbase/wallet-roast/json
 /api/x402/coinbase/wallet-roast/identity
 /api/x402/coinbase/xcup/prophecy
+/api/x402/coinbase/arbitrum/wallet-roast/identity
+/api/x402/coinbase/arbitrum/xcup/prophecy
 ```
 
 #### Cookieverse Mantle-native HTTP 402

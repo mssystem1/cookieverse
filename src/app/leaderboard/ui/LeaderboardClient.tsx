@@ -137,19 +137,19 @@ export default function LeaderboardClient({ mode = 'default' }: LeaderboardClien
               } else if (chainId === 196) {
                 profileLocalScore = n(p.totalScore_xlayer);
                 profileX402LocalScore = n(p.totalX402Score_xlayer ?? p.totalX402_xlayer);
+              } else if (chainId === 42161) {
+                profileLocalScore = n(p.totalScore_arbitrum);
+                profileX402LocalScore = n(
+                  p.totalX402Score_arbitrum ?? p.totalX402_arbitrum
+                );
               } else {
                 profileLocalScore = n(p.totalScore_monad);
               }
             }
 
-            // IMPORTANT:
-            // /api/leaderboard returns `mints` for selected chain.
-            // mgid profile can exist but contain 0. Do not let that erase API data.
-            const localScore = pickPositive(
-              profileLocalScore,
-              r.localScore,
-              r.mints,
-            );
+            // The roster is global, but this column must stay chain-local.
+            // Never substitute all-chain mint totals for a zero local score.
+            const localScore = p ? profileLocalScore : n(r.localScore);
 
             const totalScore = pickPositive(
               p?.totalScore,
@@ -405,11 +405,16 @@ function Table({
     if (chainId === 59144) return 'linea';    
     if (chainId === 16661) return '0G'; 
     if (chainId === 196) return 'xlayer'; 
+    if (chainId === 42161) return 'arbitrum';
     if (mitosisId && chainId === mitosisId) return 'mitosis';
     return 'monad';
   }, [chainId]);
 
-  const x402ChainSupported = chainId === 8453 || chainId === 5000 || chainId === 196;
+  const x402ChainSupported =
+    chainId === 8453 ||
+    chainId === 5000 ||
+    chainId === 196 ||
+    chainId === 42161;
 
   // address explorer href for the WALLET link
   const makeExplorerAddressUrl = React.useCallback((addr: string) => {
@@ -429,6 +434,8 @@ function Table({
         return `https://chainscan.0g.ai/token/${addr}`;       
       case 'xlayer':
         return `https://www.okx.com/web3/explorer/xlayer/token/${addr}`;                  
+      case 'arbitrum':
+        return `https://arbiscan.io/address/${addr}`;
       default:
         // monad testnet
         return `https://monadvision.com/address/${addr}`;
@@ -861,12 +868,15 @@ type ProfileMeta = {
   totalScore_mitosis?: number;
   totalScore_og?: number;  
   totalScore_xlayer?: number;  
+  totalScore_arbitrum?: number;
   totalX402_base?: number;
   totalX402_mantle?: number;
   totalX402_xlayer?: number;
+  totalX402_arbitrum?: number;
   totalX402Score_base?: number;
   totalX402Score_mantle?: number;
   totalX402Score_xlayer?: number;
+  totalX402Score_arbitrum?: number;
 };
 
 async function fetchProfilesFor(addresses: string[], preferHistory = false) {
@@ -901,12 +911,17 @@ async function fetchProfilesFor(addresses: string[], preferHistory = false) {
       totalScore_mitosis: Number(r?.totalScore_mitosis ?? 0),
       totalScore_og: Number(r?.totalScore_og ?? 0), 
       totalScore_xlayer: Number(r?.totalScore_xlayer ?? 0),           
+      totalScore_arbitrum: Number(r?.totalScore_arbitrum ?? 0),
       totalX402_base: Number(r?.totalX402_base ?? 0),
       totalX402_mantle: Number(r?.totalX402_mantle ?? 0),
       totalX402_xlayer: Number(r?.totalX402_xlayer ?? 0),
+      totalX402_arbitrum: Number(r?.totalX402_arbitrum ?? 0),
       totalX402Score_base: Number(r?.totalX402Score_base ?? r?.totalX402_base ?? 0),
       totalX402Score_mantle: Number(r?.totalX402Score_mantle ?? r?.totalX402_mantle ?? 0),
       totalX402Score_xlayer: Number(r?.totalX402Score_xlayer ?? r?.totalX402_xlayer ?? 0),
+      totalX402Score_arbitrum: Number(
+        r?.totalX402Score_arbitrum ?? r?.totalX402_arbitrum ?? 0
+      ),
     });
   }
   return out;

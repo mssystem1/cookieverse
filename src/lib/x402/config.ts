@@ -12,7 +12,7 @@ export type CookieverseX402Product =
   | "identity-roast"
   | "xcup-prophecy";
 
-export type CookieverseX402Chain = "base" | "mantle" | "xlayer";
+export type CookieverseX402Chain = "base" | "mantle" | "xlayer" | "arbitrum";
 
 export const x402Provider = (
   process.env.NEXT_PUBLIC_X402_PROVIDER || "disabled"
@@ -35,6 +35,12 @@ export function getX402ProviderForChain(
 ): CookieverseX402Provider {
   if (chain === "base") {
     return x402Provider === "coinbase" ? "coinbase" : "disabled";
+  }
+
+  if (chain === "arbitrum") {
+    return process.env.NEXT_PUBLIC_X402_ARBITRUM_ENABLED === "false"
+      ? "disabled"
+      : "coinbase";
   }
 
   if (chain === "mantle") {
@@ -66,6 +72,16 @@ export function getX402Endpoint(
   const provider = getX402ProviderForChain(chain);
 
   if (provider === "coinbase") {
+    if (chain === "arbitrum") {
+      if (product === "roast-json") return "";
+
+      return product === "xcup-prophecy"
+        ? localOriginPath("/api/x402/coinbase/arbitrum/xcup/prophecy")
+        : localOriginPath(
+            "/api/x402/coinbase/arbitrum/wallet-roast/identity"
+          );
+    }
+
     if (product === "xcup-prophecy") {
       return localOriginPath("/api/x402/coinbase/xcup/prophecy");
     }

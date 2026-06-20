@@ -20,14 +20,17 @@ Cookieverse public card readability rules:
 - Keep the main prophecy concise: up to 260 characters.
 - The prophecy should be one vivid football paragraph about the likely match flow and outcome.
 - Do not include sportsbook-style fields in public card text.
-- Return risk levels as JSON fields using full words only: Low, Medium, High, Low-Medium, Medium-High.
+- Confidence means pick confidence / prophecy conviction, not exact-score probability.
+- exactScoreConfidence is separate and should usually be much lower than confidence.
+- Do not display trueMarketProbability, implied odds, or exactScoreConfidence in public card text.
+- Preserve research.dominantScenario, research.scoringVolume, research.topScorelines, research.confidenceGovernor, and research.exactScoreVolatility when returned.
+- Risk levels must use full words only: Low, Medium, High, Low-Medium, Medium-High.
 - Do not use risk abbreviations like L, M, H, LM, or MH.
 - Include only relevant risk fields. Do not default every risk to Medium.
-- Include optional top-level JSON risk fields only when relevant: drawRisk, upsetRisk, counterAttackRisk, setPieceRisk, cleanSheetRisk, lateGoalRisk, heatFatigueRisk, travelDisruptionRisk.
-- Include matching optional top-level reason fields when they add match-specific context: drawRiskReason, upsetRiskReason, counterAttackRiskReason, setPieceRiskReason, cleanSheetRiskReason, lateGoalRiskReason, heatFatigueRiskReason, travelDisruptionRiskReason.
+- Include optional top-level JSON risk fields only when relevant: drawRisk, upsetRisk, counterAttackRisk, setPieceRisk, cleanSheetRisk, lateGoalRisk, heatFatigueRisk, travelDisruptionRisk, goalkeeperHeroRisk, physicalMismatchRisk.
+- Include matching optional top-level reason fields when they add match-specific context.
 - Risk reasons must be short public-card phrases, not full sentences.
 - Reasoning must contain exactly 2 short lines, each under 70 characters.
-- Confidence must follow the risk profile. Medium draw/upset/clean-sheet risks usually mean 84-87, not 89+.
 `;
 
 function sanitizeKey(raw: string) {
@@ -84,28 +87,59 @@ function stripInlineRiskSection(value: unknown, fallback = '') {
   return index >= 0 ? text.slice(0, index).trim() : text;
 }
 
-function normalizeReasoning(raw: any, fallback: string[]): [string, string] {
+function normalizeReasoning(raw: unknown): string[] {
   const arr = Array.isArray(raw) ? raw : [];
 
-  const first = cleanShortLine(
-    arr[0],
-    fallback[0] || 'Historical signals shape the prophecy.',
-    68,
-  );
-
-  const second = cleanShortLine(
-    arr[1],
-    fallback[1] || 'Momentum and pressure decide the edge.',
-    68,
-  );
-
-  return [first, second];
+  return arr
+    .map((line) => cleanShortLine(line, '', 68))
+    .filter(Boolean)
+    .slice(0, 2);
 }
 
 function clampScore(value: unknown, fallback = 50): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function normalizeOptionalScore(value: unknown): number | undefined {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function normalizeScoringVolume(value: unknown): string | undefined {
+  const text = cleanText(value, '');
+  if (!text) return undefined;
+
+  const lower = text.toLowerCase();
+  if (lower === 'low') return 'Low';
+  if (lower === 'medium') return 'Medium';
+  if (lower === 'high') return 'High';
+
+  return smartTruncate(text, 32);
+}
+
+function normalizeTopScorelines(raw: unknown) {
+  if (!Array.isArray(raw)) return undefined;
+
+  const rows = raw
+    .map((item, index) => {
+      const n = Number((item as any)?.rank);
+      const rank = Number.isFinite(n)
+        ? Math.max(1, Math.min(3, Math.round(n)))
+        : index + 1;
+
+      return {
+        rank,
+        scoreline: cleanShortLine((item as any)?.scoreline, '', 32),
+        shortReason: cleanShortLine((item as any)?.shortReason, '', 96),
+      };
+    })
+    .filter((item) => item.scoreline)
+    .slice(0, 3);
+
+  return rows.length ? rows : undefined;
 }
 
 function normalizeCriteria(raw: any): WorldCupProphecyCriteria {
@@ -154,15 +188,6 @@ function normalizeRiskReason(value: unknown): string | undefined {
   return text || undefined;
 }
 
-function normalizeProphecyConfidence(params: {
-  rawConfidence: unknown;
-  criteria: WorldCupProphecyCriteria;
-  pick: unknown;
-}): number {
-  const raw = clampScore(params.rawConfidence, 86);
-  return Math.max(78, Math.min(94, raw));
-}
-
 function extractJson(text: string): any | null {
   const raw = text.trim();
 
@@ -178,50 +203,6 @@ function extractJson(text: string): any | null {
   } catch {
     return null;
   }
-}
-
-function fallbackResult(input: WorldCupProphecyInput): WorldCupProphecyResult {
-  const criteria: WorldCupProphecyCriteria = {
-    form: 84,
-    attack: 86,
-    defense: 82,
-    momentum: 88,
-    fans: 84,
-    confidenceSignal: 89,
-  };
-
-  return {
-    title: 'World Cup Match Prophecy',
-    homeTeam: input.homeTeam,
-    awayTeam: input.awayTeam,
-    matchDate: input.matchDate,
-    location: '',
-    pick: 'Too close to call',
-    scoreline: '1-1',
-    confidence: 89,
-    prophecy:
-      `${input.homeTeam} and ${input.awayTeam} enter a pressure match where one momentum swing can change the story. Expect a tight game, emotional turns, and a late moment that decides the prophecy.`,
-    reasoning: [
-      'Historical signal is incomplete.',
-      'Momentum and pressure keep it tight.',
-    ],
-    research: {
-      matchDate: input.matchDate,
-      competition: 'World Cup',
-      recentForm: 'Fallback mode: OpenAI web research unavailable or failed.',
-      keyPlayers: '',
-      injuriesOrSuspensions: '',
-      fanSentiment: '',
-      tacticalContext: '',
-      sources: [],
-    },
-    criteria,
-    drawRisk: 'Medium',
-    upsetRisk: 'Medium',
-    counterAttackRisk: 'Medium',
-    setPieceRisk: 'Medium',
-    cleanSheetRisk: 'Medium',
-  };
 }
 
 function normalizeSources(response: any): string[] {
@@ -308,8 +289,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const fallback = fallbackResult(input);
-
   const KEY_NAME = (
     process.env['MFC_OPENAI_KEY_NAME'] || 'OPENAI_API_KEY_MFC_NEW'
   ).trim();
@@ -318,7 +297,10 @@ export async function POST(req: NextRequest) {
   const apiKey = sanitizeKey(raw);
 
   if (!apiKey) {
-    return NextResponse.json(fallback);
+    return NextResponse.json(
+      { error: `OpenAI API key is not configured (${KEY_NAME}).` },
+      { status: 500 },
+    );
   }
 
   try {
@@ -342,7 +324,10 @@ export async function POST(req: NextRequest) {
 
     if (!parsed) {
       console.warn('[xcup prophecy] OpenAI returned non-json', response.output_text);
-      return NextResponse.json(fallback);
+      return NextResponse.json(
+        { error: 'OpenAI returned an invalid prophecy response.' },
+        { status: 502 },
+      );
     }
 
     const detectedSources = normalizeSources(response);
@@ -353,13 +338,27 @@ export async function POST(req: NextRequest) {
       : [];
 
     const criteria = normalizeCriteria(parsed.criteria || {});
-    const confidence = normalizeProphecyConfidence({
-      rawConfidence: parsed.confidence,
-      criteria,
-      pick: parsed.pick,
-    });
+    const confidence = normalizeOptionalScore(parsed.confidence);
+    const pick = cleanShortLine(parsed.pick, '', 24);
+    const scoreline = cleanShortLine(parsed.scoreline, '', 32);
+    const prophecy = cleanText(stripInlineRiskSection(parsed.prophecy, ''), '');
+    const reasoning = normalizeReasoning(parsed.reasoning);
 
-    criteria.confidenceSignal = confidence;
+    if (
+      confidence === undefined ||
+      !pick ||
+      !scoreline ||
+      !prophecy ||
+      reasoning.length !== 2
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'OpenAI prophecy response is missing pick, scoreline, confidence, prophecy, or two reasoning lines.',
+        },
+        { status: 502 },
+      );
+    }
 
     const result: WorldCupProphecyResult = {
       title: cleanText(parsed.title, 'World Cup Match Prophecy'),
@@ -367,14 +366,15 @@ export async function POST(req: NextRequest) {
       awayTeam: cleanText(parsed.awayTeam, input.awayTeam),
       matchDate: cleanText(parsed.matchDate, input.matchDate),
       location: cleanText(parsed.location || parsed.research?.location, ''),
-      pick: cleanShortLine(parsed.pick, fallback.pick, 24),
-      scoreline: cleanShortLine(parsed.scoreline, fallback.scoreline, 32),
+      pick,
+      scoreline,
       confidence,
-      prophecy: cleanText(
-        stripInlineRiskSection(parsed.prophecy, fallback.prophecy),
-        fallback.prophecy,
-      ),
-      reasoning: normalizeReasoning(parsed.reasoning, fallback.reasoning),
+      prophecyProbability: normalizeOptionalScore(parsed.prophecyProbability) ?? confidence,
+      trueMarketProbability: normalizeOptionalScore(parsed.trueMarketProbability),
+      exactScoreConfidence: normalizeOptionalScore(parsed.exactScoreConfidence),
+      marketAngle: cleanText(parsed.marketAngle, ''),
+      prophecy,
+      reasoning,
       research: {
         matchDate: input.matchDate,
         location: cleanText(parsed.research?.location || parsed.location, ''),
@@ -384,6 +384,38 @@ export async function POST(req: NextRequest) {
         injuriesOrSuspensions: cleanText(parsed.research?.injuriesOrSuspensions, ''),
         fanSentiment: cleanText(parsed.research?.fanSentiment, ''),
         tacticalContext: cleanText(parsed.research?.tacticalContext, ''),
+        playerHealthContext: cleanText(parsed.research?.playerHealthContext, ''),
+        matchFitness: cleanText(parsed.research?.matchFitness, ''),
+        publicMarketContext: cleanText(parsed.research?.publicMarketContext, ''),
+        marketCloseness: cleanText(parsed.research?.marketCloseness, ''),
+        earlyGoalAvalancheRisk: cleanText(parsed.research?.earlyGoalAvalancheRisk, ''),
+        strikerConversionCeiling: cleanText(parsed.research?.strikerConversionCeiling, ''),
+        opponentCollapseRisk: cleanText(parsed.research?.opponentCollapseRisk, ''),
+        gameStateVolatility: cleanText(parsed.research?.gameStateVolatility, ''),
+        cleanSheetFragility: cleanText(parsed.research?.cleanSheetFragility, ''),
+        goalkeeperResistance: cleanText(parsed.research?.goalkeeperResistance, ''),
+        defensiveBlockDurability: cleanText(
+          parsed.research?.defensiveBlockDurability,
+          '',
+        ),
+        sterilePossessionRisk: cleanText(parsed.research?.sterilePossessionRisk, ''),
+        goalkeeperHeroGameRisk: cleanText(
+          parsed.research?.goalkeeperHeroGameRisk,
+          '',
+        ),
+        physicalMismatchRisk: cleanText(parsed.research?.physicalMismatchRisk, ''),
+        shotQualityVsShotVolume: cleanText(
+          parsed.research?.shotQualityVsShotVolume,
+          '',
+        ),
+        lateSubImpactRisk: cleanText(parsed.research?.lateSubImpactRisk, ''),
+        setPieceThreat: cleanText(parsed.research?.setPieceThreat, ''),
+        dominantScenario: cleanShortLine(parsed.research?.dominantScenario, '', 64),
+        scoringVolume: normalizeScoringVolume(parsed.research?.scoringVolume),
+        topScorelines: normalizeTopScorelines(parsed.research?.topScorelines),
+        confidenceGovernor: cleanText(parsed.research?.confidenceGovernor, ''),
+        exactScoreVolatility: cleanText(parsed.research?.exactScoreVolatility, ''),
+        marketAngle: cleanText(parsed.research?.marketAngle || parsed.marketAngle, ''),
         sources: [...new Set([...parsedSources, ...detectedSources])].slice(0, 8),
       },
       criteria,
@@ -395,6 +427,10 @@ export async function POST(req: NextRequest) {
       lateGoalRisk: normalizeRiskLevel(getRiskField(parsed, 'lateGoalRisk')),
       heatFatigueRisk: normalizeRiskLevel(getRiskField(parsed, 'heatFatigueRisk')),
       travelDisruptionRisk: normalizeRiskLevel(getRiskField(parsed, 'travelDisruptionRisk')),
+      goalkeeperHeroRisk: normalizeRiskLevel(getRiskField(parsed, 'goalkeeperHeroRisk')),
+      physicalMismatchRisk: normalizeRiskLevel(
+        getRiskField(parsed, 'physicalMismatchRisk'),
+      ),
       drawRiskReason: normalizeRiskReason(getRiskField(parsed, 'drawRiskReason')),
       upsetRiskReason: normalizeRiskReason(getRiskField(parsed, 'upsetRiskReason')),
       counterAttackRiskReason: normalizeRiskReason(
@@ -411,12 +447,17 @@ export async function POST(req: NextRequest) {
       travelDisruptionRiskReason: normalizeRiskReason(
         getRiskField(parsed, 'travelDisruptionRiskReason'),
       ),
+      goalkeeperHeroRiskReason: normalizeRiskReason(
+        getRiskField(parsed, 'goalkeeperHeroRiskReason'),
+      ),
+      physicalMismatchRiskReason: normalizeRiskReason(
+        getRiskField(parsed, 'physicalMismatchRiskReason'),
+      ),
     };
 
-    result.reasoning = normalizeReasoning(
-      result.reasoning,
-      fallback.reasoning,
-    ).map((line) => smartTruncate(line, MAX_REASONING_LINE)) as [string, string];
+    result.reasoning = result.reasoning.map((line) =>
+      smartTruncate(line, MAX_REASONING_LINE),
+    );
 
     return NextResponse.json(result);
   } catch (error) {
@@ -430,6 +471,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(fallback);
+    return NextResponse.json(
+      { error: `OpenAI prophecy failed: ${message}` },
+      { status: 502 },
+    );
   }
 }

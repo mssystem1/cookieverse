@@ -13,6 +13,7 @@ const ID_MAP: Record<ChainKey, number> = {
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
   og: 16661,
   xlayer: 196,
+  arbitrum: 42161,
 };
 
 const rpcFetch: typeof fetch = (input, init) => {

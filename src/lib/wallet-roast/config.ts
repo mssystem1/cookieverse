@@ -17,11 +17,16 @@ export const walletRoastConfig = {
   ogProviderFundAmount: Number(process.env.OG_PROVIDER_FUND_AMOUNT || "2"),
 };
 
-export function assertWalletRoastConfig(chain: "base" | "mantle" | "xlayer" = "base") {
+export function assertWalletRoastConfig(
+  chain: "base" | "mantle" | "xlayer" | "arbitrum" = "base"
+) {
   const missing: string[] = [];
 
-  if ((chain === "base" || chain === "mantle") && !walletRoastConfig.basescanApiKey) {
-    missing.push("BASESCAN_API_KEY");
+  if (
+    (chain === "base" || chain === "mantle" || chain === "arbitrum") &&
+    !walletRoastConfig.basescanApiKey
+  ) {
+    missing.push("ETHERSCAN_API_KEY");
   }
 
   if (chain === "xlayer") {

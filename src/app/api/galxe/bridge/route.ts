@@ -50,7 +50,8 @@ export async function GET(req: NextRequest) {
         linea: Number(player?.totalBridges_linea || 0),
         mitosis: Number(player?.totalBridges_mitosis || 0),
         og: Number(player?.totalBridges_0g || 0),
-        xlayer: Number(player?.totalBridges_xlayer || 0)        
+        xlayer: Number(player?.totalBridges_xlayer || 0),
+        arbitrum: Number(player?.totalBridges_arbitrum || 0)
       }
     },
     200,

@@ -38,6 +38,7 @@ import {
 } from "../lib/x402/config";
 
 import type { WorldCupProphecyResult } from '../lib/xcup/types';
+import { buildWorldCupProphecyMetadata } from '../lib/xcup/buildProphecyMetadata';
 
 // [FIXED] Privy + banner
 //import { PrivyProvider } from '@privy-io/react-auth';
@@ -54,9 +55,10 @@ const CHAIN_IDS = {
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
   og: 16661,
   xlayer: 196,
+  arbitrum: 42161,
 } as const;
 
-type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | 'og' | 'xlayer';
+type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | 'og' | 'xlayer' | 'arbitrum';
 
 const WORLD_CUP_RISK_LABELS: Array<{
   key: keyof Pick<
@@ -69,6 +71,8 @@ const WORLD_CUP_RISK_LABELS: Array<{
     | 'lateGoalRisk'
     | 'heatFatigueRisk'
     | 'travelDisruptionRisk'
+    | 'goalkeeperHeroRisk'
+    | 'physicalMismatchRisk'
   >;
   label: string;
 }> = [
@@ -80,6 +84,8 @@ const WORLD_CUP_RISK_LABELS: Array<{
   { key: 'lateGoalRisk', label: 'Late Goal Risk' },
   { key: 'heatFatigueRisk', label: 'Heat/Fatigue Risk' },
   { key: 'travelDisruptionRisk', label: 'Travel Risk' },
+  { key: 'goalkeeperHeroRisk', label: 'Goalkeeper Risk' },
+  { key: 'physicalMismatchRisk', label: 'Physical Risk' },
 ];
 
 function worldCupRiskSummary(prophecy?: WorldCupProphecyResult | null) {
@@ -182,6 +188,20 @@ function cookieAddressFor(chainId?: number): `0x${string}` | undefined {
   if (chainId === CHAIN_IDS.mitosis) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
   if (chainId === CHAIN_IDS.og) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG as `0x${string}`;
   if (chainId === CHAIN_IDS.xlayer) return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER as `0x${string}`;
+  if (chainId === CHAIN_IDS.arbitrum) {
+    const cookie = process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM;
+    const canonical = process.env.NEXT_PUBLIC_CANONICAL_ERC721_ARBITRUM;
+
+    if (
+      cookie &&
+      canonical &&
+      cookie.toLowerCase() !== canonical.toLowerCase()
+    ) {
+      return undefined;
+    }
+
+    return (cookie || canonical) as `0x${string}` | undefined;
+  }
 
   return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
 }
@@ -194,6 +214,9 @@ function makeExplorerNftUrl(chainId: number | undefined, contract: `0x${string}`
   if (chainId === CHAIN_IDS.og) return `https://chainscan.0g.ai/token/${contract}?a=${tokenId}`;
   if (chainId === CHAIN_IDS.xlayer) {
     return `https://www.okx.com/web3/explorer/xlayer/token/${contract}?a=${tokenId}`;
+  }
+  if (chainId === CHAIN_IDS.arbitrum) {
+    return `https://arbiscan.io/token/${contract}?a=${tokenId}`;
   }
 
   return `https://monadvision.com/nft/${contract}/${tokenId}`;
@@ -365,10 +388,6 @@ export default function Page() {
     () => cookieAddressFor(chain?.id),
     [chain?.id]
   );
-  if (connected && !COOKIE_ADDRESS) {
-    return <main className="page"><div className="muted">Unsupported network.</div></main>;
-  }
-
   const pathname = usePathname();
   const { isFarcasterMini, isBaseAppRoute, isCompactLayout } = useAppMode();
 
@@ -382,13 +401,15 @@ export default function Page() {
     [CHAIN_IDS.mitosis]: 'mitosis',
     [CHAIN_IDS.og]: 'og',
     [CHAIN_IDS.xlayer]: 'xlayer',
+    [CHAIN_IDS.arbitrum]: 'arbitrum',
   };
 
   const selectedChainKey = CHAIN_BY_ID[chain?.id || 0] || 'monad';
   const selectedX402Chain = (
     selectedChainKey === 'base' ||
     selectedChainKey === 'mantle' ||
-    selectedChainKey === 'xlayer'
+    selectedChainKey === 'xlayer' ||
+    selectedChainKey === 'arbitrum'
       ? selectedChainKey
       : null
   ) as CookieverseX402Chain | null;
@@ -398,11 +419,11 @@ export default function Page() {
   const walletRoastSupportedChain = Boolean(selectedX402Chain);
   const walletRoastRequiresNetworkSwitch = connected && !walletRoastSupportedChain;
   const walletRoastSwitchMessage =
-    'Switch to Base, X Layer, or Mantle to create a Wallet Roast.';
+    'Switch to Base, Arbitrum, X Layer, or Mantle to create a Wallet Roast.';
   const shouldUseX402Roast = Boolean(
-    connected &&
-      selectedX402Chain &&
-      isX402Enabled(selectedX402Chain)
+    selectedX402Chain &&
+      (selectedX402Chain === 'arbitrum' ||
+        (connected && isX402Enabled(selectedX402Chain)))
   );
   const shouldUseX402Prophecy = shouldUseX402Roast;
   const walletRoastNetworkLabel =
@@ -412,6 +433,8 @@ export default function Page() {
         ? 'X Layer'
         : selectedChainKey === 'base'
           ? 'Base'
+          : selectedChainKey === 'arbitrum'
+            ? 'Arbitrum'
           : selectedChainKey === 'linea'
             ? 'Linea'
             : selectedChainKey === 'mitosis'
@@ -427,15 +450,15 @@ export default function Page() {
 
   // scoreByChain & imagesByChain come from holdings (you already set these as shown earlier)
   const [scoreByChain, setScoreByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0, arbitrum: 0
   });
   const [imagesByChain, setImagesByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0, arbitrum: 0
   });
 
   // NEW: transactionsByChain (accumulated from BLOB)
   const [txByChain, setTxByChain] = React.useState<Record<ChainKey, number>>({
-    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0
+    monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0, arbitrum: 0
   });
 
   const [imageIds, setImageIds] = React.useState<number[]>([]);
@@ -481,6 +504,7 @@ export default function Page() {
   const [wcImageBlob, setWcImageBlob] = React.useState<Blob | null>(null);
   const [wcImageB64, setWcImageB64] = React.useState<string | null>(null);
   const [wcPinCid, setWcPinCid] = React.useState<string | null>(null);
+  const [wcMetadataCid, setWcMetadataCid] = React.useState<string | null>(null);
 
   type WorldCupStage =
     | 'idle'
@@ -927,6 +951,7 @@ React.useEffect(() => {
   const onMintImage = async () => {
     setUiError(null);
     if (!connected || !address) { setUiError('Connect your wallet first.'); return; }
+    if (!COOKIE_ADDRESS) { setUiError('COOKIE contract is not configured for this network.'); return; }
     if (!pinCid) { setUiError('Save the image to Pinata first.'); return; }
 
     setMintImgBusy(true);
@@ -955,6 +980,10 @@ React.useEffect(() => {
     setUiError(null);
     if (!connected || !address) {
       setUiError('Connect your wallet first.');
+      return;
+    }
+    if (!COOKIE_ADDRESS) {
+      setUiError('COOKIE contract is not configured for this network.');
       return;
     }
     if (!fortune?.trim()) {
@@ -1342,6 +1371,8 @@ const onShareWalletRoast = async () => {
         ? 'Mantle'
         : roastData?.chain === 'xlayer'
           ? 'X Layer'
+          : roastData?.chain === 'arbitrum'
+            ? 'Arbitrum'
           : roastData?.chain === 'base'
             ? 'Base'
             : walletRoastNetworkLabel);
@@ -1583,6 +1614,7 @@ async function generateWorldCupProphecy() {
     setWcImageBlob(null);
     setWcImageB64(null);
     setWcPinCid(null);
+    setWcMetadataCid(null);
 
     if (shouldUseX402Prophecy) {
       if (!address || !walletClient || !selectedX402Chain) {
@@ -1625,6 +1657,7 @@ async function generateWorldCupProphecy() {
       setWcImageUrl(url);
       setWcImageB64(b64);
       setWcPinCid(paid.image.cid || null);
+      setWcMetadataCid(paid.metadataPin?.cid || null);
       setWcStage('ready');
       return;
     }
@@ -1684,11 +1717,16 @@ async function generateWorldCupProphecy() {
   }
 }
 
-async function uploadWorldCupProphecyToPinata(): Promise<string> {
+async function uploadWorldCupProphecyToPinata(): Promise<{
+  imageCid: string;
+  metadataCid: string;
+}> {
   if (!wcImageB64) {
     throw new Error('Generate World Cup prophecy card first.');
   }
-
+  if (!wcProphecy) {
+    throw new Error('Generate World Cup prophecy first.');
+  }
   const filename = `world-cup-prophecy-${wcHomeTeam}-vs-${wcAwayTeam}.png`
     .toLowerCase()
     .replace(/[^a-z0-9.-]+/g, '-');
@@ -1713,7 +1751,33 @@ async function uploadWorldCupProphecyToPinata(): Promise<string> {
   }
 
   setWcPinCid(j.cid);
-  return j.cid;
+
+  const metadata = buildWorldCupProphecyMetadata({
+    prophecy: wcProphecy,
+    imageUri: `ipfs://${j.cid}`,
+    chain: selectedChainKey,
+    payerWallet: address,
+  });
+  const metadataRes = await fetch('/api/pinata', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      json: metadata,
+      filename: filename.replace(/\.png$/i, '.json'),
+    }),
+  });
+  const metadataJson = await metadataRes.json();
+
+  if (!metadataRes.ok || !metadataJson?.cid) {
+    throw new Error(metadataJson?.error || 'Failed to save prophecy metadata to IPFS');
+  }
+
+  setWcMetadataCid(metadataJson.cid);
+
+  return {
+    imageCid: j.cid,
+    metadataCid: metadataJson.cid,
+  };
 }
 
 async function mintWorldCupProphecy() {
@@ -1733,17 +1797,29 @@ async function mintWorldCupProphecy() {
     setUiError('Generate prophecy card first.');
     return;
   }
+  if (!COOKIE_ADDRESS) {
+    setUiError('COOKIE contract is not configured for this network.');
+    return;
+  }
 
   setWcMintBusy(true);
 
   try {
-    const cid = wcPinCid || (await uploadWorldCupProphecyToPinata());
+    let imageCid = wcPinCid;
+    let metadataCid = wcMetadataCid;
+
+    if (!imageCid || !metadataCid) {
+      const pinned = await uploadWorldCupProphecyToPinata();
+      imageCid = pinned.imageCid;
+      metadataCid = pinned.metadataCid;
+    }
 
     const fortuneText = [
+      `Metadata: ipfs://${metadataCid}`,
       `${wcProphecy.homeTeam} vs ${wcProphecy.awayTeam}`,
       `Pick: ${wcProphecy.pick}`,
       `Score: ${wcProphecy.scoreline}`,
-      `Confidence: ${wcProphecy.confidence}%`,
+      `Pick Conf: ${wcProphecy.confidence}%`,
       worldCupRiskSummary(wcProphecy) ? `Risks: ${worldCupRiskSummary(wcProphecy)}` : '',
     ]
       .filter(Boolean)
@@ -1754,7 +1830,7 @@ async function mintWorldCupProphecy() {
       address: COOKIE_ADDRESS,
       abi: FortuneABI as Abi,
       functionName: 'mintWithImage',
-      args: [fortuneText, `ipfs://${cid}`],
+      args: [fortuneText, `ipfs://${imageCid}`],
     };
 
     if (typeof onchainMintPrice === 'bigint' && onchainMintPrice > 0n) {
@@ -1809,7 +1885,7 @@ async function shareWorldCupProphecy() {
       `${wcProphecy.homeTeam} vs ${wcProphecy.awayTeam}\n` +
       `Pick: ${wcProphecy.pick}\n` +
       `Score: ${wcProphecy.scoreline}\n` +
-      `Confidence: ${wcProphecy.confidence}%\n\n` +
+      `Pick confidence: ${wcProphecy.confidence}%\n\n` +
       (riskText ? `Risks: ${riskText}\n\n` : '') +
       `Minted in Cookieverse by @MSSystemWEB3.`;
 
@@ -2488,7 +2564,12 @@ React.useEffect(() => {
 
               {wcPinCid ? (
                 <div className="hint" style={{ marginTop: 10, color: '#bbf7d0' }}>
-                  IPFS: ipfs://{wcPinCid}
+                  Image IPFS: ipfs://{wcPinCid}
+                </div>
+              ) : null}
+              {wcMetadataCid ? (
+                <div className="hint" style={{ marginTop: 6, color: '#bbf7d0' }}>
+                  Metadata IPFS: ipfs://{wcMetadataCid}
                 </div>
               ) : null}
 
@@ -2509,7 +2590,7 @@ React.useEffect(() => {
                     Scoreline: <strong>{wcProphecy.scoreline}</strong>
                   </div>
                   <div className="hint">
-                    Confidence: <strong>{wcProphecy.confidence}%</strong>
+                    Pick confidence: <strong>{wcProphecy.confidence}%</strong>
                   </div>
                   {worldCupRiskSummary(wcProphecy) ? (
                     <div className="hint" style={{ marginTop: 6 }}>
@@ -2640,6 +2721,74 @@ React.useEffect(() => {
                     </span>
                   )}
               </div>
+
+              {wcProphecy ? (
+                <details
+                  style={{
+                    order: -1,
+                    padding: 12,
+                    borderRadius: 14,
+                    border: '1px solid rgba(250,204,21,0.22)',
+                    background: 'rgba(2,6,23,0.52)',
+                  }}
+                >
+                  <summary
+                    style={{
+                      cursor: 'pointer',
+                      color: '#fde68a',
+                      fontWeight: 900,
+                    }}
+                  >
+                    Prediction Details
+                  </summary>
+
+                  <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                    {wcProphecy.research.dominantScenario ? (
+                      <div className="hint">
+                        Scenario:{' '}
+                        <strong>{wcProphecy.research.dominantScenario}</strong>
+                      </div>
+                    ) : null}
+                    {wcProphecy.research.scoringVolume ? (
+                      <div className="hint">
+                        Scoring volume:{' '}
+                        <strong>{wcProphecy.research.scoringVolume}</strong>
+                      </div>
+                    ) : null}
+                    {wcProphecy.exactScoreConfidence !== undefined ? (
+                      <div className="hint">
+                        Exact score confidence:{' '}
+                        <strong>{wcProphecy.exactScoreConfidence}%</strong>
+                      </div>
+                    ) : null}
+                    {wcProphecy.research.topScorelines?.length ? (
+                      <div className="hint">
+                        <strong>Top scorelines</strong>
+                        <ol style={{ margin: '6px 0 0', paddingLeft: 22 }}>
+                          {wcProphecy.research.topScorelines.map((item, index) => (
+                            <li key={`${item.rank}-${item.scoreline}-${index}`}>
+                              <strong>{item.scoreline}</strong>
+                              {item.shortReason ? ` — ${item.shortReason}` : ''}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
+                    {wcProphecy.research.confidenceGovernor ? (
+                      <div className="hint">
+                        <strong>Why this prophecy:</strong>{' '}
+                        {wcProphecy.research.confidenceGovernor}
+                      </div>
+                    ) : null}
+                    {wcProphecy.research.exactScoreVolatility ? (
+                      <div className="hint">
+                        <strong>Exact score volatility:</strong>{' '}
+                        {wcProphecy.research.exactScoreVolatility}
+                      </div>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
 
                <button
                   type="button"
@@ -3279,6 +3428,11 @@ React.useEffect(() => {
           --wr-accent: #bfff00;
           --wr-accent-2: #06b6d4;
           --wr-accent-3: #f97316;
+        }
+        .card--wallet-roast-arbitrum {
+          --wr-accent: #28a0f0;
+          --wr-accent-2: #96bedc;
+          --wr-accent-3: #ffffff;
         }
         .card--wallet-roast-linea {
           --wr-accent: #61d394;

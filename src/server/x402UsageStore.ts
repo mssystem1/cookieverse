@@ -16,7 +16,7 @@ export type X402UsageEvent = {
   wallet: `0x${string}`;
   product: X402Product;
   provider: X402Provider;
-  chain?: "base" | "mantle" | "xlayer";
+  chain?: "base" | "mantle" | "xlayer" | "arbitrum";
   endpoint:
     | "cookieverse-roast-json"
     | "cookieverse-identity-roast"

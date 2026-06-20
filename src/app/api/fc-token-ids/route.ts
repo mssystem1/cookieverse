@@ -5,7 +5,7 @@ import { createHmac } from 'node:crypto';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type ChainParam = 'base' | 'mantle' | 'linea' | 'monad' | 'og' | 'xlayer';
+type ChainParam = 'base' | 'mantle' | 'linea' | 'monad' | 'og' | 'xlayer' | 'arbitrum';
 
 /**
  * IMPORTANT
@@ -63,7 +63,11 @@ const CANONICAL_ADDRESSES: Record<ChainParam, string> = {
   xlayer:
     process.env.NEXT_PUBLIC_CANONICAL_ERC721_XLAYER ??
     process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER ??
-    '',    
+    '',
+  arbitrum:
+    process.env.NEXT_PUBLIC_CANONICAL_ERC721_ARBITRUM ??
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM ??
+    '',
 };
 
 const ETHERSCAN_CHAINIDS: Record<Exclude<ChainParam, 'og' | 'xlayer'>, string> = {
@@ -71,6 +75,7 @@ const ETHERSCAN_CHAINIDS: Record<Exclude<ChainParam, 'og' | 'xlayer'>, string> =
   mantle: '5000',
   linea: '59144',
   monad: '143',
+  arbitrum: '42161',
 };
 
 function isSupportedChain(value: string | null): value is ChainParam {
@@ -80,7 +85,8 @@ function isSupportedChain(value: string | null): value is ChainParam {
     value === 'linea' ||
     value === 'monad' ||
     value === 'og' ||
-    value === 'xlayer' 
+    value === 'xlayer' ||
+    value === 'arbitrum'
   );
 }
 

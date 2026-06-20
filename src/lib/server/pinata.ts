@@ -64,3 +64,44 @@ export async function pinPngBufferToPinata(
     gatewayUrl: `${gatewayBase()}${cid}`,
   };
 }
+
+export async function pinJsonToPinata(
+  value: unknown,
+  name = "cookieverse-metadata.json"
+): Promise<PinataPinResult> {
+  const jwt = process.env.PINATA_JWT;
+
+  if (!jwt) {
+    throw new Error("Missing PINATA_JWT");
+  }
+
+  const res = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pinataMetadata: { name },
+      pinataContent: value,
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Pinata metadata error: ${res.status} ${txt}`);
+  }
+
+  const json = await res.json();
+  const cid = json.IpfsHash || json.cid || json.Hash;
+
+  if (!cid) {
+    throw new Error("Pinata returned no metadata CID");
+  }
+
+  return {
+    cid,
+    ipfsUri: `ipfs://${cid}`,
+    gatewayUrl: `${gatewayBase()}${cid}`,
+  };
+}

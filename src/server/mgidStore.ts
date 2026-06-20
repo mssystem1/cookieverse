@@ -45,13 +45,19 @@ export type MgidRow = {
   totalTransactions_xlayer: number;
   totalImages_xlayer: number;  
 
+  totalScore_arbitrum: number;
+  totalTransactions_arbitrum: number;
+  totalImages_arbitrum: number;
+
   totalX402_base: number;
   totalX402_mantle: number;
   totalX402_xlayer: number;
+  totalX402_arbitrum: number;
 
   totalX402Score_base: number;
   totalX402Score_mantle: number;
   totalX402Score_xlayer: number;
+  totalX402Score_arbitrum: number;
 
   totalX402: number;
   totalX402Score: number;
@@ -69,6 +75,7 @@ export type MgidRow = {
   totalBridges_mitosis: number;
   totalBridges_0g: number;
   totalBridges_xlayer: number;  
+  totalBridges_arbitrum: number;
 
   dailyKey?: string;
   dailyBaselineCookies?: number;

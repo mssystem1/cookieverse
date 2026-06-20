@@ -8,6 +8,8 @@ const COINBASE_X402_PATHS = new Set([
   "/api/x402/coinbase/wallet-roast/json",
   "/api/x402/coinbase/wallet-roast/identity",
   "/api/x402/coinbase/xcup/prophecy",
+  "/api/x402/coinbase/arbitrum/wallet-roast/identity",
+  "/api/x402/coinbase/arbitrum/xcup/prophecy",
 ]);
 
 const QUESTFLOW_X402_PATHS = new Set([
@@ -75,15 +77,13 @@ function json(req: NextRequest, payload: unknown, status = 500) {
   });
 }
 
-function supportedFallback(network: X402Network) {
+function supportedFallback(networks: X402Network[]) {
   return {
-    kinds: [
-      {
-        x402Version: 2,
-        scheme: "exact",
-        network,
-      },
-    ],
+    kinds: networks.map((network) => ({
+      x402Version: 2,
+      scheme: "exact",
+      network,
+    })),
     extensions: [],
     signers: {},
   };
@@ -91,7 +91,7 @@ function supportedFallback(network: X402Network) {
 
 function withSupportedKindsFallback<T extends { getSupported: () => Promise<any> }>(
   client: T,
-  network: X402Network,
+  network: X402Network | X402Network[],
   label: string
 ): T {
   return new Proxy(client as any, {
@@ -123,7 +123,7 @@ function withSupportedKindsFallback<T extends { getSupported: () => Promise<any>
             error instanceof Error ? error.message : error
           );
 
-          return supportedFallback(network);
+          return supportedFallback(Array.isArray(network) ? network : [network]);
         }
       };
     },
@@ -148,6 +148,30 @@ function getPayTo() {
   }
 
   return payTo;
+}
+
+function usdPriceToAssetAmount(
+  price: string,
+  asset: string,
+  eip712Domain: { name: string; version: string }
+) {
+  const normalized = price.trim().replace(/^\$/, "");
+  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+    throw new Error(`Invalid USD x402 price: ${price}`);
+  }
+
+  const [whole, fraction = ""] = normalized.split(".");
+  const amount = `${whole}${fraction.padEnd(6, "0").slice(0, 6)}`
+    .replace(/^0+(?=\d)/, "") || "0";
+
+  return {
+    asset,
+    amount,
+    extra: {
+      name: eip712Domain.name,
+      version: eip712Domain.version,
+    },
+  };
 }
 
 async function buildPaymentProxy(): Promise<ProxyHandler> {
@@ -186,19 +210,34 @@ async function buildPaymentProxy(): Promise<ProxyHandler> {
     import("@coinbase/x402"),
   ]);
 
-  const network = getNetwork();
+  const baseNetwork = getNetwork();
+  const arbitrumNetwork = "eip155:42161" as X402Network;
+  const arbitrumUsdc =
+    process.env.X402_ARBITRUM_USDC_ADDRESS ||
+    "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+  const arbitrumUsdcDomain = {
+    name: process.env.X402_ARBITRUM_USDC_NAME || "USD Coin",
+    version: process.env.X402_ARBITRUM_USDC_VERSION || "2",
+  };
   const payTo = getPayTo();
+  const identityRoastPrice =
+    process.env.X402_BASE_WALLET_ROAST_PRICE_USD ||
+    process.env.X402_IDENTITY_ROAST_PRICE ||
+    "$0.07";
+  const prophecyPrice =
+    process.env.X402_XCUP_PROPHECY_PRICE ||
+    process.env.X402_BASE_XCUP_PROPHECY_PRICE_USD ||
+    "$0.1";
 
   const facilitatorClient = withSupportedKindsFallback(
     new coreServer.HTTPFacilitatorClient(coinbaseX402.facilitator),
-    network,
+    [baseNetwork, arbitrumNetwork],
     "coinbase"
   );
 
-  const server = new nextX402.x402ResourceServer(facilitatorClient).register(
-    network,
-    new evmServer.ExactEvmScheme()
-  );
+  const server = new nextX402.x402ResourceServer(facilitatorClient)
+    .register(baseNetwork, new evmServer.ExactEvmScheme())
+    .register(arbitrumNetwork, new evmServer.ExactEvmScheme());
 
   const handler = nextX402.paymentProxy(
     {
@@ -207,7 +246,7 @@ async function buildPaymentProxy(): Promise<ProxyHandler> {
           {
             scheme: "exact",
             price: "$0.02",
-            network,
+            network: baseNetwork,
             payTo,
           },
         ],
@@ -220,8 +259,8 @@ async function buildPaymentProxy(): Promise<ProxyHandler> {
         accepts: [
           {
             scheme: "exact",
-            price: "$0.07",
-            network,
+            price: identityRoastPrice,
+            network: baseNetwork,
             payTo,
           },
         ],
@@ -234,13 +273,49 @@ async function buildPaymentProxy(): Promise<ProxyHandler> {
         accepts: [
           {
             scheme: "exact",
-            price: process.env.X402_XCUP_PROPHECY_PRICE || "$0.1",
-            network,
+            price: prophecyPrice,
+            network: baseNetwork,
             payTo,
           },
         ],
         description:
           "Cookieverse World Cup Match Prophecy. Generates research-backed prophecy JSON, renders a PNG card, and returns NFT-ready metadata.",
+        mimeType: "application/json",
+      },
+
+      "/api/x402/coinbase/arbitrum/wallet-roast/identity": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: usdPriceToAssetAmount(
+              identityRoastPrice,
+              arbitrumUsdc,
+              arbitrumUsdcDomain
+            ),
+            network: arbitrumNetwork,
+            payTo,
+          },
+        ],
+        description:
+          "Cookieverse Arbitrum Onchain Identity Roast. Returns an Arbitrum-themed roast card and NFT metadata.",
+        mimeType: "application/json",
+      },
+
+      "/api/x402/coinbase/arbitrum/xcup/prophecy": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: usdPriceToAssetAmount(
+              prophecyPrice,
+              arbitrumUsdc,
+              arbitrumUsdcDomain
+            ),
+            network: arbitrumNetwork,
+            payTo,
+          },
+        ],
+        description:
+          "Cookieverse World Cup Match Prophecy paid with USDC on Arbitrum.",
         mimeType: "application/json",
       },
     },
@@ -408,6 +483,8 @@ export const config = {
     "/api/x402/coinbase/wallet-roast/json",
     "/api/x402/coinbase/wallet-roast/identity",
     "/api/x402/coinbase/xcup/prophecy",
+    "/api/x402/coinbase/arbitrum/wallet-roast/identity",
+    "/api/x402/coinbase/arbitrum/xcup/prophecy",
     "/api/x402/questflow/wallet-roast/identity",
     "/api/x402/questflow/xcup/prophecy",
   ],

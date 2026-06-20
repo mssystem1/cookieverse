@@ -10,7 +10,9 @@ export function totalBridges(row: MgidRow | null | undefined) {
     Number(row.totalBridges_mantle || 0) +
     Number(row.totalBridges_linea || 0) +
     Number(row.totalBridges_mitosis || 0) +
-    Number(row.totalBridges_0g || 0)
+    Number(row.totalBridges_0g || 0) +
+    Number(row.totalBridges_xlayer || 0) +
+    Number(row.totalBridges_arbitrum || 0)
   );
 }
 
@@ -57,6 +59,8 @@ export function x402CountByProduct(
   if (product === "roast-json") return Number(summary.roastJson || 0);
 
   if (product === "identity-roast") return Number(summary.identityRoast || 0);
+
+  if (product === "xcup-prophecy") return Number(summary.xcupProphecy || 0);
 
   return Number(summary.total || 0);
 }

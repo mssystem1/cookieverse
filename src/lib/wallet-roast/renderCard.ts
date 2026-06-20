@@ -1327,6 +1327,24 @@ export async function renderCard(data: WalletRoastAnalysis): Promise<Buffer> {
   const ctx = canvas.getContext("2d");
   ctx.drawImage(template, 0, 0, width, height);
 
+  if (data.chain === "arbitrum") {
+    const overlay = ctx.createLinearGradient(0, 0, width, height);
+    overlay.addColorStop(0, "rgba(18, 31, 61, 0.44)");
+    overlay.addColorStop(0.5, "rgba(40, 160, 240, 0.13)");
+    overlay.addColorStop(1, "rgba(18, 31, 61, 0.50)");
+    ctx.fillStyle = overlay;
+    ctx.fillRect(0, 0, width, height);
+
+    const accentWidth = Math.max(4, Math.round(width * 0.012));
+    const accent = ctx.createLinearGradient(0, 0, 0, height);
+    accent.addColorStop(0, "#2D374B");
+    accent.addColorStop(0.45, "#28A0F0");
+    accent.addColorStop(1, "#96BEDC");
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, 0, accentWidth, height);
+    ctx.fillRect(width - accentWidth, 0, accentWidth, height);
+  }
+
   const displayName = getDisplayName(data);
   const mainRoast = getMainRoastText(data);
   const verdict = getVerdictText(data);

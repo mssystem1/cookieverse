@@ -19,8 +19,6 @@ import FortuneABI from '../../../abi/FortuneCookiesAI.json';
  * 3) Short server caches + real bypass on fresh=1.
  */
 
-let SELECTED_KEY: ChainKey = fallbackChainKey;
-
 function cookieAddressForKey(key: ChainKey): `0x${string}` {
   if (key === 'base')    return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_BASE as `0x${string}`;
   if (key === 'mantle')  return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MANTLE as `0x${string}`;
@@ -28,6 +26,7 @@ function cookieAddressForKey(key: ChainKey): `0x${string}` {
   if (key === 'mitosis') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
   if (key === 'og') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG as `0x${string}`;
   if (key === 'xlayer') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER as `0x${string}`;
+  if (key === 'arbitrum') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM as `0x${string}`;
 
   return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`; // monad (default)
 }
@@ -38,6 +37,7 @@ function keyFromChainId(id?: number): ChainKey {
   if (id === 59144) return 'linea';
   if (id === 16661) return 'og';
   if (id === 196) return 'xlayer';
+  if (id === 42161) return 'arbitrum';
 
   const mitosisId = Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777);
   if (id === mitosisId) return 'mitosis';
@@ -158,27 +158,34 @@ async function fetchHolders(
   if (!forceFresh && holdersInflight) return holdersInflight;
 
   holdersInflight = (async () => {
-    const KEYS: ChainKey[] = ["monad","base","mantle","linea","mitosis","og", "xlayer"];
+    const keys: ChainKey[] = [
+      "monad",
+      "base",
+      "mantle",
+      "linea",
+      "mitosis",
+      "og",
+      "xlayer",
+      "arbitrum",
+    ];
     const byAddr: Record<string, number> = {};
 
-    for (const key of KEYS) {
+    for (const key of keys) {
       try {
         const client = getServerPublicClientByKey(key);
-        const COOKIE = cookieAddressForKey(key);
-
+        const cookie = cookieAddressForKey(key);
         const all = await client.readContract({
-          address: COOKIE,
+          address: cookie,
           abi: FortuneABI,
           functionName: "getAllMints",
           authorizationList: undefined as any,
         }) as Array<{ id: bigint; wallet: `0x${string}`; isImage: boolean }>;
 
         for (const r of all) {
-          const k = (r.wallet || "0x").toLowerCase();
-          byAddr[k] = (byAddr[k] ?? 0) + 1;
+          const wallet = (r.wallet || "0x").toLowerCase();
+          byAddr[wallet] = (byAddr[wallet] ?? 0) + 1;
         }
       } catch {
-        // ignore chains that are not configured / not reachable
         continue;
       }
     }
@@ -206,18 +213,19 @@ async function fetchYouHoldingsCount(
   you: string,
   contract: string,
   apiKey: string,
+  selectedKey: ChainKey,
   forceFresh = false
 ): Promise<number | null> {
   const now = Date.now();
-  const ck = you.toLowerCase();
+  const ck = `${selectedKey}:${you.toLowerCase()}`;
 
   if (!forceFresh) {
     const cached = youCache.get(ck);
     if (cached && now - cached.at < YOU_TTL_MS) return cached.count;
   }
 
-  const client  = getServerPublicClientByKey(SELECTED_KEY);
-  const COOKIE  = cookieAddressForKey(SELECTED_KEY);
+  const client  = getServerPublicClientByKey(selectedKey);
+  const COOKIE  = cookieAddressForKey(selectedKey);
 
   const all = await client.readContract({
     address: COOKIE,
@@ -227,7 +235,11 @@ async function fetchYouHoldingsCount(
   }) as Array<{ id: bigint; wallet: `0x${string}`; isImage: boolean }>;
 
   // count only this wallet’s mints
-  const total = all.reduce((acc, r) => acc + (r.wallet?.toLowerCase() === ck ? 1 : 0), 0);
+  const walletLower = you.toLowerCase();
+  const total = all.reduce(
+    (acc, r) => acc + (r.wallet?.toLowerCase() === walletLower ? 1 : 0),
+    0,
+  );
 
   youCache.set(ck, { at: Date.now(), count: total });
   return total;
@@ -242,8 +254,8 @@ export async function GET(req: Request) {
     const chainIdHdr = req.headers.get("x-chain-id");
     const chainIdQ   = url.searchParams.get("chainId");
     const chainQ     = url.searchParams.get("chain"); // 'monad'|'base'|'mantle'|'mitosis'
-    SELECTED_KEY = chainQ
-      ? (["monad","base","mantle","linea","mitosis", "og", "xlayer"].includes(chainQ) ? (chainQ as ChainKey) : fallbackChainKey)
+    const selectedKey: ChainKey = chainQ
+      ? (["monad","base","mantle","linea","mitosis", "og", "xlayer", "arbitrum"].includes(chainQ) ? (chainQ as ChainKey) : fallbackChainKey)
       : keyFromChainId(chainIdHdr ? Number(chainIdHdr) : chainIdQ ? Number(chainIdQ) : undefined);
 
     // optional: "you" can be "0xEOA,0xSA"
@@ -256,10 +268,10 @@ export async function GET(req: Request) {
     const YOU_LIST = YOU_RAW ? YOU_RAW.split(',').map(s => s.trim()).filter(Boolean) : [];
     const YOU = YOU_LIST[0] || ''; // keep the first for backward-compatibility
 
-    const contract = cookieAddressForKey(SELECTED_KEY).toLowerCase();
+    const contract = cookieAddressForKey(selectedKey).toLowerCase();
     if (!contract) {
       return NextResponse.json(
-        { error: `Missing COOKIE address for ${SELECTED_KEY}` },
+        { error: `Missing COOKIE address for ${selectedKey}` },
         { status: 500, headers: { "Cache-Control": "no-store" } }
       );
     }
@@ -272,24 +284,21 @@ export async function GET(req: Request) {
       // per-wallet cache is skipped via forceFresh flag inside fetchYouHoldingsCount
     }
 
-    // 1) Base snapshot
-    const baseRows = await fetchHolders(contract, "" /*unused now*/, /*forceFresh*/ forceFresh);
-    const byAddr = new Map<string, number>(baseRows.map((r) => [r.address, r.mints]));
-
-    // 2) ALWAYS patch the connected wallet from holdings (authoritative)
-    if (YOU) {
-      const youCount = await fetchYouHoldingsCount(YOU, contract, "" /*unused*/, /*forceFresh*/ forceFresh);
-      if (youCount != null) {
-        const current = byAddr.get(YOU) ?? 0;
-        if (youCount !== current) byAddr.set(YOU, youCount);
-      }
-    }
+    // 1) Global all-chain holder roster. Selected chain only affects score columns.
+    const globalRows = await fetchHolders(
+      contract,
+      "" /* unused */,
+      forceFresh,
+    );
+    const byAddr = new Map<string, number>(
+      globalRows.map((r) => [r.address, r.mints]),
+    );
 
     // 2.5) Use getAllMints once to build both columns
     let textCounts  = new Map<string, number>();   // cookies
     let imageCounts = new Map<string, number>();   // images
     try {
-      const client = getServerPublicClientByKey(SELECTED_KEY);
+      const client = getServerPublicClientByKey(selectedKey);
       const all = await client.readContract({
         address: contract as `0x${string}`,
         abi: FortuneABI,
@@ -312,7 +321,7 @@ export async function GET(req: Request) {
   // --- BEGIN: compute your total mints across all chains ---
   let youMintsAllChains = 0;
   if (YOU_LIST.length) {
-    const KEYS = ['monad','base','mantle','linea','mitosis','og','xlayer'] as ChainKey[];
+    const KEYS = ['monad','base','mantle','linea','mitosis','og','xlayer','arbitrum'] as ChainKey[];
     for (const key of KEYS) {
       try {
         const client = getServerPublicClientByKey(key);
@@ -382,13 +391,11 @@ export async function GET(req: Request) {
     let you: { rank: number; address: string | string[]; mints: number; mintedCookies: number; mintedImages: number, youMintsAllChains } | null = null;
 
     if (YOU_LIST.length) {
-      // mints: sum across rows (case-insensitive)
-      const rowMap = new Map(rows.map(r => [r.address.toLowerCase(), r.mints]));
       const sum = (map: Map<string, number>) =>
         YOU_LIST.reduce((acc, a) => acc + (map.get(a) ?? 0), 0);
       const mintedCookies = sum(textCounts);
       const mintedImages  = sum(imageCounts);
-      const mints         = YOU_LIST.reduce((acc, a) => acc + (rowMap.get(a) ?? 0), 0);
+      const mints = mintedCookies + mintedImages;
 
       // rank is ambiguous for multi; set to NaN or min rank if you prefer
       you = { rank: Number.NaN, address: YOU_LIST, mints, mintedCookies, mintedImages,   youMintsAllChains };
@@ -409,41 +416,6 @@ export async function GET(req: Request) {
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (err: any) {
-    // If we have a holders cache, serve it as a fallback
-    if (holdersCacheRows) {
-      const rows = holdersCacheRows;
-      const actual = rows.slice(0, 50).map((r, i) => ({
-        rank: i + 1,
-        address: r.address,
-        mints: r.mints,
-        mintedCookies: 0,
-        mintedImages: 0,
-        youMintsAllChains: 0,
-      }));
-      const need = Math.max(0, 50 - actual.length);
-      const top50 = [
-        ...actual,
-        ...Array.from({ length: need }, (_, i) => ({
-          rank: actual.length + i + 1,
-          address: null as string | null,
-          mints: 0,
-          mintedCookies: 0,
-          mintedImages: 0,
-          youMintsAllChains: 0,
-        })),
-      ];
-      return NextResponse.json(
-        {
-          updatedAt: new Date().toISOString(),
-          totalMinters: rows.length,
-          top50,
-          you: null,
-          stale: true,
-          error: String(err?.message || err),
-        },
-        { status: 200, headers: { "Cache-Control": "no-store" } }
-      );
-    }
     return NextResponse.json(
       { error: err?.message || String(err) },
       { status: 502, headers: { "Cache-Control": "no-store" } }

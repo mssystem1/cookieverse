@@ -18,7 +18,7 @@ import { sdk } from '@farcaster/miniapp-sdk'; //ttt
 
 //const quickAuthClient = createClient(); // ⬅️ add this
 
-type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | 'og' | 'xlayer';
+type ChainKey = 'monad' | 'base' | 'mantle' | 'mitosis' | 'linea' | 'og' | 'xlayer' | 'arbitrum';
 
 const CHAIN_IDS: Record<ChainKey, number> = {
   monad: 143,
@@ -28,6 +28,7 @@ const CHAIN_IDS: Record<ChainKey, number> = {
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
   og: 16661,
   xlayer: 196,
+  arbitrum: 42161,
 };
 
 function getUtcDayKey(now: Date): string {
@@ -63,6 +64,7 @@ type BoostFlags = {
   mitosis: 0 | 1;
   og: 0 | 1;
   xlayer: 0 | 1;  
+  arbitrum: 0 | 1;
 };
 
 async function loadBoosts(address: `0x${string}`, origin: string): Promise<BoostFlags> {
@@ -77,11 +79,11 @@ async function loadBoosts(address: `0x${string}`, origin: string): Promise<Boost
     const res = await fetch(url.toString(), { cache: 'no-store' }); // url.toString() params.toString()
     if (!res.ok) {
       console.error('[mgid-upsert] /api/mgid-boosts HTTP error', res.status);
-      return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0, og: 0, xlayer: 0  };
+      return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0, og: 0, xlayer: 0, arbitrum: 0 };
     }
     const data: any = await res.json().catch(() => null);
     if (!data || !data.boosts) {
-      return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0, og: 0, xlayer: 0  };
+      return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0, og: 0, xlayer: 0, arbitrum: 0 };
     }
 
     return {
@@ -92,10 +94,11 @@ async function loadBoosts(address: `0x${string}`, origin: string): Promise<Boost
       mitosis: (data.boosts.mitosis ?? 0) ? 1 : 0,
       og: 0,
       xlayer: (data.boosts.xlayer ?? 0) ? 1 : 0,     
+      arbitrum: 0,
     };
   } catch (e) {
     console.error('[mgid-upsert] /api/mgid-boosts failed', e);
-    return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0, og: 0, xlayer: 0  };
+    return { monad: 0, base: 0, mantle: 0, linea: 0, mitosis: 0, og: 0, xlayer: 0, arbitrum: 0 };
   }
 }
 
@@ -109,8 +112,8 @@ async function loadHoldingsStats(address: `0x${string}`, origin: string): Promis
  // const baseUrl = getBaseUrl();
 
   const result: HoldingsStats = {
-    scoreByChain: { monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0 },
-    imagesByChain: { monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0 },
+    scoreByChain: { monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0, arbitrum: 0 },
+    imagesByChain: { monad: 0, base: 0, mantle: 0, mitosis: 0, linea: 0, og: 0, xlayer: 0, arbitrum: 0 },
   };
 
   await Promise.all(
@@ -157,9 +160,10 @@ type AdapterSendsByChain = {
   linea: { count: number; ok: boolean };
   monad: { count: number; ok: boolean };
   xlayer: { count: number; ok: boolean };  
+  arbitrum: { count: number; ok: boolean };
 };
 
-type X402SupportedChain = 'base' | 'mantle' | 'xlayer';
+type X402SupportedChain = 'base' | 'mantle' | 'xlayer' | 'arbitrum';
 
 type X402StatsByChain = Record<X402SupportedChain, {
   count: number;
@@ -178,6 +182,7 @@ const EMPTY_X402_STATS: X402Stats = {
     base: { count: 0, score: 0, ok: false },
     mantle: { count: 0, score: 0, ok: false },
     xlayer: { count: 0, score: 0, ok: false },
+    arbitrum: { count: 0, score: 0, ok: false },
   },
   totalCount: 0,
   totalScore: 0,
@@ -201,6 +206,7 @@ async function loadAdapterSends(address: `0x${string}`, origin: string): Promise
         linea: { count: 0, ok: false },
         monad: { count: 0, ok: false },
         xlayer: { count: 0, ok: false },        
+        arbitrum: { count: 0, ok: false },
       };
     }
     const data: any = await res.json().catch(() => null);
@@ -226,6 +232,10 @@ async function loadAdapterSends(address: `0x${string}`, origin: string): Promise
         count: Number(data?.byChain?.xlayer?.count ?? 0),
         ok: Boolean(data?.byChain?.xlayer?.ok ?? false),
       },         
+      arbitrum: {
+        count: Number(data?.byChain?.arbitrum?.count ?? 0),
+        ok: Boolean(data?.byChain?.arbitrum?.ok ?? false),
+      },
     };
   } catch (e) {
     console.error('[mgid-upsert] /api/adapter-sends failed', e);
@@ -235,6 +245,7 @@ async function loadAdapterSends(address: `0x${string}`, origin: string): Promise
       linea: { count: 0, ok: false },
       monad: { count: 0, ok: false },      
       xlayer: { count: 0, ok: false }, 
+      arbitrum: { count: 0, ok: false },
     };
   }
 }
@@ -394,6 +405,7 @@ const headerFcUsername =
   const mints_mitosis = scoreByChain.mitosis;
   const mints_og      = scoreByChain.og;
   const mints_xlayer  = scoreByChain.xlayer;
+  const mints_arbitrum = scoreByChain.arbitrum;
 
   // previous value from BLOB (so NOTOK won't zero things)
   const existingBr_monad   = existing?.totalBridges_monad   ?? 0;
@@ -403,6 +415,7 @@ const headerFcUsername =
   const existingBr_mitosis = existing?.totalBridges_mitosis ?? 0;
   const existingBr_og      = (existing as any)?.totalBridges_0g ?? 0;
   const existingBr_xlayer  = (existing as any)?.totalBridges_xlayer ?? 0;
+  const existingBr_arbitrum = (existing as any)?.totalBridges_arbitrum ?? 0;
 
   // adapter-sends result for *this* run
   const bridges_monad_raw   = Number(sends.monad.count   ?? 0);
@@ -412,6 +425,7 @@ const headerFcUsername =
   const bridges_mitosis_raw = 0;
   const bridges_og_raw      = 0;
   const bridges_xlayer_raw  = Number(sends.xlayer.count   ?? 0);
+  const bridges_arbitrum_raw = Number(sends.arbitrum.count ?? 0);
 
   // if ok=false → keep last good value from Blob
   const bridges_monad =
@@ -424,8 +438,10 @@ const headerFcUsername =
     sends.linea.ok   ? bridges_linea_raw   : existingBr_linea;
   const bridges_mitosis = existingBr_mitosis + bridges_mitosis_raw; // stays 0 for now
   const bridges_og      = existingBr_og + bridges_og_raw; // 0G does not use LayerZero bridge stats yet
-    const bridges_xlayer =
+  const bridges_xlayer =
     sends.xlayer.ok   ? bridges_xlayer_raw   : existingBr_xlayer;
+  const bridges_arbitrum =
+    sends.arbitrum.ok ? bridges_arbitrum_raw : existingBr_arbitrum;
 
   //const boost_monad   = boostFlags.monad;
   //const boost_base    = boostFlags.base;
@@ -440,14 +456,18 @@ const headerFcUsername =
   const img_mitosis = imagesByChain.mitosis;
   const img_og      = imagesByChain.og;
   const img_xlayer  = imagesByChain.xlayer;  
+  const img_arbitrum = imagesByChain.arbitrum;
 
   const existingX402_base = (existing as any)?.totalX402_base ?? 0;
   const existingX402_mantle = (existing as any)?.totalX402_mantle ?? 0;
   const existingX402_xlayer = (existing as any)?.totalX402_xlayer ?? 0;
+  const existingX402_arbitrum = (existing as any)?.totalX402_arbitrum ?? 0;
 
   const existingX402Score_base = (existing as any)?.totalX402Score_base ?? existingX402_base;
   const existingX402Score_mantle = (existing as any)?.totalX402Score_mantle ?? existingX402_mantle;
   const existingX402Score_xlayer = (existing as any)?.totalX402Score_xlayer ?? existingX402_xlayer;
+  const existingX402Score_arbitrum =
+    (existing as any)?.totalX402Score_arbitrum ?? existingX402_arbitrum;
 
   const x402_base_raw = x402Stats.byChain.base.ok
     ? x402Stats.byChain.base.count
@@ -458,6 +478,9 @@ const headerFcUsername =
   const x402_xlayer_raw = x402Stats.byChain.xlayer.ok
     ? x402Stats.byChain.xlayer.count
     : existingX402_xlayer;
+  const x402_arbitrum_raw = x402Stats.byChain.arbitrum.ok
+    ? x402Stats.byChain.arbitrum.count
+    : existingX402_arbitrum;
 
   const x402Score_base_raw = x402Stats.byChain.base.ok
     ? x402Stats.byChain.base.score
@@ -468,17 +491,27 @@ const headerFcUsername =
   const x402Score_xlayer_raw = x402Stats.byChain.xlayer.ok
     ? x402Stats.byChain.xlayer.score
     : existingX402Score_xlayer;
+  const x402Score_arbitrum_raw = x402Stats.byChain.arbitrum.ok
+    ? x402Stats.byChain.arbitrum.score
+    : existingX402Score_arbitrum;
 
   const x402_base = existing ? Math.max(existingX402_base, x402_base_raw) : x402_base_raw;
   const x402_mantle = existing ? Math.max(existingX402_mantle, x402_mantle_raw) : x402_mantle_raw;
   const x402_xlayer = existing ? Math.max(existingX402_xlayer, x402_xlayer_raw) : x402_xlayer_raw;
+  const x402_arbitrum = existing
+    ? Math.max(existingX402_arbitrum, x402_arbitrum_raw)
+    : x402_arbitrum_raw;
 
   const x402Score_base = existing ? Math.max(existingX402Score_base, x402Score_base_raw) : x402Score_base_raw;
   const x402Score_mantle = existing ? Math.max(existingX402Score_mantle, x402Score_mantle_raw) : x402Score_mantle_raw;
   const x402Score_xlayer = existing ? Math.max(existingX402Score_xlayer, x402Score_xlayer_raw) : x402Score_xlayer_raw;
+  const x402Score_arbitrum = existing
+    ? Math.max(existingX402Score_arbitrum, x402Score_arbitrum_raw)
+    : x402Score_arbitrum_raw;
 
-  const totalX402 = x402_base + x402_mantle + x402_xlayer;
-  const totalX402Score = x402Score_base + x402Score_mantle + x402Score_xlayer;
+  const totalX402 = x402_base + x402_mantle + x402_xlayer + x402_arbitrum;
+  const totalX402Score =
+    x402Score_base + x402Score_mantle + x402Score_xlayer + x402Score_arbitrum;
 
     // ── Fresh TX (mints + bridges, NO boost) ─────────────────
   const freshTx_monad   = mints_monad   + bridges_monad;
@@ -488,6 +521,7 @@ const headerFcUsername =
   const freshTx_mitosis = mints_mitosis + bridges_mitosis;
   const freshTx_og      = mints_og + bridges_og;
   const freshTx_xlayer  = mints_xlayer + bridges_xlayer;  
+  const freshTx_arbitrum = mints_arbitrum + bridges_arbitrum;
 
   const existingTx_monad   = existing?.totalTransactions_monad   ?? 0;
   const existingTx_base    = existing?.totalTransactions_base    ?? 0;
@@ -496,6 +530,8 @@ const headerFcUsername =
   const existingTx_mitosis = existing?.totalTransactions_mitosis ?? 0;
   const existingTx_og      = (existing as any)?.totalTransactions_0g ?? 0;
   const existingTx_xlayer  = (existing as any)?.totalTransactions_xlayer ?? 0;  
+  const existingTx_arbitrum =
+    (existing as any)?.totalTransactions_arbitrum ?? 0;
 
   // 🔥 Apply boost **only** where there is NEW activity vs stored TX
   const boost_monad_effective =
@@ -520,6 +556,8 @@ const headerFcUsername =
   const freshScore_mitosis = mints_mitosis + bridges_mitosis + boost_mitosis_effective;
   const freshScore_og      = mints_og + bridges_og + boost_og_effective;
   const freshScore_xlayer  = mints_xlayer + bridges_xlayer + boost_xlayer_effective + x402Score_xlayer;  
+  const freshScore_arbitrum =
+    mints_arbitrum + bridges_arbitrum + x402Score_arbitrum;
 
   // Never decrease SCORE vs existing snapshot
   const score_monad =
@@ -536,6 +574,9 @@ const headerFcUsername =
     existing ? Math.max((existing as any).totalScore_0g ?? 0, freshScore_og) : freshScore_og;
   const score_xlayer =
     existing ? Math.max((existing as any).totalScore_xlayer ?? 0, freshScore_xlayer) : freshScore_xlayer;
+  const score_arbitrum = existing
+    ? Math.max((existing as any).totalScore_arbitrum ?? 0, freshScore_arbitrum)
+    : freshScore_arbitrum;
 
   // Never decrease TX vs existing snapshot
   const tx_monad =
@@ -552,23 +593,31 @@ const headerFcUsername =
     existing ? Math.max((existing as any).totalTransactions_0g ?? 0, freshTx_og) : freshTx_og;
   const tx_xlayer =
     existing ? Math.max((existing as any).totalTransactions_xlayer ?? 0, freshTx_xlayer) : freshTx_xlayer;
+  const tx_arbitrum = existing
+    ? Math.max(existingTx_arbitrum, freshTx_arbitrum)
+    : freshTx_arbitrum;
 
   // ── Totals ────────────────────────────────────────────────
   const totalScore =
-    score_monad + score_base + score_mantle + score_linea + score_mitosis + score_og + score_xlayer;
+    score_monad + score_base + score_mantle + score_linea + score_mitosis +
+    score_og + score_xlayer + score_arbitrum;
 
   const totalTransactions =
-    tx_monad + tx_base + tx_mantle + tx_linea + tx_mitosis + tx_og + tx_xlayer;
+    tx_monad + tx_base + tx_mantle + tx_linea + tx_mitosis + tx_og +
+    tx_xlayer + tx_arbitrum;
 
   const totalImages =
-    img_monad + img_base + img_mantle + img_linea + img_mitosis + img_og + img_xlayer;
+    img_monad + img_base + img_mantle + img_linea + img_mitosis + img_og +
+    img_xlayer + img_arbitrum;
 
  // ── Global totals for quests ──────────────────────────────
   const totalCookiesCurrent =
-    mints_monad + mints_base + mints_mantle + mints_linea + mints_mitosis + mints_og + mints_xlayer;
+    mints_monad + mints_base + mints_mantle + mints_linea + mints_mitosis +
+    mints_og + mints_xlayer + mints_arbitrum;
 
   const totalBridgesCurrent =
-    bridges_monad + bridges_base + bridges_mantle + bridges_linea + bridges_mitosis + bridges_og + bridges_og + bridges_xlayer;
+    bridges_monad + bridges_base + bridges_mantle + bridges_linea +
+    bridges_mitosis + bridges_og + bridges_xlayer + bridges_arbitrum;
 
   const totalX402Current = totalX402;
   const dailyX402Target = Math.max(1, Number(process.env.MGID_DAILY_X402_TARGET || 1));
@@ -753,15 +802,19 @@ const headerFcUsername =
       (existing.totalScore_linea ?? 0) === score_linea &&
       (existing.totalScore_mitosis ?? 0) === score_mitosis &&
       ((existing as any).totalScore_0g ?? 0) === score_og &&
-      ((existing as any).totalScore_xlayer ?? 0) === score_xlayer;
+      ((existing as any).totalScore_xlayer ?? 0) === score_xlayer &&
+      ((existing as any).totalScore_arbitrum ?? 0) === score_arbitrum;
 
     const noX402Change =
       ((existing as any).totalX402_base ?? 0) === x402_base &&
       ((existing as any).totalX402_mantle ?? 0) === x402_mantle &&
       ((existing as any).totalX402_xlayer ?? 0) === x402_xlayer &&
+      ((existing as any).totalX402_arbitrum ?? 0) === x402_arbitrum &&
       ((existing as any).totalX402Score_base ?? ((existing as any).totalX402_base ?? 0)) === x402Score_base &&
       ((existing as any).totalX402Score_mantle ?? ((existing as any).totalX402_mantle ?? 0)) === x402Score_mantle &&
       ((existing as any).totalX402Score_xlayer ?? ((existing as any).totalX402_xlayer ?? 0)) === x402Score_xlayer &&
+      ((existing as any).totalX402Score_arbitrum ??
+        ((existing as any).totalX402_arbitrum ?? 0)) === x402Score_arbitrum &&
       ((existing as any).totalX402 ?? 0) === totalX402 &&
       ((existing as any).totalX402Score ?? ((existing as any).totalX402 ?? 0)) === totalX402Score;
 
@@ -772,7 +825,8 @@ const headerFcUsername =
       (existing.totalBridges_linea ?? 0) === bridges_linea &&
       (existing.totalBridges_mitosis ?? 0) === bridges_mitosis &&
       ((existing as any).totalBridges_0g ?? 0) === bridges_og &&
-      ((existing as any).totalBridges_xlayer ?? 0) === bridges_xlayer;
+      ((existing as any).totalBridges_xlayer ?? 0) === bridges_xlayer &&
+      ((existing as any).totalBridges_arbitrum ?? 0) === bridges_arbitrum;
 
     const noDailyChange =
       (existing.dailyKey ?? null) === (dailyKey ?? null) &&
@@ -855,13 +909,19 @@ const headerFcUsername =
     totalTransactions_xlayer: tx_xlayer,
     totalImages_xlayer: img_xlayer,
 
+    totalScore_arbitrum: score_arbitrum,
+    totalTransactions_arbitrum: tx_arbitrum,
+    totalImages_arbitrum: img_arbitrum,
+
     totalX402_base: x402_base,
     totalX402_mantle: x402_mantle,
     totalX402_xlayer: x402_xlayer,
+    totalX402_arbitrum: x402_arbitrum,
 
     totalX402Score_base: x402Score_base,
     totalX402Score_mantle: x402Score_mantle,
     totalX402Score_xlayer: x402Score_xlayer,
+    totalX402Score_arbitrum: x402Score_arbitrum,
 
     totalX402,
     totalX402Score,
@@ -881,6 +941,7 @@ const headerFcUsername =
     totalBridges_mitosis: bridges_mitosis,
     totalBridges_0g: bridges_og,
     totalBridges_xlayer: bridges_xlayer,
+    totalBridges_arbitrum: bridges_arbitrum,
 
     // 🔹 Persist tasks state exactly as computed above
     dailyKey,
@@ -935,6 +996,11 @@ async function loadX402Stats(address: `0x${string}`, origin: string): Promise<X4
           count: Number(byChain.xlayer?.count ?? 0),
           score: Number(byChain.xlayer?.score ?? 0),
           ok: Boolean(byChain.xlayer?.ok ?? false),
+        },
+        arbitrum: {
+          count: Number(byChain.arbitrum?.count ?? 0),
+          score: Number(byChain.arbitrum?.score ?? 0),
+          ok: Boolean(byChain.arbitrum?.ok ?? false),
         },
       },
       totalCount: Number(data?.totalCount ?? 0),

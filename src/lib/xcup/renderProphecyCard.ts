@@ -363,6 +363,22 @@ function buildInlineRiskText(input: WorldCupProphecyCardInput) {
       value: input.travelDisruptionRisk,
       explanation: cleanRiskExplanation(input.travelDisruptionRiskReason, 'delays can hurt rhythm'),
     },
+    {
+      label: 'Goalkeeper Risk',
+      value: input.goalkeeperHeroRisk,
+      explanation: cleanRiskExplanation(
+        input.goalkeeperHeroRiskReason,
+        'goalkeeper can keep it close',
+      ),
+    },
+    {
+      label: 'Physical Risk',
+      value: input.physicalMismatchRisk,
+      explanation: cleanRiskExplanation(
+        input.physicalMismatchRiskReason,
+        'duels can change momentum',
+      ),
+    },
   ];
 
   const parts = risks
@@ -1014,8 +1030,8 @@ export async function renderWorldCupProphecyCard(
 
   const safeScoreline = compactScoreline || scoreline;
 
-  const summaryLong = `PICK: ${pick}  -  SCORE: ${safeScoreline}  -  CONFIDENCE: ${confidence}%`;
-  const summaryCompact = `PICK ${pick} - SCORE ${safeScoreline} - CONF ${confidence}%`;
+  const summaryLong = `PICK: ${pick}  -  SCORE: ${safeScoreline}  -  PICK CONF: ${confidence}%`;
+  const summaryCompact = `PICK ${pick} - SCORE ${safeScoreline} - PICK CONF ${confidence}%`;
   const summary = summaryLong.length <= 90 ? summaryLong : summaryCompact;
   const displayProphecy = buildDisplayProphecy(input);
 
@@ -1029,7 +1045,7 @@ export async function renderWorldCupProphecyCard(
 
   const reasoning = reasoningLines.length
     ? reasoningLines.join('\n')
-    : 'Form edge drives the pick.\nMomentum pressure keeps it tight.';
+    : '';
 
   const criteria = [
     ['FORM', input.criteria.form],

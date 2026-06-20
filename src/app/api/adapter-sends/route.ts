@@ -10,7 +10,7 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type ChainKey = 'base' | 'mantle' | 'linea' | 'monad' | 'og' | 'xlayer';
+type ChainKey = 'base' | 'mantle' | 'linea' | 'monad' | 'og' | 'xlayer' | 'arbitrum';
 
 type ChainAdapterResult = {
   count: number;
@@ -56,6 +56,10 @@ const CANONICAL_ADDRESSES: Record<ChainKey, string> = {
     process.env.NEXT_PUBLIC_CANONICAL_ERC721_XLAYER ??
     process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER ??
     '',
+  arbitrum:
+    process.env.NEXT_PUBLIC_CANONICAL_ERC721_ARBITRUM ??
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM ??
+    '',
 };
 
 const ADAPTERS: Record<ChainKey, string | undefined> = {
@@ -65,6 +69,7 @@ const ADAPTERS: Record<ChainKey, string | undefined> = {
   monad: process.env.NEXT_PUBLIC_ADAPTER_MONAD,
   og: process.env.NEXT_PUBLIC_ADAPTER_OG,
   xlayer: process.env.NEXT_PUBLIC_ADAPTER_XLAYER,
+  arbitrum: process.env.NEXT_PUBLIC_ADAPTER_ARBITRUM,
 };
 
 const ETHERSCAN_CHAINIDS: Partial<Record<ChainKey, string>> = {
@@ -72,6 +77,7 @@ const ETHERSCAN_CHAINIDS: Partial<Record<ChainKey, string>> = {
   mantle: '5000',
   linea: '59144',
   monad: '143',
+  arbitrum: '42161',
 };
 
 const RPCS: Partial<Record<ChainKey, string>> = {
@@ -81,6 +87,9 @@ const RPCS: Partial<Record<ChainKey, string>> = {
   monad: process.env.NEXT_PUBLIC_RPC_HTTP_MONAD,
   og: process.env.NEXT_PUBLIC_RPC_HTTP_OG ?? process.env.OG_EVM_RPC_URL,
   xlayer: process.env.NEXT_PUBLIC_RPC_HTTP_XLAYER,
+  arbitrum:
+    process.env.ARBITRUM_RPC_URL ??
+    process.env.NEXT_PUBLIC_RPC_HTTP_ARBITRUM,
 };
 
 const ETHERSCAN_API_KEY =
@@ -909,13 +918,14 @@ export async function GET(req: Request) {
 
   const user = getAddress(address);
 
-const [base, mantle, linea, monad, og, xlayer] = await Promise.all([
+const [base, mantle, linea, monad, og, xlayer, arbitrum] = await Promise.all([
   fetchChainAdapterSends('base', user),
   fetchChainAdapterSends('mantle', user),
   fetchChainAdapterSends('linea', user),
   fetchChainAdapterSends('monad', user),
   fetchChainAdapterSends('og', user),
   fetchChainAdapterSends('xlayer', user),
+  fetchChainAdapterSends('arbitrum', user),
 ]);
 
   return NextResponse.json({
@@ -927,6 +937,7 @@ const [base, mantle, linea, monad, og, xlayer] = await Promise.all([
       monad,
       og,
       xlayer,
+      arbitrum,
     },
   });
 }

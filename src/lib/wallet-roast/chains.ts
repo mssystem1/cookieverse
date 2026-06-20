@@ -1,4 +1,4 @@
-export type WalletRoastChainKey = "base" | "mantle" | "xlayer";
+export type WalletRoastChainKey = "base" | "mantle" | "xlayer" | "arbitrum";
 
 export type WalletRoastChainConfig = {
   key: WalletRoastChainKey;
@@ -37,6 +37,14 @@ export const WALLET_ROAST_CHAINS: Record<
     nativePriceSymbol: "OKB",
     dataSource: "okx-xlayer",
   },
+  arbitrum: {
+    key: "arbitrum",
+    chainId: 42161,
+    label: "Arbitrum",
+    nativeSymbol: "ETH",
+    nativePriceSymbol: "ETH",
+    dataSource: "etherscan-v2",
+  },
 };
 
 export function normalizeWalletRoastChain(
@@ -45,6 +53,9 @@ export function normalizeWalletRoastChain(
   const raw = String(value || "base").trim().toLowerCase();
 
   if (raw === "mantle") return "mantle";
+  if (raw === "arbitrum" || raw === "arb" || raw === "arbitrum-one") {
+    return "arbitrum";
+  }
   if (raw === "xlayer" || raw === "x-layer" || raw === "x_layer") {
     return "xlayer";
   }

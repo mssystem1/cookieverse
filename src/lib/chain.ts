@@ -9,6 +9,8 @@ const RPC_LINEA = process.env.NEXT_PUBLIC_RPC_HTTP_LINEA || 'https://rpc.linea.b
 const RPC_MITOS = process.env.NEXT_PUBLIC_RPC_HTTP_MITOS || 'https://rpc.mitosis.org';
 const RPC_OG = process.env.NEXT_PUBLIC_RPC_HTTP_OG || 'https://evmrpc.0g.ai';
 const RPC_XLAYER = process.env.NEXT_PUBLIC_RPC_HTTP_XLAYER || 'https://rpc.xlayer.tech';
+const RPC_ARBITRUM =
+  process.env.NEXT_PUBLIC_RPC_HTTP_ARBITRUM || 'https://arb1.arbitrum.io/rpc';
 
 export const monadTestnet = defineChain({
   id: 143,
@@ -77,6 +79,19 @@ export const xLayerMainnet = defineChain({
   },
 });
 
+export const arbitrumMainnet = defineChain({
+  id: 42161,
+  name: 'Arbitrum One',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: [RPC_ARBITRUM] },
+    public: { http: [RPC_ARBITRUM] },
+  },
+  blockExplorers: {
+    default: { name: 'Arbiscan', url: 'https://arbiscan.io' },
+  },
+});
+
 export const CHAINS = [
   monadTestnet,
   baseMainnet,
@@ -85,6 +100,7 @@ export const CHAINS = [
   mitosisMainnet,
   ogMainnet,
   xLayerMainnet,
+  arbitrumMainnet,
 ];
 
 export type AppChainKey =
@@ -94,7 +110,8 @@ export type AppChainKey =
   | 'linea'
   | 'mitosis'
   | 'og'
-  | 'xlayer';
+  | 'xlayer'
+  | 'arbitrum';
 
 type DefaultChainInputKey =
   | AppChainKey
@@ -113,6 +130,7 @@ export const CHAIN_BY_DEFAULT_KEY: Record<DefaultChainInputKey, (typeof CHAINS)[
   xlayer: xLayerMainnet,
   'x-layer': xLayerMainnet,
   x_layer: xLayerMainnet,
+  arbitrum: arbitrumMainnet,
 } as const;
 
 export function normalizeDefaultChainKey(value?: string | null) {

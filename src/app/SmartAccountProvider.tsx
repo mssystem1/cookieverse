@@ -43,6 +43,9 @@ const CHAIN_SYMBOLS_BY_ID: Record<number, string> = {
   8453: 'ETH',  // baseMainnet.id
   5000: 'MNT',  // mantleMainnet.id
   59144: 'ETH', // lineaMainnet.id
+  16661: '0G',
+  196: 'OKB',
+  42161: 'ETH',
   // keep mitosis dynamic to match your env chain id:
   [Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777_777)]: 'MITO',
 };
@@ -53,6 +56,9 @@ const CHAIN_SYMBOLS: Record<ChainKey, string> = {
   mantle: 'MNT',
   linea: 'ETH',
   mitosis: 'MITO',
+  og: '0G',
+  xlayer: 'OKB',
+  arbitrum: 'ETH',
 };
 
 const tokenSymbol =

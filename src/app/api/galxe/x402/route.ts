@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
     const product =
       rawProduct === "roast-json" ||
       rawProduct === "identity-roast" ||
+      rawProduct === "xcup-prophecy" ||
       rawProduct === "any"
         ? (rawProduct as X402Product | "any")
         : "any";

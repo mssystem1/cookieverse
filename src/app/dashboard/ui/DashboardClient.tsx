@@ -7,7 +7,7 @@ import { useAccount } from "wagmi";
 // Types
 // ─────────────────────────────────────────────────────────────
 
-type ChainKey = "monad" | "base" | "mantle" | "linea" | "mitosis" | "og" | "xlayer";
+type ChainKey = "monad" | "base" | "mantle" | "linea" | "mitosis" | "og" | "xlayer" | "arbitrum";
 
 type HoldingsResponse = {
   ok: boolean;
@@ -36,14 +36,19 @@ type MgidRowClient = {
   totalScore_xlayer?: number;
   totalTransactions_xlayer?: number;
   totalImages_xlayer?: number;  
+  totalScore_arbitrum?: number;
+  totalTransactions_arbitrum?: number;
+  totalImages_arbitrum?: number;
 
   totalX402_base?: number;
   totalX402_mantle?: number;
   totalX402_xlayer?: number;
+  totalX402_arbitrum?: number;
 
   totalX402Score_base?: number;
   totalX402Score_mantle?: number;
   totalX402Score_xlayer?: number;
+  totalX402Score_arbitrum?: number;
 
   totalX402?: number;
   totalX402Score?: number;
@@ -55,6 +60,7 @@ type MgidRowClient = {
   totalBridges_mitosis?: number;
   totalBridges_0g?: number;
   totalBridges_xlayer?: number;  
+  totalBridges_arbitrum?: number;
 
   // quests
   dailyKey?: string;
@@ -112,6 +118,7 @@ const CHAINS_META: { key: ChainKey; label: string; accent: string }[] = [
   { key: "mitosis", label: "Mitosis", accent: "#a855f7" },
   { key: "og", label: "0G", accent: "#c084fc" },
   { key: "xlayer", label: "X Layer", accent: "#262525" },  
+  { key: "arbitrum", label: "Arbitrum", accent: "#28a0f0" },
 ];
 
 const CHAIN_IDS: Record<ChainKey, number> = {
@@ -122,10 +129,11 @@ const CHAIN_IDS: Record<ChainKey, number> = {
   mitosis: Number(process.env.NEXT_PUBLIC_MITOSIS_CHAIN_ID || 777777),
   og: 16661,
   xlayer: 196,  
+  arbitrum: 42161,
 };
 
-const BRIDGE_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "linea", "monad", "xlayer"]);
-const X402_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "xlayer"]);
+const BRIDGE_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "linea", "monad", "xlayer", "arbitrum"]);
+const X402_ENABLED_CHAINS = new Set<ChainKey>(["base", "mantle", "xlayer", "arbitrum"]);
 
 function isBridgeSupported(key: ChainKey): boolean {
   return BRIDGE_ENABLED_CHAINS.has(key);
@@ -140,6 +148,7 @@ function getX402ScoreForChain(mgid: MgidRowClient | null, key: ChainKey): number
   if (key === "base") return Number(mgid.totalX402Score_base ?? mgid.totalX402_base ?? 0);
   if (key === "mantle") return Number(mgid.totalX402Score_mantle ?? mgid.totalX402_mantle ?? 0);
   if (key === "xlayer") return Number(mgid.totalX402Score_xlayer ?? mgid.totalX402_xlayer ?? 0);
+  if (key === "arbitrum") return Number(mgid.totalX402Score_arbitrum ?? mgid.totalX402_arbitrum ?? 0);
   return 0;
 }
 
@@ -153,6 +162,7 @@ function getBridgeCountForChain(
   if (key === "mantle") return Number(mgid.totalBridges_mantle ?? 0);
   if (key === "linea") return Number(mgid.totalBridges_linea ?? 0);
   if (key === "xlayer") return Number(mgid.totalBridges_xlayer ?? 0);  
+  if (key === "arbitrum") return Number(mgid.totalBridges_arbitrum ?? 0);
   if (key === "monad") return Number(mgid.totalBridges_monad ?? 0);    
 
   return 0;
@@ -420,6 +430,7 @@ function computeChainStats(
       if (key === "mitosis") storedScore = Number(mgid.totalScore_mitosis ?? 0);
       if (key === "og") storedScore = Number(mgid.totalScore_0g ?? 0);
       if (key === "xlayer") storedScore = Number(mgid.totalScore_xlayer ?? 0);      
+      if (key === "arbitrum") storedScore = Number(mgid.totalScore_arbitrum ?? 0);
     }
 
     /**
@@ -763,7 +774,8 @@ function ChainGrid(props: {
 
           {(() => {
             const showBridges =
-              c.key === "base" || c.key === "mantle" || c.key === "linea" || c.key === "xlayer" || c.key === "monad";
+              c.key === "base" || c.key === "mantle" || c.key === "linea" ||
+              c.key === "xlayer" || c.key === "monad" || c.key === "arbitrum";
             const showX402 = c.x402Supported;
             const statColumns = showBridges && showX402
               ? "repeat(4,1fr)"

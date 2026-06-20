@@ -2,13 +2,14 @@ import { getAddress, isAddress } from "viem";
 import { POST as generateWorldCupProphecyPost } from "../../app/api/xcup/prophecy/route";
 import { renderWorldCupProphecyCard } from "./renderProphecyCard";
 import type { WorldCupProphecyInput, WorldCupProphecyResult } from "./types";
-import { pinPngBufferToPinata } from "../server/pinata";
+import { buildWorldCupProphecyMetadata } from "./buildProphecyMetadata";
+import { pinJsonToPinata, pinPngBufferToPinata } from "../server/pinata";
 import {
   recordX402Usage,
   type X402Provider,
 } from "../../server/x402UsageStore";
 
-type PaidProphecyChain = "base" | "mantle" | "xlayer";
+type PaidProphecyChain = "base" | "mantle" | "xlayer" | "arbitrum";
 const MAX_METADATA_RISKS = 5;
 
 type Params = {
@@ -90,6 +91,16 @@ function prophecyRiskSummary(prophecy: WorldCupProphecyResult) {
       prophecy.travelDisruptionRisk,
       prophecy.travelDisruptionRiskReason
     ),
+    formatMetadataRisk(
+      "Goalkeeper Risk",
+      prophecy.goalkeeperHeroRisk,
+      prophecy.goalkeeperHeroRiskReason
+    ),
+    formatMetadataRisk(
+      "Physical Risk",
+      prophecy.physicalMismatchRisk,
+      prophecy.physicalMismatchRiskReason
+    ),
   ] as const;
 
   return items
@@ -109,33 +120,18 @@ function buildMetadata(params: {
   const { prophecy, imageUri, chain, payerWallet } = params;
   const risks = prophecyRiskSummary(prophecy);
 
-  return {
-    name: `Cookieverse World Cup Prophecy: ${prophecy.homeTeam} vs ${prophecy.awayTeam}`,
-    description:
-      `${prophecy.prophecy}\n\n` +
-      (risks ? `Risks: ${risks}\n\n` : "") +
-      `A paid Cookieverse x402 World Cup prophecy generated and rendered as a collectible match card.`,
-    image: imageUri,
-    external_url: "https://www.cookieverse.tech/app",
-    attributes: [
-      { trait_type: "Product", value: "World Cup Prophecy" },
-      { trait_type: "Chain", value: chain },
-      { trait_type: "Home Team", value: prophecy.homeTeam },
-      { trait_type: "Away Team", value: prophecy.awayTeam },
-      { trait_type: "Match Date", value: prophecy.matchDate },
-      { trait_type: "Pick", value: prophecy.pick },
-      { trait_type: "Scoreline", value: prophecy.scoreline },
-      { trait_type: "Confidence", value: prophecy.confidence },
-      ...(risks ? [{ trait_type: "Inline Risks", value: risks }] : []),
-    ],
-    cookieverse: {
-      version: "1.0",
-      product: "xcup-prophecy",
-      chain,
-      payerWallet,
-      prophecy,
-    },
-  };
+  const metadata = buildWorldCupProphecyMetadata({
+    prophecy,
+    imageUri,
+    chain,
+    payerWallet,
+  });
+
+  if (risks) {
+    metadata.attributes.push({ trait_type: "Inline Risks", value: risks });
+  }
+
+  return metadata;
 }
 
 export async function buildPaidWorldCupProphecyResponse(params: Params) {
@@ -177,6 +173,9 @@ export async function buildPaidWorldCupProphecyResponse(params: Params) {
     | undefined;
 
   let metadata: unknown | undefined;
+  let metadataPin:
+    | Awaited<ReturnType<typeof pinJsonToPinata>>
+    | undefined;
 
   if (params.includeImage !== false) {
     const png = await renderWorldCupProphecyCard({
@@ -199,6 +198,13 @@ export async function buildPaidWorldCupProphecyResponse(params: Params) {
       chain: params.chain,
       payerWallet,
     });
+
+    metadataPin = await pinJsonToPinata(
+      metadata,
+      `cookieverse-world-cup-prophecy-${cleanSlug(prophecy.homeTeam)}-vs-${cleanSlug(
+        prophecy.awayTeam
+      )}.json`
+    );
   }
 
   await recordX402Usage({
@@ -224,6 +230,7 @@ export async function buildPaidWorldCupProphecyResponse(params: Params) {
       prophecy,
       image,
       metadata,
+      metadataPin,
     },
   };
 }

@@ -25,6 +25,7 @@ const CHAIN_IDS = {
   monad: 143,
   og: Number(process.env.NEXT_PUBLIC_OG_CHAIN_ID || 16661),
   xlayer: 196,
+  arbitrum: 42161,
 } as const;
 
 const LZ_EIDS = {
@@ -34,6 +35,7 @@ const LZ_EIDS = {
   monad: 30390,
   og: Number(process.env.NEXT_PUBLIC_LZ_EID_OG || 0),
   xlayer: Number(process.env.NEXT_PUBLIC_LZ_EID_XLAYER || 0),
+  arbitrum: Number(process.env.NEXT_PUBLIC_LZ_EID_ARBITRUM || 30110),
 } as const;
 
 type ChainKey = keyof typeof CHAIN_IDS;
@@ -57,6 +59,8 @@ const chainIdToChainKey = (chainId?: number | null): ChainKey | null => {
       return 'og';
     case CHAIN_IDS.xlayer:
       return 'xlayer';
+    case CHAIN_IDS.arbitrum:
+      return 'arbitrum';
     default:
       return null;
   }
@@ -76,6 +80,8 @@ const chainLabel = (chain: ChainKey): string => {
       return '0G';
     case 'xlayer':
       return 'X Layer';
+    case 'arbitrum':
+      return 'Arbitrum';
   }
 };
 
@@ -107,17 +113,23 @@ const CANONICAL_XLAYER =
   (process.env.NEXT_PUBLIC_CANONICAL_ERC721_XLAYER ||
     process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER) as Address;
 
+const CANONICAL_ARBITRUM =
+  (process.env.NEXT_PUBLIC_CANONICAL_ERC721_ARBITRUM ||
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM) as Address;
+
 const ADAPTER_BASE = process.env.NEXT_PUBLIC_ADAPTER_BASE as Address;
 const ADAPTER_MANTLE = process.env.NEXT_PUBLIC_ADAPTER_MANTLE as Address;
 const ADAPTER_LINEA = process.env.NEXT_PUBLIC_ADAPTER_LINEA as Address;
 const ADAPTER_MONAD = process.env.NEXT_PUBLIC_ADAPTER_MONAD as Address;
 const ADAPTER_OG = process.env.NEXT_PUBLIC_ADAPTER_OG as Address;
 const ADAPTER_XLAYER = process.env.NEXT_PUBLIC_ADAPTER_XLAYER as Address;
+const ADAPTER_ARBITRUM = process.env.NEXT_PUBLIC_ADAPTER_ARBITRUM as Address;
 
 const ONFT_MANTLE = process.env.NEXT_PUBLIC_ONFT_MANTLE as Address;
 const ONFT_LINEA = process.env.NEXT_PUBLIC_ONFT_LINEA as Address;
 const ONFT_BASE = process.env.NEXT_PUBLIC_ONFT_BASE as Address;
 const ONFT_OG = process.env.NEXT_PUBLIC_ONFT_OG as Address;
+const ONFT_BASE4 = process.env.NEXT_PUBLIC_ONFT_BASE4 as Address;
 
 
 const FEE_RECEIVER =
@@ -302,6 +314,7 @@ function makeExplorerTxUrl(chainId: number | undefined, hash: string): string {
   if (chainId === CHAIN_IDS.linea) return `https://lineascan.build/tx/${hash}`;
   if (chainId === CHAIN_IDS.monad) return `https://monadscan.com/tx/${hash}`;
   if (chainId === CHAIN_IDS.xlayer) return `https://www.okx.com/web3/explorer/xlayer/tx/${hash}`;
+  if (chainId === CHAIN_IDS.arbitrum) return `https://arbiscan.io/tx/${hash}`;
   if (chainId === CHAIN_IDS.og) {
     const explorer = process.env.NEXT_PUBLIC_OG_EXPLORER || 'https://chainscan-galileo.0g.ai';
     return `${explorer.replace(/\/+$/, '')}/tx/${hash}`;
@@ -327,6 +340,15 @@ type BridgeRoute = {
 const BRIDGE_ROUTES: Partial<
   Record<ChainKey, Partial<Record<ChainKey, BridgeRoute>>>
 > = {
+  arbitrum: {
+    base: {
+      token: CANONICAL_ARBITRUM,
+      oapp: ADAPTER_ARBITRUM,
+      sourceKind: 'adapter',
+      dstEid: LZ_EIDS.base,
+      flatFeeWei: FLAT_FEE_WEI_ETH,
+    },
+  },
   xlayer: {
     base: {
       token: CANONICAL_XLAYER,
@@ -414,6 +436,22 @@ function getBridgeRoute(src: ChainKey, dst: ChainKey): BridgeRoute {
 
   if (!route.dstEid || !Number.isFinite(route.dstEid)) {
     throw new Error(`Missing LayerZero EID for ${chainLabel(dst)}`);
+  }
+
+  if (
+    src === 'arbitrum' &&
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM &&
+    process.env.NEXT_PUBLIC_CANONICAL_ERC721_ARBITRUM &&
+    process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM.toLowerCase() !==
+      process.env.NEXT_PUBLIC_CANONICAL_ERC721_ARBITRUM.toLowerCase()
+  ) {
+    throw new Error(
+      'Arbitrum COOKIE and canonical ERC-721 addresses must match.',
+    );
+  }
+
+  if (src === 'arbitrum' && dst === 'base' && !ONFT_BASE4) {
+    throw new Error('Missing NEXT_PUBLIC_ONFT_BASE4 destination contract.');
   }
 
   return route;
@@ -1281,7 +1319,7 @@ const onChangeDst = (next: ChainKey) => {
         Fortune Cookie NFT Bridge
       </h1>
       <p className="muted" style={{ marginBottom: 24, fontSize: 14 }}>
-        Bridge your Fortune Cookies between <strong>X Layer</strong>, <strong>0G</strong>,{' '}
+        Bridge your Fortune Cookies between <strong>Arbitrum</strong>, <strong>X Layer</strong>, <strong>0G</strong>,{' '}
         <strong>Base</strong>, <strong>Mantle</strong>, <strong>Linea</strong>{' '}
         and <strong>Monad</strong> using LayerZero.
       </p>
@@ -1304,6 +1342,7 @@ const onChangeDst = (next: ChainKey) => {
               <option value="monad">Monad</option>
               <option value="og">0G</option>
               <option value="xlayer">X Layer</option>
+              <option value="arbitrum">Arbitrum</option>
             </select>
             <p className="hint">
               Where your NFT currently lives. The app detects this from your wallet network.

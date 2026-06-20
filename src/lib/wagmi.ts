@@ -13,6 +13,7 @@ import {
   mitosisMainnet,
   ogMainnet,
   xLayerMainnet,
+  arbitrumMainnet,
 } from '../lib/chain';
 
 const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!;
@@ -29,6 +30,7 @@ export const wagmiConfig = getDefaultConfig({
     [mitosisMainnet.id]: http(),
     [ogMainnet.id]: http(),
     [xLayerMainnet.id]: http(),
+    [arbitrumMainnet.id]: http(),
   },
   ssr: true,
   pollingInterval: 60_000,

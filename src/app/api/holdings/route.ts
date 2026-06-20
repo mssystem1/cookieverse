@@ -15,6 +15,7 @@ function keyFromChainId(id?: number): ChainKey {
   if (id === mitosisId) return 'mitosis';
   if (id === 16661) return "og";
   if (id === 196) return "xlayer";
+  if (id === 42161) return "arbitrum";
 
   return fallbackChainKey;
 }
@@ -26,6 +27,7 @@ function cookieAddressForKey(key: ChainKey): `0x${string}` {
   if (key === 'mitosis') return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_MITOSIS as `0x${string}`;
   if (key === "og") return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_OG as `0x${string}`;
   if (key === "xlayer") return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_XLAYER as `0x${string}`;  
+  if (key === "arbitrum") return process.env.NEXT_PUBLIC_COOKIE_ADDRESS_ARBITRUM as `0x${string}`;
   
   return process.env.NEXT_PUBLIC_COOKIE_ADDRESS as `0x${string}`;
 }

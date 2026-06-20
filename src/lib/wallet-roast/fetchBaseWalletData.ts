@@ -89,6 +89,12 @@ const BASE_BRIDGE_ADDRESSES = new Set([
   "0x4200000000000000000000000000000000000016", // L2ToL1MessagePasser
 ]);
 
+const ARBITRUM_BRIDGE_ADDRESSES = new Set([
+  "0x4dbd4fc535ac27206064b68ffcf827b0a60bab3f",
+  "0x5288c571fd7ad117be586da93f8f5d0c7de999e1",
+  "0x0000000000000000000000000000000000000064",
+]);
+
 const BRIDGE_METHOD_HINTS = [
   "bridge",
   "swapandbridge",
@@ -680,7 +686,10 @@ function normalizeFunctionName(value: unknown): string {
   return String(value ?? "").toLowerCase().replace(/\s+/g, "");
 }
 
-function isBridgeLikeRecord(tx: any): boolean {
+function isBridgeLikeRecord(
+  tx: any,
+  chain: WalletRoastChainKey = "base"
+): boolean {
   const to = normalizeAddr(tx?.to);
   const from = normalizeAddr(tx?.from);
   const contract = normalizeAddr(tx?.contractAddress);
@@ -690,7 +699,11 @@ function isBridgeLikeRecord(tx: any): boolean {
   const addressHit =
     BASE_BRIDGE_ADDRESSES.has(to) ||
     BASE_BRIDGE_ADDRESSES.has(from) ||
-    BASE_BRIDGE_ADDRESSES.has(contract);
+    BASE_BRIDGE_ADDRESSES.has(contract) ||
+    (chain === "arbitrum" &&
+      (ARBITRUM_BRIDGE_ADDRESSES.has(to) ||
+        ARBITRUM_BRIDGE_ADDRESSES.has(from) ||
+        ARBITRUM_BRIDGE_ADDRESSES.has(contract)));
 
   const methodIdHit = BRIDGE_METHOD_IDS.has(methodId);
   const functionNameHit = BRIDGE_METHOD_HINTS.some((hint) => functionName.includes(hint));
@@ -704,7 +717,7 @@ function countBridgeTransactions(inputs: {
   tokenTransfers?: any[];
   erc721Transfers?: any[];
   erc1155Transfers?: any[];
-}): number {
+}, chain: WalletRoastChainKey = "base"): number {
   const hashes = new Set<string>();
 
   for (const list of [
@@ -715,7 +728,7 @@ function countBridgeTransactions(inputs: {
     inputs.erc1155Transfers ?? [],
   ]) {
     for (const tx of list) {
-      if (!isBridgeLikeRecord(tx)) continue;
+      if (!isBridgeLikeRecord(tx, chain)) continue;
 
       const hash = String(tx?.hash ?? "").toLowerCase();
       if (hash) hashes.add(hash);
@@ -946,7 +959,7 @@ async function fetchEtherscanWalletData(
     tokenTransfers,
     erc721Transfers,
     erc1155Transfers,
-  });
+  }, chainConfig.key);
 
   return {
     basename: settledValue<string | null>(basenameResult, null),
@@ -1344,7 +1357,7 @@ async function fetchXLayerWalletData(wallet: string) {
     txs,
     tokenTransfers,
     erc721Transfers: nftTransfers,
-  });
+  }, "xlayer");
 
   return {
     basename: displayName,
