@@ -30,6 +30,7 @@ export type X402UsageEvent = {
 const TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const PREFIX = "fortune-cookie/x402-usage";
 const FALLBACK_DIR = path.join(os.tmpdir(), "cookieverse-x402-usage");
+const READ_TIMEOUT_MS = 5_000;
 
 function normAddr(address: string) {
   return address.toLowerCase();
@@ -42,6 +43,23 @@ function usagePath(address: string, createdAt: number, requestId: string) {
   return `${PREFIX}/${normAddr(address)}/v/${createdAt}-${safeRequestId}.json`;
 }
 
+async function withTimeout<T>(operation: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("x402 usage storage read timed out")),
+          READ_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function listAll(opts: { prefix: string; limit?: number }) {
   if (!TOKEN) return { blobs: [] as any[] };
 
@@ -49,12 +67,14 @@ async function listAll(opts: { prefix: string; limit?: number }) {
   let cursor: string | undefined = undefined;
 
   while (true) {
-    const res: any = await list({
-      token: TOKEN,
-      prefix: opts.prefix,
-      limit: opts.limit ?? 1000,
-      cursor
-    } as any);
+    const res: any = await withTimeout(
+      list({
+        token: TOKEN,
+        prefix: opts.prefix,
+        limit: opts.limit ?? 1000,
+        cursor
+      } as any),
+    );
 
     blobs.push(...(res.blobs ?? []));
 
@@ -67,7 +87,12 @@ async function listAll(opts: { prefix: string; limit?: number }) {
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { cache: "no-store" });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), READ_TIMEOUT_MS);
+  const res = await fetch(url, {
+    cache: "no-store",
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timer));
 
   if (!res.ok) return null;
 
@@ -127,13 +152,15 @@ export async function getX402UsageEvents(address: string): Promise<X402UsageEven
 
   const { blobs } = await listAll({ prefix: `${PREFIX}/${a}/v/` });
 
-  const rows = await Promise.all(
+  const settled = await Promise.allSettled(
     blobs.map((b: any) => fetchJson<X402UsageEvent>(b.url))
+  );
+  const rows = settled.flatMap((result) =>
+    result.status === "fulfilled" && result.value ? [result.value] : []
   );
 
   return rows
-    .filter(Boolean)
-    .sort((x, y) => x!.createdAt - y!.createdAt) as X402UsageEvent[];
+    .sort((x, y) => x.createdAt - y.createdAt);
 }
 
 export async function getX402UsageSummary(address: string) {

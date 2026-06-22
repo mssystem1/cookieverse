@@ -16,6 +16,25 @@ export type WorldCupRiskLevel =
   | 'Low-Medium'
   | 'Medium-High';
 
+export type WorldCupScoringVolume = 'Low' | 'Medium' | 'High';
+
+export type WorldCupCandidateType =
+  | 'baseline'
+  | 'low_event'
+  | 'high_event'
+  | 'draw_path'
+  | 'alternative_or_disruption';
+
+export type WorldCupDominantScenario =
+  | 'Favorite control'
+  | 'Favorite pressure with concession'
+  | 'Favorite attacking breakout'
+  | 'Draw trap'
+  | 'Chaotic transition game'
+  | 'Underdog disruption'
+  | 'Low-event stalemate'
+  | 'Set-piece swing game';
+
 export type WorldCupProphecyRisks = {
   drawRisk?: WorldCupRiskLevel;
   upsetRisk?: WorldCupRiskLevel;
@@ -45,6 +64,46 @@ export type WorldCupTopScoreline = {
   shortReason: string;
 };
 
+export type WorldCupScorelineCandidate = {
+  rank?: number;
+  candidateType: WorldCupCandidateType;
+  homeGoals: number;
+  awayGoals: number;
+  pick: string;
+  scoreline: string;
+  dominantScenario: WorldCupDominantScenario | string;
+  scoringVolume: WorldCupScoringVolume | string;
+  exactScoreConfidence?: number;
+  viabilityScore?: number;
+  evidenceFit: string;
+  contradiction: string;
+  shortReason: string;
+  strengths?: string;
+  weaknesses?: string;
+};
+
+export type WorldCupRawScorelineCandidate = Omit<
+  WorldCupScorelineCandidate,
+  'pick' | 'scoreline'
+>;
+
+export type WorldCupCandidateGenerationResult = {
+  matchDate: string;
+  homeTeam: string;
+  awayTeam: string;
+  location?: string;
+  researchSummary: string;
+  mainSignals: {
+    favoriteSignals?: string[];
+    underdogSignals?: string[];
+    drawTrapSignals?: string[];
+    breakoutSignals?: string[];
+    lowEventSignals?: string[];
+  };
+  candidates: WorldCupScorelineCandidate[];
+  sources?: string[];
+};
+
 export type WorldCupProphecyInput = {
   homeTeam: string;
   awayTeam: string;
@@ -61,10 +120,11 @@ export type WorldCupResearchContext = {
   fanSentiment?: string;
   tacticalContext?: string;
   dominantScenario?: string;
-  scoringVolume?: 'Low' | 'Medium' | 'High' | string;
+  scoringVolume?: WorldCupScoringVolume | string;
   topScorelines?: WorldCupTopScoreline[];
   confidenceGovernor?: string;
   exactScoreVolatility?: string;
+  candidateGenerationSummary?: string;
   marketAngle?: string;
   playerHealthContext?: string;
   matchFitness?: string;

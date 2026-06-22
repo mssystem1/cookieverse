@@ -6,11 +6,14 @@
   "scripts": {
     "check:og": "tsx scripts/check-og-compute.ts",
     "setup:og": "tsx scripts/setup-og-compute-account.ts",
-    "postinstall": "node scripts/patch-ox.js",
+    "test:xcup": "tsx scripts/test-xcup-prophecy-validation.ts",
+    "check:xcup-prompts": "tsx scripts/check-xcup-prompt-seeding.ts",
+    "check:metadata": "tsx scripts/check-metadata.ts",
+    "postinstall": "node scripts/patch-ox.js && node scripts/patch-reown-basic-config.js",
     "prebuild": "node -e \"const fs=require('fs');console.log('PWD:',process.cwd());console.log('CONFIGS:',fs.readdirSync('.').filter(n=>n.startsWith('next.config')));\"",
     "build": "next build",
-    "vercel-build": "npm run prebuild && node scripts/patch-ox.js && next build",
-    "dev": "next dev -H 127.0.0.1",
+    "vercel-build": "npm run prebuild && node scripts/patch-ox.js && node scripts/patch-reown-basic-config.js && next build",
+    "dev": "node --use-system-ca node_modules/next/dist/bin/next dev -H 127.0.0.1",
     "start": "next start",
     "lint": "next lint"
   },

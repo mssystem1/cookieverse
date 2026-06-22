@@ -222,9 +222,14 @@ export default function LeaderboardClient({ mode = 'default' }: LeaderboardClien
       });
   }
 
-  // Fetch on mount and when wallet changes (fresh)
+  // Debounce mount/hydration changes. React development mode mounts effects
+  // twice, and wallet/chain hydration can otherwise start overlapping scans.
   useEffect(() => {
-    fetchData(true);
+    const timer = window.setTimeout(() => {
+      fetchData(false);
+    }, 150);
+
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, chainId]); // saAddress
 

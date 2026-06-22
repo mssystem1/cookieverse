@@ -206,6 +206,7 @@ export default function DashboardClient() {
   const [totalScore, setTotalScore] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [mgidRevision, setMgidRevision] = React.useState(0);
   const mgidFarcasterUsername = mgid?.usernamefarcaster?.trim() || "";
 
   // periodic mgid-upsert every 60s (like bridge page, simpler headers)
@@ -234,6 +235,10 @@ export default function DashboardClient() {
         }
         if (!res.ok) {
           console.error("periodic mgid-upsert (dashboard) HTTP error", res.status);
+        } else if (!cancelled) {
+          // Re-read only after the write completed; otherwise the dashboard and
+          // upsert race each other every minute and can repeatedly show old x402.
+          setMgidRevision((revision) => revision + 1);
         }
       } catch (e) {
         console.error("periodic mgid-upsert (dashboard) failed", e);
@@ -275,7 +280,11 @@ export default function DashboardClient() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           cache: "no-store",
-          body: JSON.stringify({ op: "readMany", addresses: [addr] }),
+          body: JSON.stringify({
+            op: "readMany",
+            addresses: [addr],
+            preferHistory: true,
+          }),
         });
 
         let mgidRow: MgidRowClient | null = null;
@@ -354,7 +363,7 @@ export default function DashboardClient() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [address, isConnected]);
+  }, [address, isConnected, mgidRevision]);
 
   if (!isConnected || !address) {
     return (

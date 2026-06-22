@@ -110,6 +110,28 @@ type WalletRoastStage =
   | 'ready'
   | 'error';
 
+type WorldCupStage =
+  | 'idle'
+  | 'payment'
+  | 'researching'
+  | 'candidates'
+  | 'judging'
+  | 'rendering'
+  | 'ready'
+  | 'error';
+
+const WORLD_CUP_PROGRESS_STEPS: Array<{
+  stage: WorldCupStage;
+  label: string;
+  paidOnly?: boolean;
+}> = [
+  { stage: 'payment', label: 'Payment', paidOnly: true },
+  { stage: 'researching', label: 'Match research' },
+  { stage: 'candidates', label: 'Candidate scenarios' },
+  { stage: 'judging', label: 'Final judge' },
+  { stage: 'rendering', label: 'Card render' },
+];
+
 const WALLET_ROAST_PROGRESS_STEPS: Array<{
   stage: WalletRoastStage;
   label: string;
@@ -505,14 +527,6 @@ export default function Page() {
   const [wcImageB64, setWcImageB64] = React.useState<string | null>(null);
   const [wcPinCid, setWcPinCid] = React.useState<string | null>(null);
   const [wcMetadataCid, setWcMetadataCid] = React.useState<string | null>(null);
-
-  type WorldCupStage =
-    | 'idle'
-    | 'researching'
-    | 'scoring'
-    | 'rendering'
-    | 'ready'
-    | 'error';
 
   const [wcBusy, setWcBusy] = React.useState(false);
   const [wcStage, setWcStage] = React.useState<WorldCupStage>('idle');
@@ -1551,10 +1565,14 @@ const onShareCookieToX = React.useCallback(
 
 function worldCupStageLabel(stage: WorldCupStage) {
   switch (stage) {
+    case 'payment':
+      return 'Payment authorization confirmed. Starting match analysis…';
     case 'researching':
-      return 'AI is studying previous matches, team style and tournament context…';
-    case 'scoring':
-      return 'Calculating form, attack, defense, momentum, fans and confidence…';
+      return 'Researching form, team style, injuries and tournament context…';
+    case 'candidates':
+      return 'Generating diverse scorelines and match-flow scenarios…';
+    case 'judging':
+      return 'Final Judge is comparing evidence, contradictions and confidence…';
     case 'rendering':
       return 'Rendering your collectible World Cup prophecy card…';
     case 'ready':
@@ -1568,12 +1586,16 @@ function worldCupStageLabel(stage: WorldCupStage) {
 
 function worldCupStagePercent(stage: WorldCupStage) {
   switch (stage) {
+    case 'payment':
+      return 12;
     case 'researching':
-      return 34;
-    case 'scoring':
-      return 62;
+      return 28;
+    case 'candidates':
+      return 52;
+    case 'judging':
+      return 76;
     case 'rendering':
-      return 86;
+      return 92;
     case 'ready':
       return 100;
     case 'error':
@@ -1583,7 +1605,35 @@ function worldCupStagePercent(stage: WorldCupStage) {
   }
 }
 
-const worldCupIsLoading = wcBusy || ['researching', 'scoring', 'rendering'].includes(wcStage);
+function worldCupStepIndex(stage: WorldCupStage, paid: boolean) {
+  const steps = WORLD_CUP_PROGRESS_STEPS.filter((step) => paid || !step.paidOnly);
+  return steps.findIndex((item) => item.stage === stage);
+}
+
+function worldCupStatusLabel(stage: WorldCupStage) {
+  switch (stage) {
+    case 'payment':
+      return 'Payment confirmed';
+    case 'researching':
+      return 'Researching matchup';
+    case 'candidates':
+      return 'Building scenarios';
+    case 'judging':
+      return 'Choosing prophecy';
+    case 'rendering':
+      return 'Rendering card';
+    case 'ready':
+      return 'Card ready';
+    case 'error':
+      return 'Failed';
+    default:
+      return 'Waiting for signature';
+  }
+}
+
+const worldCupIsLoading = wcBusy;
+const worldCupProgressVisible =
+  wcBusy && ['payment', 'researching', 'candidates', 'judging', 'rendering'].includes(wcStage);
 
 // Large inline prophecy loading panel removed.
 
@@ -1603,8 +1653,43 @@ async function generateWorldCupProphecy() {
   setWcAwayTeam(normalizedAwayTeam);
 
   setWcBusy(true);
-  setWcStage('researching');
-  setWcStartedAt(Date.now());
+  setWcStage(shouldUseX402Prophecy ? 'idle' : 'researching');
+  setWcStartedAt(shouldUseX402Prophecy ? null : Date.now());
+
+  const progressTimers: number[] = [];
+  let processingStarted = !shouldUseX402Prophecy;
+  const clearProgressTimers = () => {
+    progressTimers.forEach((timer) => window.clearTimeout(timer));
+    progressTimers.length = 0;
+  };
+  const advanceWorldCupStage = (
+    allowedStages: WorldCupStage[],
+    nextStage: WorldCupStage,
+  ) => {
+    setWcStage((stage) => (allowedStages.includes(stage) ? nextStage : stage));
+  };
+  const scheduleWorldCupAiStages = () => {
+    clearProgressTimers();
+    progressTimers.push(
+      window.setTimeout(() => {
+        advanceWorldCupStage(['researching'], 'candidates');
+      }, 12_000),
+      window.setTimeout(() => {
+        advanceWorldCupStage(['researching', 'candidates'], 'judging');
+      }, 75_000),
+    );
+  };
+  const beginWorldCupProcessing = () => {
+    if (processingStarted) return;
+    processingStarted = true;
+    setWcStartedAt(Date.now());
+    setWcStage('researching');
+    scheduleWorldCupAiStages();
+  };
+
+  if (!shouldUseX402Prophecy) {
+    scheduleWorldCupAiStages();
+  }
 
   try {
     if (wcImageUrl) URL.revokeObjectURL(wcImageUrl);
@@ -1628,25 +1713,52 @@ async function generateWorldCupProphecy() {
         homeTeam: normalizedHomeTeam,
         awayTeam: normalizedAwayTeam,
         matchDate: wcMatchDate,
+        onPaidRequest: beginWorldCupProcessing,
       });
-
-      await refreshMgidAfterX402('x402 match prophecy');
 
       if (!paid.prophecy) {
         throw new Error('x402 prophecy response did not include prophecy data.');
       }
 
-      setWcStage('scoring');
+      clearProgressTimers();
+      setWcStage('judging');
       setWcProphecy(paid.prophecy);
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
       setWcStage('rendering');
 
-      if (!paid.image?.gatewayUrl) {
-        throw new Error('x402 prophecy response did not include rendered image.');
+      // Usage refresh is bookkeeping. Never block the paid preview on it.
+      void refreshMgidAfterX402('x402 match prophecy');
+
+      // Render the preview directly from the paid prophecy response. A newly
+      // pinned IPFS gateway URL can take minutes to propagate and previously
+      // left the UI stuck in "rendering" with no timeout.
+      let imgRes = await fetch('/api/xcup/render', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ...paid.prophecy,
+          mintedBy: address,
+        }),
+      });
+
+      if (!imgRes.ok && paid.image?.gatewayUrl) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 12_000);
+
+        try {
+          imgRes = await fetch(paid.image.gatewayUrl, {
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+        } finally {
+          window.clearTimeout(timeout);
+        }
       }
 
-      const imgRes = await fetch(paid.image.gatewayUrl, { cache: 'no-store' });
       if (!imgRes.ok) {
-        throw new Error(`Failed to fetch x402 prophecy image: HTTP ${imgRes.status}`);
+        throw new Error(
+          `Failed to render x402 prophecy preview: HTTP ${imgRes.status}`,
+        );
       }
 
       const blob = await imgRes.blob();
@@ -1678,10 +1790,11 @@ async function generateWorldCupProphecy() {
       throw new Error(prophecyData?.error || 'Failed to generate World Cup prophecy');
     }
 
-    setWcStage('scoring');
+    clearProgressTimers();
+    setWcStage('judging');
     setWcProphecy(prophecyData);
 
-    // Give the UI one frame to visibly move from AI research → scoring/rendering.
+    // Give the UI one frame to visibly complete the judge stage before rendering.
     await new Promise((resolve) => window.setTimeout(resolve, 250));
 
     setWcStage('rendering');
@@ -1712,6 +1825,7 @@ async function generateWorldCupProphecy() {
     setWcStage('error');
     setUiError(String(e?.message || e));
   } finally {
+    clearProgressTimers();
     setWcBusy(false);
     setWcStartedAt(null);
   }
@@ -2362,7 +2476,7 @@ React.useEffect(() => {
         </div>
       ) : null}
 
-      {worldCupIsLoading ? (
+      {worldCupProgressVisible ? (
         <div
           className="cook-panel cook-panel--world-cup"
           role="status"
@@ -2384,8 +2498,37 @@ React.useEffect(() => {
             <span style={{ width: `${worldCupStagePercent(wcStage)}%` }} />
           </div>
 
+          <div className="world-cup-progress-steps">
+            {WORLD_CUP_PROGRESS_STEPS
+              .filter((step) => shouldUseX402Prophecy || !step.paidOnly)
+              .map((step, index, steps) => {
+                const activeIndex = worldCupStepIndex(wcStage, shouldUseX402Prophecy);
+                const done =
+                  wcStage === 'ready' ||
+                  (activeIndex >= 0 && index < activeIndex);
+                const active = activeIndex === index && wcStage !== 'ready';
+
+                return (
+                  <span
+                    key={step.stage}
+                    className={[
+                      'world-cup-progress-step',
+                      done ? 'world-cup-progress-step--done' : '',
+                      active ? 'world-cup-progress-step--active' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    style={{ width: `${100 / steps.length}%` }}
+                  >
+                    <i />
+                    {step.label}
+                  </span>
+                );
+              })}
+          </div>
+
           <div className="cook-panel__hint">
-            Do not close this page. First AI researches the match, then Cookieverse renders the card.
+            Keep this page open. Candidate generation and Final Judge are separate AI steps and may each take some time.
           </div>
         </div>
       ) : null}
@@ -2541,7 +2684,9 @@ React.useEffect(() => {
                   }}
                 >
                   {worldCupIsLoading
-                    ? 'AI is creating prophecy…'
+                    ? wcStage === 'idle'
+                      ? 'Confirm x402 payment…'
+                      : worldCupStatusLabel(wcStage)
                     : shouldUseX402Prophecy
                       ? 'x402 Create Match Prophecy'
                       : 'Create Match Prophecy'}
@@ -2614,7 +2759,7 @@ React.useEffect(() => {
 
             <div className="col" style={{ minWidth: 280, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <label className="label">Prophecy card preview</label>
-              {worldCupIsLoading ? (
+              {worldCupProgressVisible ? (
                 <div
                   style={{
                     padding: '9px 11px',
@@ -2665,8 +2810,22 @@ React.useEffect(() => {
                         boxShadow: '0 18px 45px rgba(0,0,0,0.32)',
                       }}
                     />
-                  ) : worldCupIsLoading ? (
-                    <div style={{ textAlign: 'center', padding: 18 }}>
+                  ) : worldCupProgressVisible ? (
+                    <div
+                      className="wallet-roast-loader"
+                      role="status"
+                      aria-live="polite"
+                      style={
+                        {
+                          '--wr-accent': '#facc15',
+                          '--wr-accent-2': '#f97316',
+                          '--wr-accent-3': '#a855f7',
+                        } as React.CSSProperties
+                      }
+                    >
+                      <span className="wallet-roast-loader__eyebrow">
+                        AI is cooking Match Prophecy · {wcElapsedSec}s
+                      </span>
                       <div
                         style={{
                           width: 58,
@@ -2679,40 +2838,46 @@ React.useEffect(() => {
                         }}
                       />
 
-                      <div
-                        style={{
-                          color: '#fde68a',
-                          fontWeight: 900,
-                          marginBottom: 6,
-                        }}
-                      >
-                        Building your prophecy card
+                      <strong>{worldCupStatusLabel(wcStage)}</strong>
+
+                      <span className="wallet-roast-loader__copy">
+                        {worldCupStageLabel(wcStage)}
+                      </span>
+
+                      <div className="wallet-roast-loader__bar">
+                        <span style={{ width: `${worldCupStagePercent(wcStage)}%` }} />
                       </div>
 
-                      <div className="hint" style={{ maxWidth: 290 }}>
-                        AI is generating the match logic, then Cookieverse renders the collectible image.
-                      </div>
+                      <div className="wallet-roast-steps">
+                        {WORLD_CUP_PROGRESS_STEPS
+                          .filter((step) => shouldUseX402Prophecy || !step.paidOnly)
+                          .map((step, index) => {
+                            const activeIndex = worldCupStepIndex(
+                              wcStage,
+                              shouldUseX402Prophecy,
+                            );
+                            const done =
+                              wcStage === 'ready' ||
+                              (activeIndex >= 0 && index < activeIndex);
+                            const active =
+                              activeIndex === index && wcStage !== 'ready';
 
-                      <div
-                        style={{
-                          marginTop: 14,
-                          width: 220,
-                          maxWidth: '100%',
-                          height: 7,
-                          borderRadius: 999,
-                          overflow: 'hidden',
-                          background: 'rgba(250,204,21,0.12)',
-                          border: '1px solid rgba(250,204,21,0.18)',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${worldCupStagePercent(wcStage)}%`,
-                            height: '100%',
-                            background: 'linear-gradient(90deg,#facc15,#f97316,#a855f7)',
-                            transition: 'width 420ms ease',
-                          }}
-                        />
+                            return (
+                              <span
+                                key={step.stage}
+                                className={[
+                                  'wallet-roast-step',
+                                  done ? 'wallet-roast-step--done' : '',
+                                  active ? 'wallet-roast-step--active' : '',
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ')}
+                              >
+                                <i />
+                                {step.label}
+                              </span>
+                            );
+                          })}
                       </div>
                     </div>
                   ) : (
@@ -3364,11 +3529,63 @@ React.useEffect(() => {
           box-shadow: 0 0 18px color-mix(in srgb, var(--cook-accent) 42%, transparent);
           transition: width 420ms ease;
         }
+        .world-cup-progress-steps {
+          display: flex;
+          gap: 6px;
+          margin-top: 10px;
+        }
+        .world-cup-progress-step {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          min-width: 0;
+          padding: 6px 4px;
+          border-radius: 8px;
+          border: 1px solid rgba(250, 204, 21, 0.14);
+          background: rgba(2, 6, 23, 0.4);
+          color: #94a3b8;
+          font-size: 9px;
+          font-weight: 900;
+          line-height: 1.15;
+          text-align: center;
+        }
+        .world-cup-progress-step i {
+          width: 7px;
+          height: 7px;
+          flex: 0 0 auto;
+          border-radius: 999px;
+          background: rgba(148, 163, 184, 0.5);
+        }
+        .world-cup-progress-step--active {
+          color: #fff7cc;
+          border-color: rgba(250, 204, 21, 0.58);
+          background: rgba(250, 204, 21, 0.11);
+        }
+        .world-cup-progress-step--active i {
+          background: #facc15;
+          box-shadow: 0 0 13px rgba(250, 204, 21, 0.8);
+        }
+        .world-cup-progress-step--done {
+          color: #fde68a;
+        }
+        .world-cup-progress-step--done i {
+          background: linear-gradient(135deg, #facc15, #f97316);
+        }
         .cook-panel__hint {
           margin-top: 9px;
           color: #9ca3af;
           font-size: 11px;
           line-height: 1.35;
+        }
+        @media (max-width: 700px) {
+          .world-cup-progress-steps {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .world-cup-progress-step {
+            width: auto !important;
+          }
         }
         .col { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
         .card {

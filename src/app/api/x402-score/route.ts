@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getAddress, isAddress, type Address } from "viem";
+import { getX402UsageEvents } from "../../../server/x402UsageStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -610,6 +611,20 @@ function maybeStripEvents(result: ChainResult, includeEvents: boolean): ChainRes
   return includeEvents ? result : { ...result, events: [] };
 }
 
+function mergeRecordedUsage(
+  result: ChainResult,
+  recordedCount: number,
+): ChainResult {
+  const count = Math.max(result.count, recordedCount);
+  return {
+    ...result,
+    count,
+    score: Math.max(result.score, count),
+    ok: result.ok || recordedCount > 0,
+    source: result.ok ? result.source : "none",
+  };
+}
+
 async function safeChainResult(
   fn: () => Promise<ChainResult>,
 ): Promise<ChainResult> {
@@ -731,12 +746,39 @@ export async function GET(req: Request) {
   }
 
   const user = getAddress(address);
-  const [base, mantle, xlayer, arbitrum] = await Promise.all([
+  const [baseResult, mantleResult, xlayerResult, arbitrumResult, usageEvents] = await Promise.all([
     safeChainResult(() => fetchBaseResult(user)),
     safeChainResult(() => fetchMantleResult(user)),
     safeChainResult(() => fetchXLayerResult(user)),
     safeChainResult(() => fetchArbitrumResult(user)),
+    getX402UsageEvents(user).catch((error) => {
+      console.error("[x402-score] recorded usage fallback failed", {
+        wallet: user.toLowerCase(),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }),
   ]);
+
+  const recordedByChain: Record<X402ScoreChain, number> = {
+    base: 0,
+    mantle: 0,
+    xlayer: 0,
+    arbitrum: 0,
+  };
+  for (const event of usageEvents) {
+    if (event.chain && event.chain in recordedByChain) {
+      recordedByChain[event.chain as X402ScoreChain] += 1;
+    }
+  }
+
+  // Successful Cookieverse responses are recorded immediately, while explorers
+  // and provider APIs may index the matching payment minutes later. Use the
+  // larger count so the fallback fills that gap without double-counting.
+  const base = mergeRecordedUsage(baseResult, recordedByChain.base);
+  const mantle = mergeRecordedUsage(mantleResult, recordedByChain.mantle);
+  const xlayer = mergeRecordedUsage(xlayerResult, recordedByChain.xlayer);
+  const arbitrum = mergeRecordedUsage(arbitrumResult, recordedByChain.arbitrum);
 
   const totalCount = base.count + mantle.count + xlayer.count + arbitrum.count;
   const totalScore = base.score + mantle.score + xlayer.score + arbitrum.score;

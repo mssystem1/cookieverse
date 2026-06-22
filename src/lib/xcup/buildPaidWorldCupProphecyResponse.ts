@@ -135,6 +135,7 @@ function buildMetadata(params: {
 }
 
 export async function buildPaidWorldCupProphecyResponse(params: Params) {
+  const requestStartedAt = Date.now();
   if (!isAddress(params.payerWallet)) {
     return {
       status: 400,
@@ -178,17 +179,33 @@ export async function buildPaidWorldCupProphecyResponse(params: Params) {
     | undefined;
 
   if (params.includeImage !== false) {
+    const renderStartedAt = Date.now();
     const png = await renderWorldCupProphecyCard({
       ...prophecy,
       mintedBy: payerWallet,
     });
 
+    console.info("[xcup paid image] rendered", {
+      provider: params.provider,
+      chain: params.chain,
+      durationMs: Date.now() - renderStartedAt,
+      bytes: png.byteLength,
+    });
+
+    const imagePinStartedAt = Date.now();
     image = await pinPngBufferToPinata(
       Buffer.from(png),
       `cookieverse-world-cup-prophecy-${cleanSlug(prophecy.homeTeam)}-vs-${cleanSlug(
         prophecy.awayTeam
       )}.png`
     );
+
+    console.info("[xcup paid image] pinned", {
+      provider: params.provider,
+      chain: params.chain,
+      durationMs: Date.now() - imagePinStartedAt,
+      cid: image.cid,
+    });
   }
 
   if (params.includeMintMetadata !== false) {
@@ -199,12 +216,20 @@ export async function buildPaidWorldCupProphecyResponse(params: Params) {
       payerWallet,
     });
 
+    const metadataPinStartedAt = Date.now();
     metadataPin = await pinJsonToPinata(
       metadata,
       `cookieverse-world-cup-prophecy-${cleanSlug(prophecy.homeTeam)}-vs-${cleanSlug(
         prophecy.awayTeam
       )}.json`
     );
+
+    console.info("[xcup paid metadata] pinned", {
+      provider: params.provider,
+      chain: params.chain,
+      durationMs: Date.now() - metadataPinStartedAt,
+      cid: metadataPin.cid,
+    });
   }
 
   await recordX402Usage({
@@ -217,6 +242,14 @@ export async function buildPaidWorldCupProphecyResponse(params: Params) {
     imageUrl: image?.gatewayUrl,
     metadataReady: Boolean(metadata),
     createdAt: Date.now(),
+  });
+
+  console.info("[xcup paid response] ready", {
+    provider: params.provider,
+    chain: params.chain,
+    durationMs: Date.now() - requestStartedAt,
+    hasImage: Boolean(image),
+    hasMetadata: Boolean(metadataPin),
   });
 
   return {

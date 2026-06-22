@@ -630,6 +630,7 @@ export async function callCookieverseX402Prophecy(params: {
   homeTeam: string;
   awayTeam: string;
   matchDate: string;
+  onPaidRequest?: () => void;
 }): Promise<CookieverseX402ProphecyResponse> {
   if (
     params.walletClient.chain?.id !==
@@ -670,6 +671,7 @@ export async function callCookieverseX402Prophecy(params: {
       endpoint,
       chain: params.chain,
       init,
+      onPaidRequest: params.onPaidRequest,
     });
     const text = await response.text();
     let data: CookieverseX402ProphecyResponse | null = null;
@@ -702,6 +704,7 @@ export async function callCookieverseX402Prophecy(params: {
             walletClient: params.walletClient,
             endpoint,
             init,
+            onPaidRequest: params.onPaidRequest,
           })
         : await mantleDevkitFetchWithPayment({
             endpoint,
@@ -736,6 +739,7 @@ export async function callCookieverseX402Prophecy(params: {
     createCoinbasePaymentFetch({
       walletClient: params.walletClient,
       chain: params.chain,
+      onPaidRequest: params.onPaidRequest,
     }),
     client,
   );

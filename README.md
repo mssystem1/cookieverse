@@ -202,7 +202,7 @@ docs/mantle-x402-facilitator-guide.md
 | 🖼️ AI Image Mints | Generate or upload image-based COOKIE NFTs with IPFS metadata. |
 | ⚽ World Cup Prophecy | GPT-5.5 researches historical match context, creates a World Cup-style prophecy, renders a collectible PNG card, and mints it as a COOKIE NFT. Supports paid x402-style flows on Base, Mantle, and X Layer where enabled. |
 | 🏟️ Prophecy Generation UX | Shows compact progress states while GPT-5.5 works: button state, preview spinner/progress, bottom status overlay, and research → criteria → render stage messages. |
-| 🔐 Hidden Prophecy Prompt | Stores the full World Cup prophecy prompt in server-only env `XCUP_PROPHECY_PROMPT_SECRET`, not in GitHub and not in the frontend bundle. |
+| 🔐 Hidden Prophecy Prompts | Stores Candidate Generator and Final Judge prompts in server-only env variables. The legacy prompt is available only through an explicit fallback switch. |
 | 🧾 Strict Prophecy JSON | Supports schema-driven, card-ready prophecy JSON so the renderer receives structured data instead of free-form AI prose. |
 | 🌍 World Cup Team Selector | Team 1 / Team 2 inputs support searchable World Cup teams, aliases, real flag images, and manual custom typing. |
 | 🏳️ Real Flag Rendering | Uses real flag images in the UI and rendered cards instead of emoji flags, avoiding broken Windows / Node canvas flag rendering. |
@@ -264,6 +264,19 @@ Base App-specific World Cup UI updates:
 - Team selector remains compact for mobile/Base App layout.
 - Sharing favors copy/download/native share flows where supported.
 ```
+
+Website and `/app` link previews use dedicated Cookieverse metadata:
+
+```txt
+Title: Cookieverse
+Open Graph / X card: 1200x630 MSSystem World Cup artwork
+Root canonical URL: https://www.cookieverse.tech/
+App canonical URL: https://www.cookieverse.tech/app
+```
+
+The social-preview update does not change `/mini`, the Farcaster manifest, or
+Base.dev project metadata. `base:app_id` remains associated with the existing
+approved Base.dev project.
 
 
 ### Farcaster Mini App
@@ -743,25 +756,27 @@ they can render as AR / FR / SN or broken glyphs
 real flag images create stable social-share and NFT images
 ```
 
-#### Hidden World Cup Prophecy Prompt
+#### Hidden World Cup Prophecy Prompts
 
-The full World Cup prophecy prompt is private and server-only.
+The two World Cup prophecy prompts are private and server-only.
 
-It must be stored in:
+They must be stored in:
 
 ```bash
-XCUP_PROPHECY_PROMPT_SECRET="..."
+XCUP_PROPHECY_CANDIDATES_PROMPT_SECRET="..."
+XCUP_PROPHECY_FINAL_PROMPT_SECRET="..."
 ```
 
 Do not use:
 
 ```bash
-NEXT_PUBLIC_XCUP_PROPHECY_PROMPT_SECRET
+NEXT_PUBLIC_XCUP_PROPHECY_CANDIDATES_PROMPT_SECRET
+NEXT_PUBLIC_XCUP_PROPHECY_FINAL_PROMPT_SECRET
 ```
 
 because every `NEXT_PUBLIC_*` variable can be exposed to the frontend bundle.
 
-The private prompt uses placeholders:
+Both private prompts use placeholders:
 
 ```txt
 {{HOME_TEAM}}
@@ -769,7 +784,67 @@ The private prompt uses placeholders:
 {{MATCH_DATE}}
 ```
 
-The API route replaces those placeholders server-side before calling OpenAI:
+The API route replaces those placeholders server-side before calling OpenAI.
+The Candidate Generator call performs required web research and produces five
+validated scoreline paths. The Final Judge receives those candidates without a
+web-search tool and selects the final card result.
+
+An explicit legacy fallback is available:
+
+```bash
+XCUP_PROPHECY_ALLOW_LEGACY_FALLBACK=1
+XCUP_PROPHECY_PROMPT_SECRET="..."
+```
+
+The fallback runs when one or both new prompt variables are missing. It also
+runs after Candidate Generator or Final Judge execution/validation remains
+invalid after its focused repair attempt. This behavior is shared by free and
+paid prophecy routes.
+
+Candidate Generator output uses numeric `homeGoals` and `awayGoals`. The
+application derives `scoreline` and `pick`, so model wording cannot create a
+pick/scoreline mismatch. The five required candidate slots are:
+
+```txt
+baseline
+low_event
+high_event
+draw_path
+alternative_or_disruption
+```
+
+The initial candidate call performs web research. A failed candidate set gets
+one repair call using the rejected JSON and validation findings, without a
+second web search.
+
+Candidates are passed to the Final Judge as a randomized, keyed
+`candidatePool`; key and serialization order do not represent rank. Every
+candidate includes `viabilityScore`, `evidenceFit`, and `contradiction` so the
+judge compares evidence instead of selecting the first conventional path.
+The prompt-seeding audit can be run with:
+
+```bash
+npm run check:xcup-prompts
+```
+
+Two-prompt normalization never supplies missing final confidence values.
+Missing confidence fields trigger the existing single repair attempt. The
+known `Favorite control` + `Medium` + `2-0` + `86` fingerprint also triggers
+repair instead of being accepted as a final result.
+
+The Final Judge uses Responses API Structured Outputs with a strict, seed-free
+JSON schema. Required fields are enforced by the API without embedding example
+scores or confidence values in the prompt. Any remaining shape failure is
+reported with a field-specific validation code instead of generic
+`FINAL_SCHEMA`.
+
+The Final Judge ranks opaque candidate IDs instead of repeating candidate
+fields. The application copies `pick`, `scoreline`, `dominantScenario`,
+`scoringVolume`, `exactScoreConfidence`, and ranked scorelines from the chosen
+candidates. This prevents harmless wording differences from causing another
+Final Judge request.
+
+Placeholder replacement:
 
 ```ts
 function replacePromptPlaceholders(template: string, input: WorldCupProphecyInput) {
@@ -1656,11 +1731,18 @@ npm run setup:og
 MFC_OPENAI_KEY_NAME=OPENAI_API_KEY_MFC_NEW
 OPENAI_API_KEY_MFC_NEW=sk-...
 XCUP_OPENAI_MODEL=gpt-5-mini
+XCUP_PROPHECY_CANDIDATES_PROMPT_SECRET="..."
+XCUP_PROPHECY_FINAL_PROMPT_SECRET="..."
+
+# Explicit compatibility fallback:
+XCUP_PROPHECY_ALLOW_LEGACY_FALLBACK=1
 XCUP_PROPHECY_PROMPT_SECRET="..."
 XCUP_RENDER_DEBUG_BOXES=0
 ```
 
-`XCUP_PROPHECY_PROMPT_SECRET` is server-only and must not be committed to GitHub.
+All prophecy prompt variables are server-only and must not be committed to
+GitHub. The legacy prompt is read only when the explicit fallback switch is
+enabled and a new prompt is missing.
 
 Required prompt placeholders:
 

@@ -115,6 +115,14 @@ const TOKEN = process.env.BLOB_READ_WRITE_TOKEN || '';
 
 // Dev fallback (only used when no token)
 const FALLBACK_DIR = path.join(os.tmpdir(), 'mgid-v2');
+const READ_TIMEOUT_MS = 5_000;
+const PLAYER_CACHE_TTL_MS = 60_000;
+const playerCache = new Map<string, { at: number; row: MgidRow | null }>();
+const playerInflight = new Map<string, Promise<MgidRow | null>>();
+let latestBlobUrlsCache:
+  | { at: number; urls: Map<string, string> }
+  | null = null;
+let latestBlobUrlsInflight: Promise<Map<string, string>> | null = null;
 
 function normAddr(a: string) {
   return a.toLowerCase();
@@ -129,6 +137,27 @@ function v2LatestPath(addr: string) {
 }
 
 // ---------- Helpers ----------
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs = READ_TIMEOUT_MS,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`MGID storage read timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function listAll(opts: { prefix: string; limit?: number }) {
   if (!TOKEN) return { blobs: [] as any[] };
 
@@ -137,12 +166,14 @@ async function listAll(opts: { prefix: string; limit?: number }) {
 
   // list() supports limit + cursor pagination :contentReference[oaicite:3]{index=3}
   while (true) {
-    const res: any = await list({
-      token: TOKEN,
-      prefix: opts.prefix,
-      limit: opts.limit ?? 1000,
-      cursor,
-    } as any);
+    const res: any = await withTimeout(
+      list({
+        token: TOKEN,
+        prefix: opts.prefix,
+        limit: opts.limit ?? 1000,
+        cursor,
+      } as any),
+    );
 
     blobs.push(...(res.blobs ?? []));
 
@@ -154,16 +185,54 @@ async function listAll(opts: { prefix: string; limit?: number }) {
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { cache: 'no-store' });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), READ_TIMEOUT_MS);
+  const res = await fetch(url, {
+    cache: 'no-store',
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timer));
   if (!res.ok) return null;
   return (await res.json()) as T;
 }
 
 async function blobUrlByExactPathname(pathname: string): Promise<string | null> {
   if (!TOKEN) return null;
-  const { blobs } = await list({ token: TOKEN, prefix: pathname });
+  const { blobs } = await withTimeout(
+    list({ token: TOKEN, prefix: pathname }),
+  );
   const exact = (blobs ?? []).find((b: any) => b.pathname === pathname);
   return exact?.url ?? null;
+}
+
+async function listLatestBlobUrls(): Promise<Map<string, string>> {
+  const now = Date.now();
+  if (
+    latestBlobUrlsCache &&
+    now - latestBlobUrlsCache.at < PLAYER_CACHE_TTL_MS
+  ) {
+    return latestBlobUrlsCache.urls;
+  }
+  if (latestBlobUrlsInflight) return latestBlobUrlsInflight;
+
+  latestBlobUrlsInflight = (async () => {
+    const { blobs } = await listAll({ prefix: V2_PREFIX });
+    const urls = new Map<string, string>();
+
+    for (const blob of blobs) {
+      const pathname = String(blob.pathname);
+      const match = pathname.match(/^fortune-cookie\/players\/([^/]+)\/latest\.json$/);
+      if (match) urls.set(match[1], blob.url);
+    }
+
+    latestBlobUrlsCache = { at: Date.now(), urls };
+    return urls;
+  })();
+
+  try {
+    return await latestBlobUrlsInflight;
+  } finally {
+    latestBlobUrlsInflight = null;
+  }
 }
 
 // ---------- Legacy snapshot read ----------
@@ -213,18 +282,6 @@ async function readV2Best(
 ): Promise<MgidRow | null> {
   const a = normAddr(addr);
 
-  if (opts.preferHistory) {
-    try {
-      const history = await readV2HistoryBest(a);
-      if (history) return history;
-    } catch (error) {
-      console.error('[mgidStore] history read failed, falling back to latest', {
-        address: a,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
   // 1) try latest.json (fast path)
   if (!TOKEN) {
     try {
@@ -249,7 +306,17 @@ async function readV2Best(
     return null;
   }
 
-  return readV2HistoryBest(a);
+  try {
+    return await readV2HistoryBest(a);
+  } catch (error) {
+    if (opts.preferHistory) {
+      console.error('[mgidStore] history fallback read failed', {
+        address: a,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    throw error;
+  }
 }
 
 // ---------- V2 write: bullet-proof upsert ----------
@@ -262,10 +329,12 @@ async function readV2Best(
 export async function upsertPlayer(row: MgidRow) {
   const addr = normAddr(row.EOAWallet);
   const ts = row.updatedAt || Date.now();
+  const storedRow = { ...row, updatedAt: ts };
 
   // Local fallback (no blob token) – keep behavior safe in dev
   if (!TOKEN) {
-    await writeFile(path.join(FALLBACK_DIR, `${addr}.latest.json`), JSON.stringify({ ...row, updatedAt: ts }), 'utf8');
+    await writeFile(path.join(FALLBACK_DIR, `${addr}.latest.json`), JSON.stringify(storedRow), 'utf8');
+    playerCache.set(addr, { at: Date.now(), row: storedRow });
     return;
   }
 
@@ -274,7 +343,7 @@ export async function upsertPlayer(row: MgidRow) {
   let historyPath = v2HistoryPath(addr, ts);
   for (let i = 0; i < 3; i++) {
     try {
-      await put(historyPath, JSON.stringify({ ...row, updatedAt: ts }), {
+      await put(historyPath, JSON.stringify(storedRow), {
         token: TOKEN,
         access: 'public',
         contentType: 'application/json',
@@ -300,7 +369,7 @@ export async function upsertPlayer(row: MgidRow) {
     // Guard: only overwrite latest if newer than what we see.
     const cur = await readV2Best(addr);
     if (!cur || (cur.updatedAt ?? 0) <= ts) {
-      await put(v2LatestPath(addr), JSON.stringify({ ...row, updatedAt: ts }), {
+      await put(v2LatestPath(addr), JSON.stringify(storedRow), {
         token: TOKEN,
         access: 'public',
         contentType: 'application/json',
@@ -311,6 +380,9 @@ export async function upsertPlayer(row: MgidRow) {
   } catch {
     // swallow: history already persisted
   }
+
+  playerCache.delete(addr);
+  latestBlobUrlsCache = null;
 }
 
 // ---------- Public reads ----------
@@ -318,12 +390,45 @@ export async function getPlayer(
   EOAWallet: `0x${string}`,
   opts: { preferHistory?: boolean } = {}
 ) {
-  // Prefer V2; if not found, fall back to legacy snapshot
-  const v2 = await readV2Best(EOAWallet, opts);
-  if (v2) return v2;
+  const address = normAddr(EOAWallet);
 
- // const legacy = await readLegacySnapshot();
- // return legacy.players[normAddr(EOAWallet)] || null;
+  if (opts.preferHistory && TOKEN) {
+    const historyKey = `history:${address}`;
+    const existingHistory = playerInflight.get(historyKey);
+    if (existingHistory) return existingHistory;
+
+    const historyRequest = readV2HistoryBest(address)
+      .then((row) => {
+        playerCache.set(address, { at: Date.now(), row });
+        return row;
+      })
+      .finally(() => {
+        playerInflight.delete(historyKey);
+      });
+
+    playerInflight.set(historyKey, historyRequest);
+    return historyRequest;
+  }
+
+  const cached = playerCache.get(address);
+  if (cached && Date.now() - cached.at < PLAYER_CACHE_TTL_MS) {
+    return cached.row;
+  }
+
+  const existing = playerInflight.get(address);
+  if (existing) return existing;
+
+  const request = readV2Best(address, opts)
+    .then((row) => {
+      playerCache.set(address, { at: Date.now(), row });
+      return row;
+    })
+    .finally(() => {
+      playerInflight.delete(address);
+    });
+
+  playerInflight.set(address, request);
+  return request;
 }
 
 /**
@@ -379,20 +484,74 @@ export async function getPlayersMany(
   opts: { preferHistory?: boolean } = {}
 ): Promise<MgidRow[]> {
   const uniq = Array.from(new Set(addresses.map((a) => a?.toLowerCase()).filter(Boolean) as string[]));
-  const settled = await Promise.allSettled(
-    uniq.map(async (a) => ({ address: a, row: await getPlayer(a as any, opts) }))
-  );
+  if (!uniq.length) return [];
+
+  if (!TOKEN || opts.preferHistory) {
+    const settled = await Promise.allSettled(
+      uniq.map((a) => getPlayer(a as `0x${string}`, opts)),
+    );
+    return settled.flatMap((result) =>
+      result.status === 'fulfilled' && result.value ? [result.value] : [],
+    );
+  }
 
   const rows: MgidRow[] = [];
+  const unresolved: string[] = [];
+  const now = Date.now();
 
-  for (const result of settled) {
-    if (result.status === 'fulfilled') {
-      if (result.value.row) rows.push(result.value.row);
-      continue;
+  for (const address of uniq) {
+    const cached = playerCache.get(address);
+    if (cached && now - cached.at < PLAYER_CACHE_TTL_MS) {
+      if (cached.row) rows.push(cached.row);
+    } else {
+      unresolved.push(address);
+    }
+  }
+
+  if (!unresolved.length) return rows;
+
+  try {
+    // One Blob listing replaces one list request per leaderboard wallet.
+    const latestByAddress = await listLatestBlobUrls();
+
+    const settled = await Promise.allSettled(
+      unresolved.map(async (address) => {
+        const url = latestByAddress.get(address);
+        if (!url) return { address, row: null as MgidRow | null };
+        return { address, row: await fetchJson<MgidRow>(url) };
+      }),
+    );
+
+    const missingLatest: string[] = [];
+    for (const result of settled) {
+      if (result.status === 'rejected') {
+        console.error('[mgidStore] getPlayersMany row read failed', {
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+        continue;
+      }
+
+      const { address, row } = result.value;
+      playerCache.set(address, { at: Date.now(), row });
+      if (row) rows.push(row);
+      else if (opts.preferHistory) missingLatest.push(address);
     }
 
-    console.error('[mgidStore] getPlayersMany row read failed', {
-      error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+    if (missingLatest.length) {
+      const historySettled = await Promise.allSettled(
+        missingLatest.map((address) => readV2HistoryBest(address)),
+      );
+      for (const result of historySettled) {
+        if (result.status === 'fulfilled' && result.value) {
+          const row = result.value;
+          playerCache.set(normAddr(row.EOAWallet), { at: Date.now(), row });
+          rows.push(row);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[mgidStore] getPlayersMany batch read failed', {
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 

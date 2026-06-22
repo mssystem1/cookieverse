@@ -20,6 +20,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../lib/auth"; // we'll create this in step 2
 import { isXAuthRequired } from "../lib/xAuthMode";
 import XAuthButton from "../components/XAuthButton";
+import {
+  buildCookieversePageMetadata,
+  COOKIEVERSE_DESCRIPTION,
+} from "../lib/siteMetadata";
 
 export async function generateMetadata(): Promise<Metadata> {
   const h = await headers()
@@ -45,10 +49,11 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: "Cookieverse",
-    description: "AI blessing cookies",  
+    ...buildCookieversePageMetadata({
+      canonicalPath: '/',
+      description: COOKIEVERSE_DESCRIPTION,
+    }),
     other: {
-      'base:app_id': '69413c95d19763ca26ddc346',
       "fc:miniapp": JSON.stringify(embed),
       'fc:frame': JSON.stringify(embed),
     },
