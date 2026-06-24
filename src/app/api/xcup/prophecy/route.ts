@@ -924,7 +924,7 @@ export async function POST(req: NextRequest) {
           const finalResponse = await client.responses.create({
             model,
             reasoning: {
-              effort: 'low',
+              effort: 'medium',
             },
             text: {
               format: FINAL_PROPHECY_TEXT_FORMAT,
